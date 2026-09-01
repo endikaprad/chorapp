@@ -1,0 +1,15 @@
+{
+  "name": "chorapp",
+  "version": "0.1.0",
+  "description": "ChorApp — app de estudio para el coro Bihotsak (regalo para Maite)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "build": "node scripts/build.js",
+    "sync": "npm run build && npx cap sync",
+    "android": "npm run build && npx cap sync android && npx cap open android"
+  },
+  "keywords": ["coro", "bihotsak", "capacitor", "pwa"],
+  "license": "UNLICENSED"
+}

@@ -1,0 +1,21 @@
+# Dependencias
+node_modules/
+
+# Build web (generada desde src/)
+www/
+
+# Capacitor / Android
+android/
+.gradle/
+*.keystore
+!debug.keystore
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+npm-debug.log*
+*.log
