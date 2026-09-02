@@ -36,10 +36,14 @@ window.Reproductor = (function () {
     var web = ('mediaSession' in navigator) ? navigator.mediaSession : null;
     if (!nativo && !web) return function () {};
 
+    // OJO: @jofr/capacitor-media-session peta con NullPointerException si se
+    // llama a setMetadata SIN la clave `artwork` (hace artwork.toList() sin
+    // comprobar null → cierra la app entera). Siempre debe ir, aunque vacío.
     var metadatos = {
       title: meta.titulo || 'Canción',
       artist: meta.compositor || 'Coro Bihotsak',
       album: 'ChorApp',
+      artwork: [],
     };
 
     var manejadores = {
@@ -53,12 +57,24 @@ window.Reproductor = (function () {
     };
     var acis = Object.keys(manejadores);
 
-    if (nativo) {
-      nativo.setMetadata(metadatos);
-      acis.forEach(function (a) {
-        nativo.setActionHandler({ action: a }, manejadores[a]);
-      });
-    } else {
+    // --- Plugin nativo (@jofr/capacitor-media-session) ---
+    // No tocamos el plugin hasta la 1ª reproducción real: así su servicio en
+    // primer plano (tipo "mediaPlayback") solo arranca cuando de verdad suena
+    // algo, que es lo que Android espera.
+    var nativoListo = false;
+
+    function initNativo() {
+      if (nativoListo || !nativo) return;
+      nativoListo = true;
+      try {
+        nativo.setMetadata(metadatos);
+        acis.forEach(function (a) {
+          try { nativo.setActionHandler({ action: a }, manejadores[a]); } catch (e) {}
+        });
+      } catch (e) { nativoListo = false; }
+    }
+
+    if (!nativo && web) {
       try {
         web.metadata = new window.MediaMetadata(metadatos);
       } catch (e) {}
@@ -78,8 +94,16 @@ window.Reproductor = (function () {
         };
       }
       if (nativo) {
-        nativo.setPlaybackState({ playbackState: sonando ? 'playing' : 'paused' });
-        if (pos) nativo.setPositionState(pos);
+        // Hasta la 1ª reproducción no despertamos el servicio nativo.
+        if (!nativoListo) {
+          if (!sonando) return;
+          initNativo();
+          if (!nativoListo) return;
+        }
+        try {
+          nativo.setPlaybackState({ playbackState: sonando ? 'playing' : 'paused' });
+          if (pos) nativo.setPositionState(pos);
+        } catch (e) {}
       } else {
         web.playbackState = sonando ? 'playing' : 'paused';
         try { if (pos) web.setPositionState(pos); } catch (e) {}
@@ -96,7 +120,8 @@ window.Reproductor = (function () {
       audio.removeEventListener('timeupdate', sincronizar);
       audio.removeEventListener('loadedmetadata', sincronizar);
       if (nativo) {
-        nativo.setPlaybackState({ playbackState: 'none' });
+        if (!nativoListo) return;
+        try { nativo.setPlaybackState({ playbackState: 'none' }); } catch (e) {}
         acis.forEach(function (a) {
           try { nativo.setActionHandler({ action: a }, null); } catch (e) {}
         });

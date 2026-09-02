@@ -8,6 +8,10 @@ window.Pagina_recordings = (function () {
 
   var raiz, selCancion, btnRec, btnRecTxt, aviso, lista, vacio;
   var grabadora = null, crono = null, urls = [];
+  // Si al empezar a grabar hay una canción de la app sonando, guardamos
+  // cuál es y en qué segundo iba: así la toma se sincroniza con la pista
+  // original igual que en el modo estudio.
+  var recCancion = null, recOffset = null;
   var obs = null, vacioP = null, vacioTxt = '';
 
   // La voz grabada llega con un pequeño retardo (latencia del micro), así que
@@ -80,8 +84,23 @@ window.Pagina_recordings = (function () {
   }
 
   function empezar() {
+    recCancion = null;
+    recOffset = null;
+
     grabadora = window.Grabadora.crear();
     grabadora.iniciar().then(function () {
+      // ¿Hay una canción de la app sonando ahora mismo? Si es así, la
+      // detectamos y anotamos el segundo por el que va, para sincronizar.
+      if (window.CancionActiva && window.CancionActiva.reproduciendo &&
+          window.CancionActiva.hayCancion()) {
+        var cAct = window.Canciones
+          ? window.Canciones.obtener(window.CancionActiva.cancionId()) : null;
+        if (cAct && cAct.archivos && cAct.archivos.audio) {
+          recCancion = cAct;
+          recOffset = Math.max(0, (window.CancionActiva.estado().actual) || 0);
+        }
+      }
+
       var t0 = Date.now();
       raiz.classList.add('is-grabando');
       btnRec.classList.add('is-grabando');
@@ -111,14 +130,19 @@ window.Pagina_recordings = (function () {
       btnRecTxt.textContent = 'Empezar a grabar';
       if (!blob || !blob.size) return;
 
-      var id = selCancion.value;
-      var c = id && window.Canciones ? window.Canciones.obtener(id) : null;
+      // La canción que sonaba durante la toma manda sobre el desplegable.
+      var c = recCancion;
+      if (!c) {
+        var id = selCancion.value;
+        c = id && window.Canciones ? window.Canciones.obtener(id) : null;
+      }
       return window.Grabaciones.crear({
         cancionId: c ? c.id : null,
         titulo: c ? c.titulo : 'Sin canción concreta',
         mime: blob.type,
         dur: Math.round(dur),
         picos: g.picos(),
+        audioOffset: recCancion ? recOffset : null,
       }, blob).then(pintarLista);
     });
   }
@@ -164,10 +188,12 @@ window.Pagina_recordings = (function () {
 
       // Comparación: debajo de tu grabación, la pista original de la canción.
       var cancion = g.cancionId && window.Canciones ? window.Canciones.obtener(g.cancionId) : null;
-      if (cancion && cancion.archivos && cancion.archivos.audio) {
-        var sincro = typeof g.audioOffset === 'number' && isFinite(g.audioOffset);
-
-        if (sincro) {
+      var sincro = typeof g.audioOffset === 'number' && isFinite(g.audioOffset);
+      // Solo mostramos la pista original si la toma se grabó CON la canción
+      // sonando (en modo estudio o aquí mismo). Si se grabó sin nada de fondo,
+      // aunque haya una canción asociada, no aparece la pista original.
+      if (cancion && cancion.archivos && cancion.archivos.audio && sincro) {
+        {
           // La toma se grabó con la canción de fondo: la pista original suena
           // a la vez y SOLO el trozo que Maite grabó (de audioOffset a
           // audioOffset + duración de la toma). La gobierna su reproductor.
@@ -227,20 +253,6 @@ window.Pagina_recordings = (function () {
           sincronizar(audio, audioRef, offset, trozo,
             ref.querySelector('[data-relleno]'), ref.querySelector('[data-t]'),
             function () { return modo === 'mix'; });
-        } else {
-          // La toma se grabó sin canción de fondo: pista original completa,
-          // como reproductor aparte para comparar.
-          var refC = document.createElement('div');
-          refC.className = 'grabacion__ref';
-          refC.innerHTML =
-            '<span class="grabacion__ref-etiqueta">Pista original</span>' +
-            '<div class="grabacion__fila">' + window.MiniPlayer.plantilla() + '</div>';
-          var audioC = refC.querySelector('audio');
-          window.MiniPlayer.montar(refC.querySelector('[data-mp]'), 0);
-          window.Archivos.url(cancion.id + ':audio').then(function (u) {
-            if (u) { urls.push(u); audioC.src = u; }
-          });
-          fila.appendChild(refC);
         }
       }
       fila.querySelector('.ficha__quitar').addEventListener('click', function () {

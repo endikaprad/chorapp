@@ -102,34 +102,34 @@ cp keystore.properties.ejemplo keystore.properties
 Edita `keystore.properties` con tus contraseñas reales. Ese archivo está en
 `.gitignore`, nunca se sube.
 
-### 3. Compilar (cada versión)
+### 3. Compilar (cada versión) — un solo comando
 
 ```bash
-npm run sync                        # build web + cap sync
-cd android
-./gradlew assembleRelease           # en Windows: .\gradlew assembleRelease
+npm run release            # 1.3 -> 1.4 (sube el último número)
+npm run release 2.0        # fija versionName = 2.0
+npm run release -- --code  # solo sube versionCode, deja el nombre
 ```
 
-APK firmado en:
-```
-android/app/build/outputs/apk/release/app-release.apk
-```
+Hace todo: sube `versionCode` (+1) y `versionName` en `android/app/build.gradle`,
+`npm run sync`, `gradlew assembleRelease`, y copia el resultado a
+**`ChorApp-<versión>.apk`** en la raíz. Si `ANDROID_HOME` / `JAVA_HOME` no
+están definidos, prueba rutas habituales de Windows.
 
-Si `gradlew` se queja del SDK, define `ANDROID_HOME` (ver arriba). También
-puedes hacer este paso desde Android Studio: `Build > Build APK(s)` — ya
-firmará en release porque el `signingConfig` está en `app/build.gradle`.
+<details><summary>A mano, si hiciera falta</summary>
+
+```bash
+# subir versionCode y versionName en android/app/build.gradle
+npm run sync
+cd android && ./gradlew assembleRelease      # Windows: .\gradlew.bat assembleRelease
+# APK en android/app/build/outputs/apk/release/app-release.apk
+```
+</details>
 
 ### 4. Instalar en el móvil
 
 Pasa el `.apk` al teléfono (cable, Drive, Telegram…). En el móvil: activar
-"Instalar apps desconocidas" para esa app y tocar el archivo.
-
-### Publicar una actualización
-
-1. Cambia el código.
-2. En `android/app/build.gradle` sube `versionCode` (2, 3, 4…) y
-   `versionName` ("1.1", "1.2"…).
-3. Repite el paso 3 y reinstala el APK encima (conserva los datos).
+"Instalar apps desconocidas" para esa app y tocar el archivo. Se instala
+encima de la versión anterior y **conserva todos los datos** (mismo keystore).
 
 > `android/` está en `.gitignore`: si algún día rehaces `npx cap add android`,
 > vuelve a aplicar el bloque `signingConfigs` de `app/build.gradle` (está más
