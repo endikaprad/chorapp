@@ -12,6 +12,10 @@ npm install --legacy-peer-deps      # (--legacy-peer-deps: el plugin media aún 
 npm run dev                          # http://localhost:5173  (probar en móvil 375–430px)
 ```
 
+> `@capacitor-community/media` se quitó: su versión 7.0.1 no compila contra
+> Capacitor 7 (`PluginCall.success()` ya no existe) y la app no lo necesita
+> (archivos por IndexedDB en `archivos.js`, grabación por `MediaRecorder`).
+
 Variable necesaria para compilar Android (una vez):
 
 ```powershell
