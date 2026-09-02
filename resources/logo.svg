@@ -1,0 +1,27 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- ChorApp · coro Bihotsak
+       Interpretación del logo: un corazón trazado de un solo gesto que
+       baja hasta rizarse en una espiral de clave de sol; dos puntos
+       (guiño a la clave de fa) lo acompañan. Cobalto Bihotsak. -->
+  <g fill="none" stroke="#1512D6" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Corazón + bajada central -->
+    <path d="M256 168
+             C 232 112, 178 92, 138 118
+             C 92 148, 88 214, 128 262
+             L 256 398
+             L 300 354" />
+    <!-- Tercio derecho del corazón -->
+    <path d="M256 168
+             C 280 112, 334 92, 374 118
+             C 420 148, 424 214, 384 262
+             L 330 316" />
+    <!-- Espiral de clave de sol en el pie -->
+    <path d="M300 354
+             C 344 330, 356 388, 322 408
+             C 292 426, 262 402, 274 366
+             C 282 344, 312 340, 322 362" />
+  </g>
+  <!-- Puntos de la clave de fa -->
+  <circle cx="410" cy="150" r="17" fill="#1512D6" />
+  <circle cx="410" cy="206" r="17" fill="#1512D6" />
+</svg>
