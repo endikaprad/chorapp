@@ -10,6 +10,21 @@
     "sync": "npm run build && npx cap sync",
     "android": "npm run build && npx cap sync android && npx cap open android"
   },
-  "keywords": ["coro", "bihotsak", "capacitor", "pwa"],
-  "license": "UNLICENSED"
+  "keywords": [
+    "coro",
+    "bihotsak",
+    "capacitor",
+    "pwa"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@capacitor-community/media": "^7.0.0",
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/preferences": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  }
 }

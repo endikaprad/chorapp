@@ -1,0 +1,9 @@
+{
+  "appId": "com.chorapp.mama",
+  "appName": "ChorApp",
+  "webDir": "www",
+  "backgroundColor": "#FBF8F3",
+  "android": {
+    "allowMixedContent": false
+  }
+}
