@@ -1,5 +1,61 @@
-<!-- Canciones — biblioteca del repertorio (se completa en la Fase 3) -->
-<div class="vacio">
-  <span class="vacio__icono" aria-hidden="true">🎵</span>
-  <p>Añade tu primera canción para empezar</p>
+<!-- Canciones — biblioteca del repertorio (Fase 3) -->
+<div class="canciones" data-modulo="songs">
+
+  <!-- Buscador (oculto mientras no haya canciones) -->
+  <label class="buscador" hidden data-buscador>
+    <svg class="buscador__lupa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+    </svg>
+    <input type="search" placeholder="Buscar por título o compositor" aria-label="Buscar canción" data-input-buscar />
+  </label>
+
+  <!-- Aquí se pinta la lista o el estado vacío -->
+  <div data-contenido></div>
+
+  <!-- Botón flotante para añadir -->
+  <button class="fab" type="button" aria-label="Añadir canción" data-nueva>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
+  </button>
+
+  <!-- Formulario de alta / edición -->
+  <div class="hoja" hidden data-hoja>
+    <div class="hoja__fondo" data-cerrar></div>
+    <form class="hoja__panel" data-form novalidate>
+      <div class="hoja__asa" aria-hidden="true"></div>
+      <h2 class="hoja__titulo" data-form-titulo>Nueva canción</h2>
+
+      <label class="campo">
+        <span class="campo__label">Título</span>
+        <input name="titulo" type="text" required maxlength="120" autocomplete="off" />
+      </label>
+
+      <label class="campo">
+        <span class="campo__label">Compositor <span class="campo__opcional">(opcional)</span></span>
+        <input name="compositor" type="text" maxlength="120" autocomplete="off" />
+      </label>
+
+      <fieldset class="campo">
+        <legend class="campo__label">Estado</legend>
+        <div class="segmentado" role="radiogroup">
+          <label><input type="radio" name="estado" value="pendiente" checked /><span>Pendiente</span></label>
+          <label><input type="radio" name="estado" value="progreso" /><span>En progreso</span></label>
+          <label><input type="radio" name="estado" value="aprendida" /><span>Aprendida</span></label>
+        </div>
+      </fieldset>
+
+      <label class="campo">
+        <span class="campo__label">Notas <span class="campo__opcional">(opcional)</span></span>
+        <textarea name="notas" rows="3" maxlength="2000" placeholder="Lo que quieras recordar de esta canción"></textarea>
+      </label>
+
+      <div class="hoja__acciones">
+        <button type="button" class="btn btn--fantasma" data-borrar hidden>Eliminar</button>
+        <button type="button" class="btn btn--texto" data-cerrar>Cancelar</button>
+        <button type="submit" class="btn btn--primario">Guardar</button>
+      </div>
+    </form>
+  </div>
+
 </div>

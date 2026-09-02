@@ -1,29 +1,31 @@
 <!-- Inicio — bienvenida y punto de partida del estudio -->
-<p class="subsaludo">
-  Tu rincón para estudiar las canciones del coro <strong>Bihotsak</strong> a tu ritmo.
-</p>
+<div data-modulo="home">
+  <p class="subsaludo">
+    Tu rincón para estudiar las canciones del coro <strong>Bihotsak</strong> a tu ritmo.
+  </p>
 
-<button class="tarjeta tarjeta--destacada" type="button" disabled>
-  <span class="tarjeta__icono" aria-hidden="true">▶</span>
-  <span class="tarjeta__cuerpo">
-    <span class="tarjeta__eyebrow">Seguir estudiando</span>
-    <span class="tarjeta__titulo">Aún no hay ninguna canción</span>
-  </span>
-</button>
+  <button class="tarjeta tarjeta--destacada" type="button" data-continuar disabled>
+    <span class="tarjeta__icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg></span>
+    <span class="tarjeta__cuerpo">
+      <span class="tarjeta__eyebrow" data-continuar-eyebrow>Seguir estudiando</span>
+      <span class="tarjeta__titulo" data-continuar-titulo>Aún no hay ninguna canción</span>
+    </span>
+  </button>
 
-<h2 class="seccion-titulo">Esta semana</h2>
-<div class="racha stagger">
-  <div class="racha__dato">
-    <span class="racha__num">0</span>
-    <span class="racha__label">días seguidos</span>
+  <h2 class="seccion-titulo">Esta semana</h2>
+  <div class="racha stagger">
+    <div class="racha__dato">
+      <span class="racha__num">0</span>
+      <span class="racha__label">días seguidos</span>
+    </div>
+    <div class="racha__dato">
+      <span class="racha__num" data-num-canciones>0</span>
+      <span class="racha__label">canciones en tu repertorio</span>
+    </div>
   </div>
-  <div class="racha__dato">
-    <span class="racha__num">0</span>
-    <span class="racha__label">canciones practicadas</span>
-  </div>
-</div>
 
-<div class="vacio">
-  <span class="vacio__icono" aria-hidden="true">🎵</span>
-  <p>Añade tu primera canción para empezar</p>
+  <div class="vacio" data-vacio>
+    <span class="vacio__icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+    <p>Ve a <strong>Canciones</strong> y toca <strong>+</strong> para añadir tu primera canción.</p>
+  </div>
 </div>

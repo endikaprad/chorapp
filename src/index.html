@@ -9,15 +9,24 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
+  <!-- Fondo animado cálido con auroras cobalto (decorativo) -->
+  <div class="fondo-animado" aria-hidden="true">
+    <span class="fondo-lineas"></span>
+    <span class="fondo-blob fondo-blob--1"></span>
+    <span class="fondo-blob fondo-blob--2"></span>
+    <span class="fondo-blob fondo-blob--3"></span>
+    <span class="fondo-grano"></span>
+  </div>
+
   <!-- Cabecera contextual (saludo en Inicio, título + atrás en el resto) -->
   <header id="app-header" class="app-header">
     <button id="btn-atras" class="header-back" aria-label="Volver" hidden>‹</button>
-    <h1 id="header-titulo" class="header-titulo">Hola, Maite <span class="emoji" aria-hidden="true">🎶</span></h1>
+    <h1 id="header-titulo" class="header-titulo">Hola, Maite <span class="emoji" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span></h1>
   </header>
 
   <!-- Contenedor donde se renderiza cada pantalla -->
@@ -26,28 +35,39 @@
   <!-- Navegación inferior -->
   <nav id="bottom-nav" class="bottom-nav" aria-label="Navegación principal">
     <button class="nav-item is-activa" data-ruta="inicio" aria-current="page">
-      <span class="nav-icono" aria-hidden="true">🏠</span>
+      <svg class="nav-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/>
+      </svg>
       <span class="nav-texto">Inicio</span>
     </button>
     <button class="nav-item" data-ruta="canciones">
-      <span class="nav-icono" aria-hidden="true">🎵</span>
+      <svg class="nav-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+      </svg>
       <span class="nav-texto">Canciones</span>
     </button>
     <button class="nav-item" data-ruta="practica">
-      <span class="nav-icono" aria-hidden="true">📅</span>
+      <svg class="nav-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18"/><path d="M8 2.5v4M16 2.5v4"/><path d="M8.5 14h1.5M14 14h1.5M8.5 17.5h1.5M14 17.5h1.5"/>
+      </svg>
       <span class="nav-texto">Práctica</span>
     </button>
     <button class="nav-item" data-ruta="grabaciones">
-      <span class="nav-icono" aria-hidden="true">🎙️</span>
+      <svg class="nav-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21M8.5 21h7"/>
+      </svg>
       <span class="nav-texto">Grabaciones</span>
     </button>
     <span id="nav-indicador" class="nav-indicador" aria-hidden="true"></span>
   </nav>
 
   <script src="js/storage.js"></script>
+  <script src="js/canciones.js"></script>
   <script src="js/player.js"></script>
   <script src="js/recorder.js"></script>
   <script src="js/calendar.js"></script>
+  <script src="js/pages/songs.js"></script>
+  <script src="js/pages/home.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

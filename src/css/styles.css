@@ -20,8 +20,8 @@
   --estado-pendiente: #9A9490;
 
   /* --- Tipografía --- */
-  --fuente-titulo: 'Fraunces', Georgia, 'Times New Roman', serif;
-  --fuente-texto: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --fuente-titulo: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --fuente-texto: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
   /* --- Movimiento --- */
   --curva: cubic-bezier(0.4, 0, 0.2, 1);
@@ -47,7 +47,7 @@ body {
   margin: 0 auto;
   position: relative;
   overflow-x: hidden;
-  background: var(--color-fondo);
+  background: transparent;          /* deja ver el fondo animado */
   color: var(--color-texto);
   font-family: var(--fuente-texto);
   font-size: 17px;                 /* generoso: la usuaria no es joven */
@@ -58,8 +58,9 @@ body {
 
 h1, h2, h3 {
   font-family: var(--fuente-titulo);
-  font-weight: 600;
-  line-height: 1.25;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 button {
@@ -74,6 +75,105 @@ button {
 [hidden] { display: none !important; }
 
 /* ============================================================
+   Fondo animado — auroras cobalto + pentagrama a la deriva
+   sobre papel crema con grano fino.
+   Fijo detrás de todo. Solo anima transform y opacity (60fps).
+   Todo es muy tenue: el contenido vive en tarjetas blancas,
+   así que las letras siempre se leen con holgura.
+   ============================================================ */
+.fondo-animado {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  /* Papel crema con esquinas ligeramente teñidas de cobalto */
+  background:
+    radial-gradient(120% 80% at 12% 0%,
+      color-mix(in srgb, var(--color-acento-suave) 85%, var(--color-fondo)) 0%,
+      transparent 55%),
+    radial-gradient(120% 80% at 92% 100%,
+      color-mix(in srgb, var(--color-acento-suave) 65%, var(--color-fondo)) 0%,
+      transparent 55%),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--color-acento-suave) 30%, var(--color-fondo)) 0%,
+      var(--color-fondo) 50%,
+      color-mix(in srgb, var(--color-acento-suave) 22%, var(--color-fondo)) 100%);
+}
+
+/* Halos cobalto grandes y muy difusos que se desplazan despacio */
+.fondo-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(72px);
+  will-change: transform;
+  opacity: 0.9;
+}
+.fondo-blob--1 {
+  width: 90vw; height: 90vw; max-width: 460px; max-height: 460px;
+  top: -24%; left: -32%;
+  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-acento) 30%, transparent), transparent 70%);
+  animation: fondo-flota-1 34s ease-in-out infinite alternate;
+}
+.fondo-blob--2 {
+  width: 85vw; height: 85vw; max-width: 420px; max-height: 420px;
+  bottom: -26%; right: -30%;
+  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-acento-oscuro) 26%, transparent), transparent 70%);
+  animation: fondo-flota-2 40s ease-in-out infinite alternate;
+}
+.fondo-blob--3 {
+  display: block;
+  width: 70vw; height: 70vw; max-width: 340px; max-height: 340px;
+  top: 34%; left: 45%;
+  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-acento) 16%, transparent), transparent 70%);
+  animation: fondo-flota-3 30s ease-in-out infinite alternate;
+}
+
+@keyframes fondo-flota-1 {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(8%, 6%, 0) scale(1.08); }
+}
+@keyframes fondo-flota-2 {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(-7%, -5%, 0) scale(1.1); }
+}
+@keyframes fondo-flota-3 {
+  0%   { transform: translate3d(-6%, 0, 0) scale(0.95); }
+  100% { transform: translate3d(6%, -4%, 0) scale(1.05); }
+}
+
+/* Pentagrama sutil: líneas horizontales finas que reptan muy despacio.
+   Cobalto a baja opacidad sobre el crema; nunca cruza texto porque
+   está detrás de las tarjetas. */
+.fondo-lineas {
+  position: absolute;
+  inset: -20% -10%;
+  background-image: repeating-linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--color-acento) 22%, transparent) 0 1px,
+    transparent 1px 26px
+  );
+  -webkit-mask-image: radial-gradient(120% 70% at 50% 20%, #000 0%, transparent 75%);
+          mask-image: radial-gradient(120% 70% at 50% 20%, #000 0%, transparent 75%);
+  opacity: 0.5;
+  will-change: transform;
+  animation: fondo-lineas-deriva 60s linear infinite;
+}
+@keyframes fondo-lineas-deriva {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, -26px, 0); }
+}
+
+/* Grano fino de papel: da textura y mata el banding de los degradados */
+.fondo-grano {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.035;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+/* ============================================================
    Cabecera contextual
    ============================================================ */
 .app-header {
@@ -86,13 +186,17 @@ button {
   gap: 4px;
   padding: 0 18px;
   padding-top: env(safe-area-inset-top);
-  background: color-mix(in srgb, var(--color-fondo) 88%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid transparent;
-  transition: border-color var(--dur-micro) var(--curva);
+  /* Sin costura con el fondo: mismo crema translúcido, difuminado hacia abajo */
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-fondo) 82%, transparent) 0%,
+    color-mix(in srgb, var(--color-fondo) 55%, transparent) 70%,
+    transparent 100%
+  );
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
-.app-header.con-borde { border-bottom-color: var(--color-borde); }
+.app-header.con-borde { box-shadow: none; }
 
 .header-back {
   font-size: 30px;
@@ -106,9 +210,12 @@ button {
 .header-titulo { font-size: 22px; font-weight: 600; }
 .header-titulo .emoji {
   font-family: var(--fuente-texto);
-  display: inline-block;
+  display: inline-flex;
+  vertical-align: -3px;
+  color: var(--color-acento);
   animation: nota-flota 3.2s var(--curva) infinite;
 }
+.header-titulo .emoji svg { width: 22px; height: 21px; transform: translate(3px, 1px); }
 @keyframes nota-flota {
   0%, 100% { transform: translateY(0) rotate(-4deg); }
   50%      { transform: translateY(-4px) rotate(4deg); }
@@ -193,7 +300,8 @@ button {
   border-color: var(--color-acento);
   color: #fff;
 }
-.tarjeta__icono { font-size: 34px; flex-shrink: 0; }
+.tarjeta__icono { font-size: 34px; flex-shrink: 0; display: flex; }
+.tarjeta__icono svg { width: 30px; height: 30px; }
 .tarjeta__cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .tarjeta__eyebrow {
   font-size: 12px;
@@ -238,6 +346,7 @@ button {
   padding: 44px 20px;
 }
 .vacio__icono { font-size: 42px; opacity: 0.55; display: block; margin-bottom: 12px; }
+.vacio__icono svg { width: 42px; height: 42px; display: inline-block; }
 .vacio p { max-width: 30ch; margin: 0 auto; }
 
 /* ============================================================
@@ -271,8 +380,8 @@ button {
 .nav-item.is-activa { color: var(--color-acento); }
 
 .nav-icono {
-  font-size: 22px;
-  line-height: 1;
+  width: 25px;
+  height: 25px;
   transition: transform var(--dur-micro) var(--curva);
 }
 .nav-item.is-activa .nav-icono { transform: scale(1.18) translateY(-1px); }
@@ -303,4 +412,229 @@ button {
   }
   .pantalla { animation: fundido-simple 120ms linear both; }
   @keyframes fundido-simple { from { opacity: 0; } to { opacity: 1; } }
+
+  /* El fondo mantiene una deriva mínima de opacidad, muy lenta:
+     compatible con "reducir movimiento". */
+  .fondo-blob {
+    animation-duration: 12s !important;
+    animation-iteration-count: infinite !important;
+    animation-name: fondo-latido !important;
+    animation-timing-function: ease-in-out !important;
+    animation-direction: alternate !important;
+    transform: none !important;
+  }
+  .fondo-blob--2 { animation-delay: -6s !important; }
+  .fondo-blob--3 { animation-delay: -3s !important; }
+  .fondo-lineas { animation: none !important; transform: none !important; }
+  @keyframes fondo-latido {
+    from { opacity: 0.55; }
+    to   { opacity: 1; }
+  }
+  .hoja__panel { transition: opacity 120ms linear !important; transform: none !important; }
 }
+
+/* ============================================================
+   Biblioteca de canciones (Fase 3)
+   ============================================================ */
+.canciones { position: relative; }
+
+/* Buscador */
+.buscador {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  padding: 0 14px;
+  margin-bottom: 16px;
+}
+.buscador__lupa { width: 20px; height: 20px; color: var(--color-texto-2); flex-shrink: 0; }
+.buscador input {
+  flex: 1;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--color-texto);
+  padding: 13px 0;
+  outline: none;
+}
+.buscador input::placeholder { color: var(--color-texto-2); }
+
+/* Tarjeta de canción */
+.cancion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  padding: 15px 16px;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.cancion:active { transform: scale(0.97); }
+.cancion__cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cancion__titulo {
+  font-family: var(--fuente-titulo);
+  font-size: 17px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cancion__meta { font-size: 14px; color: var(--color-texto-2); }
+
+/* Chip de estado */
+.chip {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--color-acento-suave);
+  color: var(--color-texto-2);
+}
+.chip--pendiente { background: color-mix(in srgb, var(--estado-pendiente) 18%, var(--color-superficie)); color: var(--estado-pendiente); }
+.chip--progreso  { background: color-mix(in srgb, var(--estado-progreso) 18%, var(--color-superficie));  color: var(--estado-progreso); }
+.chip--aprendida { background: color-mix(in srgb, var(--estado-aprendida) 18%, var(--color-superficie)); color: var(--estado-aprendida); }
+
+.vacio--mini { padding: 28px 20px; }
+
+/* Botón flotante (+) */
+.fab {
+  position: fixed;
+  right: max(18px, calc(50% - 240px + 18px));
+  bottom: calc(var(--alto-nav) + env(safe-area-inset-bottom) + 16px);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-acento);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--color-acento) 40%, transparent);
+  transition: transform var(--dur-micro) var(--curva), background var(--dur-micro) var(--curva);
+  z-index: 25;
+}
+.fab svg { width: 26px; height: 26px; }
+.fab:active { transform: scale(0.9); background: var(--color-acento-oscuro); }
+
+/* ============================================================
+   Hoja inferior (formulario alta / edición)
+   ============================================================ */
+.hoja {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.hoja__fondo {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-texto) 45%, transparent);
+  opacity: 0;
+  transition: opacity var(--dur-pagina) var(--curva);
+}
+.hoja.is-abierta .hoja__fondo { opacity: 1; }
+
+.hoja__panel {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  background: var(--color-fondo);
+  border-radius: 22px 22px 0 0;
+  padding: 10px 20px calc(env(safe-area-inset-bottom) + 22px);
+  transform: translateY(100%);
+  transition: transform var(--dur-pagina) var(--curva);
+  max-height: 92vh;
+  overflow-y: auto;
+}
+.hoja.is-abierta .hoja__panel { transform: translateY(0); }
+
+.hoja__asa {
+  width: 38px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-borde);
+  margin: 4px auto 14px;
+}
+.hoja__titulo { font-size: 20px; margin-bottom: 18px; }
+
+.campo {
+  display: block;
+  border: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+.campo__label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-texto-2);
+  margin-bottom: 7px;
+}
+.campo__opcional { font-weight: 400; }
+.campo input[type="text"],
+.campo textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 12px;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color var(--dur-micro) var(--curva);
+}
+.campo input[type="text"]:focus,
+.campo textarea:focus { border-color: var(--color-acento); }
+.campo textarea { resize: vertical; min-height: 76px; }
+.campo--error { border-color: #b3261e !important; }
+
+/* Selector segmentado de estado */
+.segmentado { display: flex; gap: 6px; }
+.segmentado label { flex: 1; }
+.segmentado input { position: absolute; opacity: 0; pointer-events: none; }
+.segmentado span {
+  display: block;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 4px;
+  border: 1px solid var(--color-borde);
+  border-radius: 10px;
+  background: var(--color-superficie);
+  color: var(--color-texto-2);
+  transition: background var(--dur-micro) var(--curva), color var(--dur-micro) var(--curva), border-color var(--dur-micro) var(--curva);
+}
+.segmentado input:checked + span {
+  background: var(--color-acento-suave);
+  border-color: var(--color-acento);
+  color: var(--color-acento-oscuro);
+}
+.segmentado label:active span { transform: scale(0.97); }
+
+/* Botones de la hoja */
+.hoja__acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+}
+.btn {
+  font: inherit;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 12px 18px;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.btn:active { transform: scale(0.96); }
+.btn--primario { background: var(--color-acento); color: #fff; margin-left: auto; }
+.btn--texto { color: var(--color-texto-2); }
+.btn--fantasma { color: #b3261e; }
+

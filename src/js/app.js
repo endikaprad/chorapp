@@ -14,7 +14,7 @@
   //   titulo  : texto de la cabecera
   //   raiz    : true si es una pestaña del bottom nav (sin botón atrás)
   var PANTALLAS = {
-    inicio:      { archivo: 'home',       titulo: 'Hola, ' + NOMBRE_USUARIA + ' <span class="emoji" aria-hidden="true">🎶</span>', raiz: true },
+    inicio:      { archivo: 'home',       titulo: 'Hola, ' + NOMBRE_USUARIA + ' <span class="emoji" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>', raiz: true },
     canciones:   { archivo: 'songs',      titulo: 'Canciones',   raiz: true },
     practica:    { archivo: 'practice',   titulo: 'Práctica',    raiz: true },
     grabaciones: { archivo: 'recordings', titulo: 'Grabaciones', raiz: true },
