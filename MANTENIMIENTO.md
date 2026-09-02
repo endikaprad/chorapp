@@ -64,24 +64,72 @@ CSS; animar solo `transform` y `opacity`; respetar `prefers-reduced-motion`.
 
 ---
 
-## Generar el APK
-
-```bash
-npm run android      # build + cap sync + abre Android Studio
-```
-
-En Android Studio:
-
-- **APK de pruebas** (rápido, para instalar ya en el móvil de Maite):
-  `Build > Build APK(s)`. Instalar activando "Instalar apps desconocidas".
-- **APK firmado (release)** — Fase 9:
-  1. `Build > Generate Signed Bundle / APK > APK`.
-  2. *Create new…* keystore. **Guardar el archivo `.keystore` y sus
-     contraseñas en un lugar seguro** (sin él no se pueden publicar
-     actualizaciones que Android acepte como la misma app).
-  3. Variant `release`, firmar y generar.
+## Generar el APK firmado (release)
 
 `appId`: `com.chorapp.mama` · `appName`: `ChorApp` (ver `capacitor.config.json`).
+
+### 1. Crear el keystore — SOLO LA PRIMERA VEZ
+
+En la carpeta del proyecto (donde está `package.json`):
+
+```bash
+keytool -genkey -v -keystore chorapp.jks -alias chorapp \
+  -keyalg RSA -keysize 2048 -validity 10000
+```
+
+(`keytool` viene con el JDK. Si "no se reconoce", usa la ruta completa:
+`"C:\Program Files\Java\jdk-21\bin\keytool.exe"` o la que corresponda.)
+
+Te pedirá:
+- **Contraseña del keystore** → invéntala y **apúntala**.
+- Nombre, organización, etc. → puedes dejarlo casi todo en blanco (Enter).
+- **Contraseña de la clave** `chorapp` → Enter para usar la misma.
+
+Genera `chorapp.jks` en la carpeta. **Guarda ese archivo y las dos
+contraseñas en un sitio seguro** (gestor de contraseñas + copia en la nube).
+Sin ellos, Android no aceptará futuras actualizaciones como la misma app.
+
+### 2. Configurar las credenciales — SOLO LA PRIMERA VEZ
+
+```bash
+cp keystore.properties.ejemplo keystore.properties
+```
+
+Edita `keystore.properties` con tus contraseñas reales. Ese archivo está en
+`.gitignore`, nunca se sube.
+
+### 3. Compilar (cada versión)
+
+```bash
+npm run sync                        # build web + cap sync
+cd android
+./gradlew assembleRelease           # en Windows: .\gradlew assembleRelease
+```
+
+APK firmado en:
+```
+android/app/build/outputs/apk/release/app-release.apk
+```
+
+Si `gradlew` se queja del SDK, define `ANDROID_HOME` (ver arriba). También
+puedes hacer este paso desde Android Studio: `Build > Build APK(s)` — ya
+firmará en release porque el `signingConfig` está en `app/build.gradle`.
+
+### 4. Instalar en el móvil
+
+Pasa el `.apk` al teléfono (cable, Drive, Telegram…). En el móvil: activar
+"Instalar apps desconocidas" para esa app y tocar el archivo.
+
+### Publicar una actualización
+
+1. Cambia el código.
+2. En `android/app/build.gradle` sube `versionCode` (2, 3, 4…) y
+   `versionName` ("1.1", "1.2"…).
+3. Repite el paso 3 y reinstala el APK encima (conserva los datos).
+
+> `android/` está en `.gitignore`: si algún día rehaces `npx cap add android`,
+> vuelve a aplicar el bloque `signingConfigs` de `app/build.gradle` (está más
+> abajo en este archivo) y recrea `colors.xml` (ver sección del icono).
 
 ---
 
@@ -126,4 +174,40 @@ npx capacitor-assets generate --android \
 npm run sync        # build + cap sync
 ```
 
-Después, recompilar el APK en Android Studio.
+Después, recompilar el APK (paso 3 de "Generar el APK firmado").
+
+---
+
+## Apéndice: bloque de firma de `android/app/build.gradle`
+
+Si hay que rehacer la plataforma Android, vuelve a añadir esto (arriba del
+bloque `android { }` el primer trozo, y dentro de `android { }` el segundo):
+
+```gradle
+def keystorePropsFile = rootProject.file("../keystore.properties")
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropsFile))
+}
+```
+
+```gradle
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile rootProject.file("../" + keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            // ...lo que ya había...
+            if (keystorePropsFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+```

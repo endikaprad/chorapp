@@ -9,6 +9,8 @@ android/
 .gradle/
 *.keystore
 !debug.keystore
+*.jks
+keystore.properties
 
 # Sistema / editores
 .DS_Store
