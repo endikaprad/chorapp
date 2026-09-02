@@ -239,6 +239,10 @@ window.Pagina_songs = (function () {
     }
     form.titulo.classList.remove('campo--error');
 
+    var estadoPrevio = idEditando
+      ? (window.Canciones.obtener(idEditando) || {}).estado
+      : null;
+
     var cancion = idEditando
       ? window.Canciones.actualizar(idEditando, datos)
       : window.Canciones.crear(datos);
@@ -247,6 +251,7 @@ window.Pagina_songs = (function () {
       cerrarHoja();
       primeraCarga = false;
       pintarLista();
+      if (datos.estado === 'aprendida' && estadoPrevio !== 'aprendida') celebrar();
     });
   }
 
@@ -283,6 +288,20 @@ window.Pagina_songs = (function () {
   }
 
   /* ---------- Utilidades ---------- */
+
+  // Pequeña celebración al marcar una canción como "Aprendida".
+  function celebrar() {
+    var el = document.createElement('div');
+    el.className = 'celebra';
+    el.innerHTML =
+      '<div class="celebra__circulo">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="m5 13 4 4L19 7"/>' +
+        '</svg>' +
+      '</div>';
+    document.body.appendChild(el);
+    setTimeout(function () { el.remove(); }, 1000);
+  }
 
   function escapar(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {

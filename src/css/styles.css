@@ -196,7 +196,9 @@ button {
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
-.app-header.con-borde { box-shadow: none; }
+.app-header.con-borde {
+  box-shadow: 0 1px 0 var(--color-borde), 0 6px 16px -12px color-mix(in srgb, var(--color-texto) 40%, transparent);
+}
 
 .header-back {
   font-size: 30px;
@@ -678,7 +680,8 @@ button {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-texto-2);
-  padding: 6px 8px;
+  padding: 10px 8px;
+  min-height: 40px;
 }
 
 /* Icono de "tiene audio" en la tarjeta de canción */
@@ -855,8 +858,14 @@ button {
   font-size: 15px;
   line-height: 1;
   color: var(--color-texto-2);
-  padding: 2px 4px;
+  min-width: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--dur-micro) var(--curva);
 }
+.ficha__quitar:active { transform: scale(0.85); }
 
 /* Notas de voz */
 .nota-voz {
@@ -950,8 +959,8 @@ button {
 }
 .cal__mes { font-family: var(--fuente-titulo); font-weight: 700; font-size: 16px; }
 .cal__nav {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   font-size: 20px;
   color: var(--color-acento);
@@ -1107,4 +1116,72 @@ button {
 .grabacion__fecha { font-size: 12px; color: var(--color-texto-2); }
 .grabacion__fila { display: flex; align-items: center; gap: 10px; }
 .grabacion__fila audio { flex: 1; min-width: 0; height: 38px; }
+
+/* ============================================================
+   Pulido (Fase 8): skeleton con shimmer + celebración
+   ============================================================ */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-acento-suave);
+  border-radius: var(--radio);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-superficie) 70%, transparent),
+    transparent
+  );
+  animation: shimmer 1.3s var(--curva) infinite;
+}
+.skeleton--doc { height: 60vh; }
+.skeleton--img { height: 180px; }
+@keyframes shimmer { to { transform: translateX(100%); } }
+
+/* Celebración al marcar "Aprendida": check que se dibuja, sin confeti */
+.celebra {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.celebra__circulo {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--color-superficie);
+  box-shadow: 0 12px 40px -8px color-mix(in srgb, var(--estado-aprendida) 60%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: celebra-pop 900ms var(--curva) both;
+}
+.celebra__circulo svg { width: 48px; height: 48px; color: var(--estado-aprendida); }
+.celebra__circulo svg path {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: celebra-check 500ms var(--curva) 140ms forwards;
+}
+@keyframes celebra-pop {
+  0%   { opacity: 0; transform: scale(0.5); }
+  15%  { opacity: 1; transform: scale(1.06); }
+  70%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+@keyframes celebra-check { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; }
+  .celebra__circulo { animation: celebra-pop-simple 700ms linear both; }
+  .celebra__circulo svg path { animation: none; stroke-dashoffset: 0; }
+  @keyframes celebra-pop-simple { 0%,80% { opacity: 1; } 100% { opacity: 0; } }
+}
 
