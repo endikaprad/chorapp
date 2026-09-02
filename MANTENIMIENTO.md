@@ -87,18 +87,36 @@ En Android Studio:
 
 ## Icono y splash (Fase 9)
 
-Punto de partida en `resources/logo.svg` (interpretación del corazón de
-claves de Bihotsak en cobalto). Para generar los recursos nativos:
+Fuentes en `resources/` (el corazón de clave de sol + clave de fa de Bihotsak):
+
+| Archivo | Qué es |
+|---|---|
+| `icon.png` | 1024² — icono cuadrado heredado: símbolo crema sobre cobalto |
+| `icon-foreground.png` | 1024² con transparencia — capa delantera del icono adaptativo |
+| `icon-background.png` | 1024² — cobalto liso `#1512D6` (capa de fondo) |
+| `splash.png` / `splash-dark.png` | 2732² — símbolo cobalto centrado sobre crema |
+| `logo.svg` | boceto vectorial de referencia |
+
+Regenerar los recursos nativos (tras cambiar cualquier PNG):
 
 ```bash
-npm i -D @capacitor/assets --legacy-peer-deps
-# resources/icon.png  -> 1024x1024   (corazón sobre cobalto o crema)
-# resources/splash.png -> 2732x2732  (logo centrado sobre crema #FBF8F3)
-npx capacitor-assets generate --android
+npm i -D @capacitor/assets --legacy-peer-deps      # solo la primera vez
+npx capacitor-assets generate --android \
+  --iconBackgroundColor "#1512D6" --iconBackgroundColorDark "#1512D6" \
+  --splashBackgroundColor "#F8F5EC" --splashBackgroundColorDark "#F8F5EC"
 ```
 
-Si se cambia el arte, basta con reemplazar `resources/icon.png` /
-`resources/splash.png` y volver a lanzar ese comando.
+**Después, dos retoques manuales en `android/`** (se pierden si se rehace
+`npx cap add android`, no si solo se hace `cap sync`):
+
+1. `android/app/src/main/res/values/colors.xml` — crear si falta:
+   `colorPrimary #1512D6`, `colorPrimaryDark #0E0B9E`, `colorAccent #1512D6`.
+2. `android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml` y
+   `ic_launcher_round.xml` — poner el fondo como color sin `inset`:
+   ```xml
+   <background android:drawable="@color/ic_launcher_background" />
+   ```
+   y en `values/ic_launcher_background.xml` el color `#1512D6`.
 
 ---
 
