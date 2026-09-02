@@ -1,5 +1,86 @@
-<!-- Modo estudio — pantalla principal de cada canción (se completa en la Fase 5) -->
-<p class="subsaludo">
-  Aquí podrás reproducir el audio, ver la letra y la partitura, marcar
-  fragmentos difíciles y grabar notas de voz mientras estudias.
-</p>
+<!-- Modo estudio — pantalla principal de cada canción (Fase 5) -->
+<div class="estudio" data-modulo="study">
+
+  <!-- Cabecera de la canción -->
+  <div class="estudio__cab">
+    <div class="estudio__id">
+      <h2 class="estudio__titulo" data-titulo>—</h2>
+      <p class="estudio__meta" data-meta hidden></p>
+    </div>
+    <span class="chip" data-chip>—</span>
+    <button class="estudio__editar" type="button" aria-label="Editar canción" data-editar>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Reproductor de audio -->
+  <section class="player" data-player hidden>
+    <input class="player__barra" type="range" min="0" max="1000" value="0"
+           step="1" aria-label="Posición del audio" data-barra />
+    <div class="player__tiempos">
+      <span data-t-actual>0:00</span>
+      <span data-t-total>0:00</span>
+    </div>
+    <div class="player__controles">
+      <button class="player__btn" type="button" aria-label="Retroceder 5 segundos" data-retro>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M11 4 4 11l7 7"/><path d="M4 11h10a6 6 0 0 1 0 12h-3"/>
+        </svg>
+        <span>5s</span>
+      </button>
+      <button class="player__play" type="button" aria-label="Reproducir" data-play>
+        <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg>
+        <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>
+      </button>
+      <button class="player__btn player__vel" type="button" aria-label="Velocidad de reproducción" data-vel>1×</button>
+    </div>
+    <audio data-audio preload="metadata"></audio>
+  </section>
+
+  <!-- Letra -->
+  <h3 class="seccion-titulo">Letra</h3>
+  <div class="visor-letra" data-letra>
+    <p class="visor-vacio" data-letra-vacio>Aún no hay letra. Añádela desde <strong>✎ Editar</strong>.</p>
+    <pre class="visor-letra__texto" data-letra-texto hidden></pre>
+    <div class="visor-doc" data-letra-doc hidden></div>
+  </div>
+
+  <!-- Partitura -->
+  <h3 class="seccion-titulo">Partitura</h3>
+  <div class="visor-partitura" data-partitura>
+    <p class="visor-vacio" data-partitura-vacio>Aún no hay partitura. Añádela desde <strong>✎ Editar</strong>.</p>
+    <button class="visor-partitura__img" type="button" data-partitura-img hidden aria-label="Ampliar partitura">
+      <img alt="Partitura" data-partitura-src />
+    </button>
+    <div class="visor-doc" data-partitura-doc hidden></div>
+  </div>
+
+  <!-- Fragmentos difíciles -->
+  <h3 class="seccion-titulo">Fragmentos difíciles</h3>
+  <div class="fragmentos" data-fragmentos></div>
+  <button class="btn-bloque" type="button" data-marcar>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
+    Marcar fragmento difícil
+  </button>
+
+  <!-- Notas de voz -->
+  <h3 class="seccion-titulo">Notas de voz</h3>
+  <div class="notas-voz" data-notas-voz></div>
+  <button class="btn-bloque" type="button" data-grabar-nota>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21M8.5 21h7"/>
+    </svg>
+    <span data-grabar-nota-txt>Grabar nota de voz</span>
+  </button>
+
+  <!-- Visor a pantalla completa (partitura ampliada) -->
+  <div class="lightbox" data-lightbox hidden>
+    <button class="lightbox__cerrar" type="button" aria-label="Cerrar" data-lightbox-cerrar>✕</button>
+    <img alt="Partitura ampliada" data-lightbox-src />
+  </div>
+
+</div>

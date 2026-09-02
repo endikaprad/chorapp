@@ -638,3 +638,297 @@ button {
 .btn--texto { color: var(--color-texto-2); }
 .btn--fantasma { color: #b3261e; }
 
+/* ============================================================
+   Importar archivos en la hoja de edición (Fase 4)
+   ============================================================ */
+.archivo-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+.archivo-fila__ic { width: 20px; height: 20px; color: var(--color-texto-2); flex-shrink: 0; }
+.archivo-fila--con-archivo .archivo-fila__ic { color: var(--color-acento); }
+.archivo-fila__txt {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--color-texto-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.archivo-fila--con-archivo .archivo-fila__txt { color: var(--color-texto); font-weight: 600; }
+.archivo-fila__accion {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-acento);
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--color-acento-suave);
+  cursor: pointer;
+}
+.archivo-fila__quitar {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-texto-2);
+  padding: 6px 8px;
+}
+
+/* Icono de "tiene audio" en la tarjeta de canción */
+.cancion__audio { flex-shrink: 0; color: var(--color-acento); display: flex; }
+.cancion__audio svg { width: 15px; height: 15px; }
+
+/* ============================================================
+   Modo estudio (Fase 5)
+   ============================================================ */
+.estudio__cab {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.estudio__id { flex: 1; min-width: 0; }
+.estudio__titulo { font-size: 23px; }
+.estudio__meta { color: var(--color-texto-2); font-size: 15px; margin-top: 2px; }
+.estudio__editar {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--color-acento-suave);
+  color: var(--color-acento);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.estudio__editar svg { width: 19px; height: 19px; }
+.estudio__editar:active { transform: scale(0.9); }
+.estudio__cab .chip { align-self: center; }
+
+/* Reproductor */
+.player {
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  padding: 16px;
+}
+.player__barra {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-acento-suave);
+  outline: none;
+}
+.player__barra::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-acento);
+  cursor: pointer;
+}
+.player__barra::-moz-range-thumb {
+  width: 18px; height: 18px; border: none;
+  border-radius: 50%; background: var(--color-acento); cursor: pointer;
+}
+.player__tiempos {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-texto-2);
+  margin-top: 6px;
+}
+.player__controles {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 10px;
+}
+.player__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-texto-2);
+  min-width: 48px;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.player__btn svg { width: 26px; height: 26px; }
+.player__btn:active { transform: scale(0.9); }
+.player__vel {
+  font-size: 15px;
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: var(--color-acento);
+}
+.player__play {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--color-acento);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--color-acento) 38%, transparent);
+  transition: transform var(--dur-micro) var(--curva);
+}
+.player__play svg { width: 26px; height: 26px; }
+.player__play:active { transform: scale(0.92); }
+.player__play.is-sonando { animation: player-pulso 2s var(--curva) infinite; }
+@keyframes player-pulso {
+  0%, 100% { box-shadow: 0 8px 22px color-mix(in srgb, var(--color-acento) 38%, transparent); }
+  50%      { box-shadow: 0 8px 30px color-mix(in srgb, var(--color-acento) 55%, transparent); }
+}
+
+/* Visores de letra / partitura */
+.visor-vacio {
+  color: var(--color-texto-2);
+  font-size: 14px;
+  padding: 4px 2px;
+}
+.visor-letra__texto {
+  font-family: var(--fuente-texto);
+  font-size: 16px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  padding: 16px;
+}
+.visor-doc object {
+  width: 100%;
+  height: 60vh;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  background: var(--color-superficie);
+}
+.visor-doc__abrir {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-acento);
+}
+.visor-partitura__img {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  overflow: hidden;
+  background: var(--color-superficie);
+  padding: 0;
+}
+.visor-partitura__img img { display: block; width: 100%; }
+
+/* Fichas de fragmentos difíciles */
+.ficha {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--color-acento-suave);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.ficha__texto { flex: 1; font-size: 15px; word-break: break-word; }
+.ficha__quitar {
+  flex-shrink: 0;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--color-texto-2);
+  padding: 2px 4px;
+}
+
+/* Notas de voz */
+.nota-voz {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.nota-voz__fecha { font-size: 12px; color: var(--color-texto-2); flex-shrink: 0; }
+.nota-voz audio { flex: 1; min-width: 0; height: 36px; }
+
+/* Botón de acción a lo ancho (marcar fragmento / grabar nota) */
+.btn-bloque {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  font-weight: 600;
+  color: var(--color-acento);
+  background: var(--color-superficie);
+  border: 1px dashed var(--color-acento);
+  border-radius: 12px;
+  padding: 13px;
+  margin-top: 4px;
+  transition: transform var(--dur-micro) var(--curva), background var(--dur-micro) var(--curva);
+}
+.btn-bloque svg { width: 19px; height: 19px; }
+.btn-bloque:active { transform: scale(0.98); }
+.btn-bloque.is-grabando {
+  color: #b3261e;
+  border-color: #b3261e;
+  border-style: solid;
+  background: color-mix(in srgb, #b3261e 8%, var(--color-superficie));
+  animation: grabando-late 1.4s ease-in-out infinite;
+}
+@keyframes grabando-late {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.7; }
+}
+
+/* Lightbox de partitura ampliada */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--color-texto) 82%, transparent);
+  animation: fundido 160ms var(--curva) both;
+}
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.lightbox__cerrar {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 12px);
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 18px;
+}
+

@@ -1,24 +1,27 @@
 /* ============================================================
-   Pagina_songs — Biblioteca de canciones (Fase 3)
+   Pagina_songs — Biblioteca de canciones (Fases 3 y 4)
    Lista + búsqueda + alta / edición / borrado.
-   app.js llama a iniciar(contenedor) al cargar pages/songs.html.
+   La hoja de edición incluye letra (texto) e importación de
+   archivos (audio, letra, partitura) a través de window.Archivos.
+   Al tocar una canción se abre el Modo estudio (Fase 5).
    ============================================================ */
 
 window.Pagina_songs = (function () {
   'use strict';
 
+  var TIPOS_ARCHIVO = ['audio', 'letra', 'partitura'];
+
   var raiz, contenido, buscador, inputBuscar, hoja, form, formTitulo, btnBorrar;
   var idEditando = null;   // null => alta; id => edición
   var filtro = '';
   var primeraCarga = true;
+  var pendienteEditar = null;   // id a editar tras navegar desde otra pantalla
+
+  // Cambios de archivo pendientes de guardar: { audio: File|null|'quitar', ... }
+  var archivosPendientes = {};
 
   function iniciar(contenedor) {
-    // Limpia restos de montajes anteriores (hoja / fab van al <body>,
-    // ver más abajo, y no se destruyen al cambiar de pantalla).
-    Array.prototype.forEach.call(
-      document.querySelectorAll('body > [data-hoja], body > [data-fab-songs]'),
-      function (el) { el.remove(); }
-    );
+    limpiarRestos();
 
     raiz = contenedor.querySelector('[data-modulo="songs"]');
     contenido = raiz.querySelector('[data-contenido]');
@@ -30,9 +33,8 @@ window.Pagina_songs = (function () {
     btnBorrar = raiz.querySelector('[data-borrar]');
 
     var fab = raiz.querySelector('[data-nueva]');
-    // .pantalla tiene una animación con transform: eso crea un bloque
-    // contenedor y rompe `position: fixed`. Movemos el FAB y la hoja
-    // al <body> para que se posicionen respecto al viewport.
+    // .pantalla se anima con transform y crea un bloque contenedor que
+    // rompe `position: fixed`. Movemos FAB y hoja al <body>.
     fab.setAttribute('data-fab-songs', '');
     document.body.appendChild(fab);
     document.body.appendChild(hoja);
@@ -41,8 +43,27 @@ window.Pagina_songs = (function () {
     btnBorrar.addEventListener('click', onBorrar);
     form.addEventListener('submit', onGuardar);
 
-    Array.prototype.forEach.call(raiz.querySelectorAll('[data-cerrar]'), function (el) {
+    // hoja ya se ha movido al <body>: hay que consultarla directamente,
+    // no a través de `raiz` (que ya no la contiene).
+    Array.prototype.forEach.call(hoja.querySelectorAll('[data-cerrar]'), function (el) {
       el.addEventListener('click', cerrarHoja);
+    });
+
+    // Inputs de archivo de la hoja
+    Array.prototype.forEach.call(form.querySelectorAll('[data-input]'), function (inp) {
+      inp.addEventListener('change', function () {
+        var tipo = inp.getAttribute('data-input');
+        var f = inp.files && inp.files[0];
+        if (f) { archivosPendientes[tipo] = f; pintarFilaArchivo(tipo, f.name); }
+        inp.value = '';
+      });
+    });
+    Array.prototype.forEach.call(form.querySelectorAll('[data-quitar]'), function (btn) {
+      btn.addEventListener('click', function () {
+        var tipo = btn.getAttribute('data-quitar');
+        archivosPendientes[tipo] = 'quitar';
+        pintarFilaArchivo(tipo, null);
+      });
     });
 
     inputBuscar.addEventListener('input', function () {
@@ -50,22 +71,36 @@ window.Pagina_songs = (function () {
       pintarLista();
     });
 
-    // Cuando #vista deja de contener esta pantalla (cambio de sección),
-    // retiramos el FAB y la hoja que habíamos movido al <body>.
+    // Al salir de la sección, retiramos FAB y hoja del <body>.
     var vista = document.getElementById('vista');
     var obs = new MutationObserver(function () {
-      if (!document.body.contains(raiz)) {
-        Array.prototype.forEach.call(
-          document.querySelectorAll('body > [data-hoja], body > [data-fab-songs]'),
-          function (el) { el.remove(); }
-        );
-        obs.disconnect();
-      }
+      if (!document.body.contains(raiz)) { limpiarRestos(); obs.disconnect(); }
     });
     obs.observe(vista, { childList: true, subtree: true });
 
     primeraCarga = true;
     pintarLista();
+
+    if (pendienteEditar) {
+      var id = pendienteEditar;
+      pendienteEditar = null;
+      abrirHoja(id);
+    }
+  }
+
+  function limpiarRestos() {
+    Array.prototype.forEach.call(
+      document.querySelectorAll('body > [data-hoja], body > [data-fab-songs]'),
+      function (el) { el.remove(); }
+    );
+  }
+
+  /* ---------- API externa ---------- */
+
+  // Llamado desde el Modo estudio para editar la canción abierta.
+  function editar(id) {
+    pendienteEditar = id;
+    window.App.ir('canciones');
   }
 
   /* ---------- Render de la lista ---------- */
@@ -90,9 +125,7 @@ window.Pagina_songs = (function () {
 
     var lista = document.createElement('div');
     lista.className = 'lista' + (primeraCarga ? ' stagger' : '');
-    visibles.forEach(function (c) {
-      lista.appendChild(tarjetaCancion(c));
-    });
+    visibles.forEach(function (c) { lista.appendChild(tarjetaCancion(c)); });
     contenido.innerHTML = '';
     contenido.appendChild(lista);
     primeraCarga = false;
@@ -100,6 +133,7 @@ window.Pagina_songs = (function () {
 
   function tarjetaCancion(c) {
     var est = window.Canciones.ESTADOS[c.estado] || window.Canciones.ESTADOS.pendiente;
+    var tieneAudio = !!(c.archivos && c.archivos.audio);
 
     var btn = document.createElement('button');
     btn.type = 'button';
@@ -108,15 +142,16 @@ window.Pagina_songs = (function () {
     btn.innerHTML =
       '<span class="cancion__cuerpo">' +
         '<span class="cancion__titulo">' + escapar(c.titulo) + '</span>' +
-        (c.compositor
-          ? '<span class="cancion__meta">' + escapar(c.compositor) + '</span>'
-          : '') +
+        (c.compositor ? '<span class="cancion__meta">' + escapar(c.compositor) + '</span>' : '') +
       '</span>' +
+      (tieneAudio ? '<span class="cancion__audio" aria-label="Tiene audio">' +
+        '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg></span>' : '') +
       '<span class="chip chip--' + est.token + '">' + est.etiqueta + '</span>';
 
-    // Fase 3: al tocar la tarjeta se abre la edición.
-    // (En la Fase 5 pasará a abrir el Modo estudio.)
-    btn.addEventListener('click', function () { abrirHoja(c.id); });
+    // Al tocar: abrir el Modo estudio de esta canción.
+    btn.addEventListener('click', function () {
+      window.App.ir('estudio', { datos: { id: c.id } });
+    });
     return btn;
   }
 
@@ -132,29 +167,60 @@ window.Pagina_songs = (function () {
 
   function abrirHoja(id) {
     idEditando = id || null;
+    archivosPendientes = {};
     var c = id ? window.Canciones.obtener(id) : null;
 
     form.titulo.value = c ? c.titulo : '';
     form.compositor.value = c ? c.compositor : '';
     form.notas.value = c ? c.notas : '';
+    form.letraTexto.value = c ? (c.letraTexto || '') : '';
     var estado = c ? c.estado : 'pendiente';
     Array.prototype.forEach.call(form.estado, function (r) { r.checked = r.value === estado; });
+
+    TIPOS_ARCHIVO.forEach(function (tipo) {
+      var meta = c && c.archivos ? c.archivos[tipo] : null;
+      pintarFilaArchivo(tipo, meta ? meta.nombre : null);
+    });
 
     formTitulo.textContent = c ? 'Editar canción' : 'Nueva canción';
     btnBorrar.hidden = !c;
 
     hoja.hidden = false;
-    void hoja.offsetHeight;            // fuerza reflow: la transición arranca desde el estado cerrado
+    void hoja.offsetHeight;            // fuerza reflow: la transición arranca cerrada
     hoja.classList.add('is-abierta');
     setTimeout(function () { form.titulo.focus(); }, 60);
+  }
+
+  var ETIQUETA_BASE = {
+    audio: 'Audio (MP3)',
+    letra: 'Letra (PDF o texto)',
+    partitura: 'Partitura (imagen o PDF)',
+  };
+
+  function pintarFilaArchivo(tipo, nombre) {
+    var fila = form.querySelector('[data-fila="' + tipo + '"]');
+    if (!fila) return;
+    var txt = fila.querySelector('[data-nombre="' + tipo + '"]');
+    var quitar = fila.querySelector('[data-quitar="' + tipo + '"]');
+    var accion = fila.querySelector('.archivo-fila__accion');
+    if (nombre) {
+      txt.textContent = nombre;
+      fila.classList.add('archivo-fila--con-archivo');
+      quitar.hidden = false;
+      accion.firstChild.textContent = 'Cambiar';
+    } else {
+      txt.textContent = ETIQUETA_BASE[tipo];
+      fila.classList.remove('archivo-fila--con-archivo');
+      quitar.hidden = true;
+      accion.firstChild.textContent = 'Añadir';
+    }
   }
 
   function cerrarHoja() {
     hoja.classList.remove('is-abierta');
     var cerrar = function () { hoja.hidden = true; hoja.removeEventListener('transitionend', cerrar); };
     hoja.addEventListener('transitionend', cerrar);
-    // Salvaguarda si no hay transición (reduce-motion).
-    setTimeout(cerrar, 260);
+    setTimeout(cerrar, 260);   // salvaguarda si no hay transición (reduce-motion)
   }
 
   function onGuardar(ev) {
@@ -164,6 +230,7 @@ window.Pagina_songs = (function () {
       compositor: form.compositor.value,
       estado: (form.querySelector('input[name="estado"]:checked') || {}).value || 'pendiente',
       notas: form.notas.value,
+      letraTexto: form.letraTexto.value,
     };
     if (!datos.titulo.trim()) {
       form.titulo.focus();
@@ -172,12 +239,37 @@ window.Pagina_songs = (function () {
     }
     form.titulo.classList.remove('campo--error');
 
-    if (idEditando) window.Canciones.actualizar(idEditando, datos);
-    else window.Canciones.crear(datos);
+    var cancion = idEditando
+      ? window.Canciones.actualizar(idEditando, datos)
+      : window.Canciones.crear(datos);
 
-    cerrarHoja();
-    primeraCarga = false;
-    pintarLista();
+    aplicarArchivos(cancion.id).then(function () {
+      cerrarHoja();
+      primeraCarga = false;
+      pintarLista();
+    });
+  }
+
+  // Guarda / quita en window.Archivos los cambios pendientes y
+  // actualiza los metadatos de la canción.
+  function aplicarArchivos(cancionId) {
+    var tareas = TIPOS_ARCHIVO.map(function (tipo) {
+      var cambio = archivosPendientes[tipo];
+      if (!cambio) return Promise.resolve();
+      var clave = cancionId + ':' + tipo;
+      if (cambio === 'quitar') {
+        return window.Archivos.borrar(clave).then(function () {
+          window.Canciones.fijarArchivo(cancionId, tipo, null);
+        });
+      }
+      return window.Archivos.guardar(clave, cambio).then(function (meta) {
+        window.Canciones.fijarArchivo(cancionId, tipo, meta);
+      });
+    });
+    return Promise.all(tareas).catch(function (e) {
+      console.error('No se pudo guardar un archivo:', e);
+      window.alert('No se pudo guardar uno de los archivos.');
+    });
   }
 
   function onBorrar() {
@@ -198,5 +290,5 @@ window.Pagina_songs = (function () {
     });
   }
 
-  return { iniciar: iniciar };
+  return { iniciar: iniciar, editar: editar };
 })();

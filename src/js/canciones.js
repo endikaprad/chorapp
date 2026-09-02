@@ -10,8 +10,14 @@
        compositor: string,
        estado:     'pendiente' | 'progreso' | 'aprendida',
        notas:      string,
-       fragmentos: [ { id, texto, nota } ],   // fragmentos difíciles (Fase 5)
-       archivos:   { audio: null, letra: null, partitura: null }, // (Fase 4)
+       letraTexto: string,                    // letra escrita a mano (Fase 5)
+       fragmentos: [ { id, texto, creado } ],  // fragmentos difíciles (Fase 5)
+       archivos:   {                           // metadatos; el blob va en Archivos (Fase 4)
+                     audio:     null | { nombre, mime, tamano, guardado },
+                     letra:     null | { … },
+                     partitura: null | { … }
+                   },
+       notasVoz:   [ { id, creado } ],         // blob en Archivos "<id>:voz:<notaId>"
        creada:     number (timestamp),
        actualizada:number (timestamp)
      }
@@ -76,8 +82,10 @@ window.Canciones = (function () {
       compositor: (datos.compositor || '').trim(),
       estado: ESTADOS[datos.estado] ? datos.estado : 'pendiente',
       notas: (datos.notas || '').trim(),
+      letraTexto: (datos.letraTexto || '').trim(),
       fragmentos: [],
       archivos: { audio: null, letra: null, partitura: null },
+      notasVoz: [],
       creada: ahora,
       actualizada: ahora,
     };
@@ -88,29 +96,73 @@ window.Canciones = (function () {
     return cancion;
   }
 
-  function actualizar(id, cambios) {
+  // Aplica `fn(cancion)` a la canción `id` y persiste. Devuelve la
+  // versión resultante (o null si no existe). No toca `actualizada`
+  // salvo que `fn` lo haga: útil para cambios "de fondo".
+  function _mutar(id, fn, marcarActualizada) {
     var lista = window.Almacen.leer(CLAVE, []);
     if (!Array.isArray(lista)) lista = [];
-    var actualizada = null;
+    var res = null;
     lista = lista.map(function (c) {
       if (c.id !== id) return c;
-      actualizada = Object.assign({}, c, {
-        titulo: cambios.titulo != null ? String(cambios.titulo).trim() : c.titulo,
-        compositor: cambios.compositor != null ? String(cambios.compositor).trim() : c.compositor,
-        estado: ESTADOS[cambios.estado] ? cambios.estado : c.estado,
-        notas: cambios.notas != null ? String(cambios.notas).trim() : c.notas,
-        actualizada: Date.now(),
-      });
-      return actualizada;
+      var copia = JSON.parse(JSON.stringify(c));
+      if (!copia.archivos) copia.archivos = { audio: null, letra: null, partitura: null };
+      if (!Array.isArray(copia.fragmentos)) copia.fragmentos = [];
+      if (!Array.isArray(copia.notasVoz)) copia.notasVoz = [];
+      fn(copia);
+      if (marcarActualizada !== false) copia.actualizada = Date.now();
+      res = copia;
+      return copia;
     });
     _guardarTodo(lista);
-    return actualizada;
+    return res;
+  }
+
+  function actualizar(id, cambios) {
+    return _mutar(id, function (c) {
+      if (cambios.titulo != null) c.titulo = String(cambios.titulo).trim();
+      if (cambios.compositor != null) c.compositor = String(cambios.compositor).trim();
+      if (ESTADOS[cambios.estado]) c.estado = cambios.estado;
+      if (cambios.notas != null) c.notas = String(cambios.notas).trim();
+      if (cambios.letraTexto != null) c.letraTexto = String(cambios.letraTexto);
+    });
+  }
+
+  // --- Archivos (metadatos). tipo: 'audio' | 'letra' | 'partitura'.
+  //     meta = objeto de Archivos.guardar(), o null para quitarlo.
+  function fijarArchivo(id, tipo, meta) {
+    return _mutar(id, function (c) { c.archivos[tipo] = meta || null; });
+  }
+
+  // --- Fragmentos difíciles
+  function agregarFragmento(id, texto) {
+    var frag = { id: 'f-' + Date.now().toString(36), texto: String(texto || '').trim(), creado: Date.now() };
+    _mutar(id, function (c) { c.fragmentos.push(frag); });
+    return frag;
+  }
+  function borrarFragmento(id, fragId) {
+    return _mutar(id, function (c) {
+      c.fragmentos = c.fragmentos.filter(function (f) { return f.id !== fragId; });
+    });
+  }
+
+  // --- Notas de voz (metadatos; el audio va en Archivos)
+  function agregarNotaVoz(id) {
+    var nota = { id: 'v-' + Date.now().toString(36), creado: Date.now() };
+    _mutar(id, function (c) { c.notasVoz.push(nota); });
+    return nota;
+  }
+  function borrarNotaVoz(id, notaId) {
+    return _mutar(id, function (c) {
+      c.notasVoz = c.notasVoz.filter(function (v) { return v.id !== notaId; });
+    });
   }
 
   function borrar(id) {
     var lista = window.Almacen.leer(CLAVE, []);
     if (!Array.isArray(lista)) lista = [];
     _guardarTodo(lista.filter(function (c) { return c.id !== id; }));
+    if (window.Archivos) window.Archivos.borrarCancion(id);
   }
 
   return {
@@ -120,6 +172,11 @@ window.Canciones = (function () {
     obtener: obtener,
     crear: crear,
     actualizar: actualizar,
+    fijarArchivo: fijarArchivo,
+    agregarFragmento: agregarFragmento,
+    borrarFragmento: borrarFragmento,
+    agregarNotaVoz: agregarNotaVoz,
+    borrarNotaVoz: borrarNotaVoz,
     borrar: borrar,
   };
 })();

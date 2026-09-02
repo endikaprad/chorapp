@@ -14,6 +14,13 @@ window.Pagina_home = (function () {
 
     raiz.querySelector('[data-num-canciones]').textContent = String(total);
 
+    // Racha de días de estudio (practica.js).
+    var racha = window.Practica ? window.Practica.racha() : 0;
+    var elRacha = raiz.querySelector('[data-num-racha]');
+    if (elRacha) elRacha.textContent = String(racha);
+    var elRachaLabel = raiz.querySelector('[data-racha-label]');
+    if (elRachaLabel) elRachaLabel.textContent = racha === 1 ? 'día seguido' : 'días seguidos';
+
     var card = raiz.querySelector('[data-continuar]');
     var eyebrow = raiz.querySelector('[data-continuar-eyebrow]');
     var titulo = raiz.querySelector('[data-continuar-titulo]');
@@ -35,8 +42,7 @@ window.Pagina_home = (function () {
     if (vacio) vacio.hidden = true;
 
     card.addEventListener('click', function () {
-      // Fase 5: abrirá el Modo estudio de esta canción.
-      window.App.ir('canciones');
+      window.App.ir('estudio', { datos: { id: ultima.id } });
     });
   }
 

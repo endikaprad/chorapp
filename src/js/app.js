@@ -44,7 +44,10 @@
   async function ir(ruta, opts) {
     opts = opts || {};
     var pantalla = PANTALLAS[ruta];
-    if (!pantalla || cargando || ruta === rutaActual) return;
+    if (!pantalla || cargando) return;
+    // Se puede volver a entrar en el modo estudio con otra canción;
+    // el resto de rutas no se recargan si ya son la actual.
+    if (ruta === rutaActual && ruta !== 'estudio') return;
     cargando = true;
 
     var esCambioDeTab = pantalla.raiz && (rutaActual === null || PANTALLAS[rutaActual].raiz);
