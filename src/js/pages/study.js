@@ -15,12 +15,14 @@ window.Pagina_study = (function () {
   'use strict';
 
   var cont, cancion, reproductor, grabadora, obs;
+  var vistaSub = null;        // baja de window.CancionActiva mientras la pantalla vive
   var transporte = null;      // píldora flotante de controles (letra/partitura a pantalla completa)
   var transObs = null;        // observa la apertura de visores a pantalla completa
   var urls = [];              // object URLs a revocar al salir
   var cronoNota = null;       // intervalo del contador de grabación
   var estaGrabando = false;   // true mientras se graba (para mostrar el transporte a mano)
   var notaT0 = 0;             // inicio de la grabación de nota (ms)
+  var notaOffset = null;      // segundo de la canción original al empezar la toma (o null)
   var tiempoActual = 0;       // posición del audio ahora mismo (s)
   var duracionAudio = 0;      // duración total del audio (s)
 
@@ -53,6 +55,7 @@ window.Pagina_study = (function () {
     });
     cont.querySelector('[data-marcar]').addEventListener('click', marcarFragmento);
     cont.querySelector('[data-grabar-nota]').addEventListener('click', alternarGrabacion);
+    document.addEventListener('chorapp:bloqueo', pararGrabacionPorBloqueo);
 
     // Limpieza al abandonar la pantalla.
     var vista = document.getElementById('vista');
@@ -64,7 +67,12 @@ window.Pagina_study = (function () {
 
   function destruir() {
     if (obs) { obs.disconnect(); obs = null; }
-    if (reproductor) { reproductor.destruir(); reproductor = null; }
+    document.removeEventListener('chorapp:bloqueo', pararGrabacionPorBloqueo);
+    // La canción NO se para al salir: sigue sonando en window.CancionActiva
+    // y aparece la barra flotante. Solo soltamos nuestra vista.
+    if (vistaSub) { vistaSub(); vistaSub = null; }
+    if (window.CancionActiva) window.CancionActiva.fijarVistaAbierta(false);
+    reproductor = null;
     if (grabadora) { grabadora.cancelar(); grabadora = null; }
     if (cronoNota) { clearInterval(cronoNota); cronoNota = null; }
     estaGrabando = false;
@@ -97,8 +105,8 @@ window.Pagina_study = (function () {
   function montarAudio() {
     var seccion = q('[data-player]');
     if (!cancion.archivos || !cancion.archivos.audio) { seccion.hidden = true; return; }
+    window.CancionActiva.fijarVistaAbierta(true);   // mientras estemos aquí, sin barra flotante
 
-    var audio = q('[data-audio]');
     var barra = q('[data-barra]');
     var tAct = q('[data-t-actual]');
     var tTot = q('[data-t-total]');
@@ -107,33 +115,102 @@ window.Pagina_study = (function () {
     var icPause = btnPlay.querySelector('.ic-pause');
     var velBarra = q('[data-vel-barra]');
     var velValor = q('[data-vel-valor]');
+    var btnBucleA = q('[data-bucle-a]');
+    var btnBucleB = q('[data-bucle-b]');
+    var btnBucleOff = q('[data-bucle-off]');
+    var bucleInfo = q('[data-bucle-info]');
+    var bucleZona = q('[data-bucle-zona]');
+    var bucleA = null;   // A pendiente de fijar (aún sin B)
+
+    // El <audio> y la lógica viven en window.CancionActiva (persisten al
+    // navegar). Aquí solo cargamos la canción y nos suscribimos a su estado.
+    reproductor = window.CancionActiva;
 
     window.Archivos.url(cancion.id + ':audio').then(function (u) {
       if (!u) { seccion.hidden = true; return; }
-      urls.push(u);
-      audio.src = u;
       seccion.hidden = false;
+      window.CancionActiva.cargar(cancion, u);
+      window.CancionActiva.fijarVistaAbierta(true);
     });
 
-    reproductor = window.Reproductor.crear(audio, {
-      meta: { titulo: cancion.titulo, compositor: cancion.compositor },
-      onEstado: function (s) {
-        // .hidden como propiedad no existe en <svg>: hay que tocar el atributo.
-        icPlay.toggleAttribute('hidden', s.reproduciendo);
-        icPause.toggleAttribute('hidden', !s.reproduciendo);
-        btnPlay.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
-        btnPlay.classList.toggle('is-sonando', s.reproduciendo);
-        tiempoActual = s.actual || 0;
-        if (s.total && s.total !== duracionAudio) { duracionAudio = s.total; pintarMarcas(); }
-        tAct.textContent = fmtTiempo(s.actual);
-        tTot.textContent = fmtTiempo(s.total);
-        if (s.total && !barra.matches(':active')) {
-          barra.value = String(Math.round((s.actual / s.total) * 1000));
+    vistaSub = window.CancionActiva.suscribir(function (s) {
+      // .hidden como propiedad no existe en <svg>: hay que tocar el atributo.
+      icPlay.toggleAttribute('hidden', s.reproduciendo);
+      icPause.toggleAttribute('hidden', !s.reproduciendo);
+      btnPlay.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
+      btnPlay.classList.toggle('is-sonando', s.reproduciendo);
+      tiempoActual = s.actual || 0;
+      if (s.total && s.total !== duracionAudio) { duracionAudio = s.total; pintarMarcas(); }
+      tAct.textContent = fmtTiempo(s.actual);
+      tTot.textContent = fmtTiempo(s.total);
+      if (s.total && !barra.matches(':active')) {
+        barra.value = String(Math.round((s.actual / s.total) * 1000));
+      }
+      velValor.textContent = fmtVel(s.velocidad);
+      if (!velBarra.matches(':active')) velBarra.value = String(s.velocidad);
+      pintarBucle(s.bucle);
+      sincronizarTransporte(s);
+    });
+
+    /* ---- Bucle A–B ---- */
+
+    function pintarBucle(bc) {
+      if (bc) {
+        bucleA = bc.a;
+        btnBucleA.classList.add('is-set');
+        btnBucleA.textContent = 'A ' + fmtTiempo(bc.a);
+        btnBucleB.disabled = false;
+        btnBucleB.classList.add('is-set');
+        btnBucleB.textContent = 'B ' + fmtTiempo(bc.b);
+        btnBucleOff.hidden = false;
+        bucleInfo.textContent = 'Sonando en bucle ' + fmtTiempo(bc.a) + ' – ' + fmtTiempo(bc.b) +
+          '. Pulsa B para mover el final o Quitar para salir.';
+        if (duracionAudio) {
+          var izq = Math.max(0, Math.min(100, (bc.a / duracionAudio) * 100));
+          var der = Math.max(0, Math.min(100, (bc.b / duracionAudio) * 100));
+          bucleZona.style.left = izq + '%';
+          bucleZona.style.width = Math.max(0, der - izq) + '%';
+          bucleZona.hidden = false;
         }
-        velValor.textContent = fmtVel(s.velocidad);
-        if (!velBarra.matches(':active')) velBarra.value = String(s.velocidad);
-        sincronizarTransporte(s);
-      },
+        return;
+      }
+      // Sin bucle activo.
+      btnBucleOff.hidden = true;
+      bucleZona.hidden = true;
+      btnBucleB.classList.remove('is-set');
+      if (bucleA == null) {
+        btnBucleA.classList.remove('is-set');
+        btnBucleA.textContent = 'A';
+        btnBucleB.disabled = true;
+        btnBucleB.textContent = 'B';
+      } else {
+        // A ya marcada, esperando B.
+        btnBucleA.classList.add('is-set');
+        btnBucleA.textContent = 'A ' + fmtTiempo(bucleA);
+        btnBucleB.disabled = false;
+        btnBucleB.textContent = 'B';
+      }
+      bucleInfo.textContent = bucleA == null
+        ? 'Repite un trozo difícil: pulsa A donde empieza y B donde acaba.'
+        : 'Ahora escucha hasta el final del trozo y pulsa B.';
+    }
+
+    btnBucleA.addEventListener('click', function () {
+      reproductor.quitarBucle();      // si había uno, se rehace desde aquí
+      bucleA = tiempoActual;
+      pintarBucle(null);
+    });
+    btnBucleB.addEventListener('click', function () {
+      if (bucleA == null) return;
+      if (tiempoActual <= bucleA + 0.5) {
+        window.UI.aviso('La B tiene que ir después de la A.');
+        return;
+      }
+      reproductor.fijarBucle(bucleA, tiempoActual);
+    });
+    btnBucleOff.addEventListener('click', function () {
+      bucleA = null;
+      reproductor.quitarBucle();
     });
 
     btnPlay.addEventListener('click', function () { reproductor.alternar(); });
@@ -144,7 +221,7 @@ window.Pagina_study = (function () {
       velValor.textContent = fmtVel(v);
     });
     barra.addEventListener('input', function () {
-      if (audio.duration) reproductor.irA((barra.value / 1000) * audio.duration);
+      if (duracionAudio) reproductor.irA((barra.value / 1000) * duracionAudio);
     });
 
     montarTransporte();
@@ -348,6 +425,21 @@ window.Pagina_study = (function () {
     });
   }
 
+  /* Repetir en bucle desde un fragmento marcado: de su minuto hasta el
+     siguiente fragmento cercano, o 15 s si no hay ninguno. */
+  function bucleDesdeFragmento(seg) {
+    if (!reproductor || !duracionAudio) return;
+    var fin = Math.min(duracionAudio, seg + 15);
+    (cancion.fragmentos || []).forEach(function (f) {
+      if (typeof f.segundo === 'number' && f.segundo > seg + 1.5 && f.segundo < fin) {
+        fin = f.segundo;
+      }
+    });
+    reproductor.irA(seg);
+    reproductor.fijarBucle(seg, fin);
+    if (!reproductor.reproduciendo) reproductor.alternar();
+  }
+
   function pintarFragmentos() {
     var caja = q('[data-fragmentos]');
     var frags = cancion.fragmentos || [];
@@ -367,11 +459,17 @@ window.Pagina_study = (function () {
               '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5a1 1 0 0 1 1.53-.85l9 6.5a1 1 0 0 1 0 1.7l-9 6.5A1 1 0 0 1 8 18.5z"/></svg>' +
               fmtTiempo(f.segundo) + '</button>'
           : '') +
+        (tieneTiempo
+          ? '<button type="button" class="ficha__bucle" aria-label="Repetir este fragmento en bucle">⟲</button>'
+          : '') +
         (f.texto ? '<p class="ficha__texto">' + escapar(f.texto) + '</p>' : '') +
         '<button type="button" class="ficha__quitar" aria-label="Quitar fragmento">✕</button>';
       if (tieneTiempo) {
         fila.querySelector('.ficha__tiempo').addEventListener('click', function () {
           if (reproductor) reproductor.irA(f.segundo);
+        });
+        fila.querySelector('.ficha__bucle').addEventListener('click', function () {
+          bucleDesdeFragmento(f.segundo);
         });
       }
       fila.querySelector('.ficha__quitar').addEventListener('click', function () {
@@ -392,6 +490,12 @@ window.Pagina_study = (function () {
   /* ¿Hay audio de la canción para acompañar la grabación? */
   function tieneAudio() {
     return !!(reproductor && cancion.archivos && cancion.archivos.audio);
+  }
+
+  // Si el hijo bloquea la app en mitad de una toma, la cerramos como si
+  // Maite hubiera pulsado "Detener" (se guarda lo grabado hasta ahí).
+  function pararGrabacionPorBloqueo() {
+    if (grabadora && grabadora.grabando) alternarGrabacion();
   }
 
   function alternarGrabacion() {
@@ -422,6 +526,7 @@ window.Pagina_study = (function () {
           mime: blob.type,
           dur: dur,
           picos: g.picos(),
+          audioOffset: notaOffset,
         }, blob).then(pintarGrabaciones);
       });
       return;
@@ -432,6 +537,7 @@ window.Pagina_study = (function () {
       return;
     }
     var conAudio = tieneAudio() && chkAudio && chkAudio.checked;
+    notaOffset = null;
 
     grabadora = window.Grabadora.crear();
     grabadora.iniciar().then(function () {
@@ -447,10 +553,18 @@ window.Pagina_study = (function () {
       if (opt) opt.classList.add('is-bloqueada');
       if (chkAudio) chkAudio.disabled = true;
 
-      // Acompañar la voz con la canción sonando desde el principio.
-      if (conAudio) {
-        reproductor.irA(0);
-        if (!reproductor.reproduciendo) reproductor.alternar();
+      // Acompañar la voz con la canción: si la casilla está marcada, suena
+      // desde donde esté ahora (o desde el principio si está parada).
+      if (conAudio && reproductor && !reproductor.reproduciendo) {
+        notaOffset = Math.max(0, tiempoActual || 0);
+        reproductor.alternar();
+      }
+      // Si la canción está sonando al empezar la toma (por la casilla o
+      // porque Maite le dio al play), guardamos el segundo exacto: así en
+      // Grabaciones se puede oír SOLO ese trozo de la pista original,
+      // sincronizado con la voz (de tiempoActual a tiempoActual + duración).
+      if (reproductor && reproductor.reproduciendo && (cancion.archivos && cancion.archivos.audio)) {
+        notaOffset = Math.max(0, tiempoActual || 0);
       }
     }).catch(function () {
       grabadora = null;

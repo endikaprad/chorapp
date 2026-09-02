@@ -47,6 +47,10 @@ window.Grabaciones = (function () {
       mime: meta.mime || (blob && blob.type) || '',
       dur: meta.dur || 0,
       picos: Array.isArray(meta.picos) ? meta.picos : [],
+      // Si la grabación se hizo con la canción sonando de fondo, el segundo
+      // de la pista original en que empezó la toma (para reproducirlas juntas).
+      audioOffset: (typeof meta.audioOffset === 'number' && isFinite(meta.audioOffset))
+        ? Math.max(0, meta.audioOffset) : null,
     };
     return window.Archivos.guardar('grab:' + g.id, blob).then(function () {
       var l = _leer();

@@ -145,7 +145,7 @@
         <button class="primario" id="btn-bloqueo-libre">Bloquear</button>
       </div>
       <textarea id="motivo-bloqueo" placeholder="Motivo opcional (se muestra en la pantalla de pausa)" style="margin-top:8px"></textarea>
-      <div class="fila">
+      <div class="fila oculto" id="fila-desbloquear">
         <button class="peligro" id="btn-desbloquear" style="flex:1">Desbloquear ahora</button>
       </div>
     </section>
@@ -181,8 +181,7 @@ var AVISOS = [
   "Respira antes de empezar la frase.",
   "Vas un poco deprisa, tómatelo con calma.",
   "Ojo con la afinación en las notas altas.",
-  "Descansa cinco minutos y sigues.",
-  "¡Te está quedando precioso! 💙"
+  "Descansa cinco minutos y sigues."
 ];
 
 var BLOQUEOS_MIN = [5, 10, 15, 30, 45, 60];
@@ -282,13 +281,21 @@ function bloquear(minutos, motivo) {
   escribirControl({
     bloqueoHasta: Date.now() + minutos * 60000,
     motivoBloqueo: (motivo || '').trim()
-  }).then(function () { flash('App bloqueada ' + minutos + ' min ✓'); consultarEstado(); })
+  }).then(function () {
+    flash('App bloqueada ' + minutos + ' min ✓');
+    $('fila-desbloquear').classList.remove('oculto');
+    consultarEstado();
+  })
     .catch(function (e) { flash('No se pudo bloquear: ' + e.message, true); });
 }
 
 function desbloquear() {
   escribirControl({ bloqueoHasta: 0, motivoBloqueo: '' })
-    .then(function () { flash('App desbloqueada ✓'); consultarEstado(); })
+    .then(function () {
+      flash('App desbloqueada ✓');
+      $('fila-desbloquear').classList.add('oculto');
+      consultarEstado();
+    })
     .catch(function (e) { flash('Error: ' + e.message, true); });
 }
 
@@ -302,6 +309,7 @@ function consultarEstado() {
     var visto = s.vistaPorUltimaVez
       ? haceCuanto(s.vistaPorUltimaVez) : 'nunca (todavía no ha abierto la app con esto)';
     var bloq = s.bloqueada ? 'Sí, ahora mismo' : 'No';
+    $('fila-desbloquear').classList.toggle('oculto', !s.bloqueada);
     $('estado-texto').innerHTML =
       'App abierta por última vez: <b>' + visto + '</b><br>' +
       'Bloqueada: <b>' + bloq + '</b>';

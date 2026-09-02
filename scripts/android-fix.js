@@ -25,6 +25,14 @@ let cambiado = false;
 const permisos = [
   'android.permission.RECORD_AUDIO',
   'android.permission.MODIFY_AUDIO_SETTINGS',
+  // Notificación multimedia (reproductor en la barra de estado / bloqueo)
+  // que aporta el plugin @jofr/capacitor-media-session.
+  // POST_NOTIFICATIONS: en Android 13+ sin él la notificación se descarta en silencio.
+  // FOREGROUND_SERVICE_MEDIA_PLAYBACK: obligatorio en Android 14+ (targetSdk 34+)
+  //   o el servicio en primer plano del plugin peta al arrancar.
+  'android.permission.POST_NOTIFICATIONS',
+  'android.permission.FOREGROUND_SERVICE',
+  'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
 ];
 
 for (const p of permisos) {

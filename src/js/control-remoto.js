@@ -33,6 +33,66 @@ window.ControlRemoto = (function () {
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* --------------------------------------------------------
+     Sonido — se genera con la Web Audio API, sin archivos.
+     'aviso'  : dos notas suaves ascendentes.
+     'bloqueo': zumbido áspero y repetido, más agresivo.
+     Los navegadores exigen un gesto previo para reproducir
+     audio; enganchamos uno al primer toque de la usuaria.
+     -------------------------------------------------------- */
+
+  var audioCtx = null;
+
+  function ctx() {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!audioCtx) audioCtx = new AC();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  (function desbloquearAudio() {
+    function unlock() {
+      ctx();
+      document.removeEventListener('touchstart', unlock);
+      document.removeEventListener('click', unlock);
+    }
+    document.addEventListener('touchstart', unlock, { passive: true });
+    document.addEventListener('click', unlock);
+  })();
+
+  function tono(ac, freq, inicio, dur, tipo, volumen) {
+    var osc = ac.createOscillator();
+    var gan = ac.createGain();
+    osc.type = tipo;
+    osc.frequency.value = freq;
+    var t0 = ac.currentTime + inicio;
+    gan.gain.setValueAtTime(0, t0);
+    gan.gain.linearRampToValueAtTime(volumen, t0 + 0.015);
+    gan.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gan).connect(ac.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+
+  function sonar(tipo) {
+    var ac = ctx();
+    if (!ac) return;
+    try {
+      if (tipo === 'bloqueo') {
+        // Tres ráfagas ásperas y disonantes.
+        for (var i = 0; i < 3; i++) {
+          var t = i * 0.22;
+          tono(ac, 196, t, 0.16, 'sawtooth', 0.32);
+          tono(ac, 208, t, 0.16, 'square', 0.22); // batido -> suena áspero
+        }
+      } else {
+        tono(ac, 659, 0, 0.18, 'sine', 0.18);
+        tono(ac, 988, 0.16, 0.28, 'sine', 0.16);
+      }
+    } catch (e) { /* sin audio: da igual */ }
+  }
+
+  /* --------------------------------------------------------
      Arranque
      -------------------------------------------------------- */
 
@@ -111,11 +171,26 @@ window.ControlRemoto = (function () {
      Overlay de bloqueo — tapa toda la app
      -------------------------------------------------------- */
 
+  // Al caer un bloqueo, callar cualquier audio en curso: la canción del
+  // modo estudio y una grabación que estuviera en marcha.
+  function silenciarTodo() {
+    try {
+      if (window.CancionActiva && window.CancionActiva.reproduciendo) {
+        window.CancionActiva.alternar();
+      }
+    } catch (e) {}
+    try {
+      document.dispatchEvent(new CustomEvent('chorapp:bloqueo'));
+    } catch (e) {}
+  }
+
   function ponerBloqueo(hasta, motivo) {
     if (capaBloqueo) {
       actualizarContador(hasta);
       return;
     }
+
+    silenciarTodo();
 
     capaBloqueo = document.createElement('div');
     capaBloqueo.className = 'bloqueo-remoto';
@@ -138,6 +213,7 @@ window.ControlRemoto = (function () {
     elMotivo.textContent = motivo ||
       'Tómate un respiro. Seguimos en un ratito 🎶';
 
+    sonar('bloqueo');
     document.body.appendChild(capaBloqueo);
     // Bloquea el scroll de fondo mientras dure.
     document.body.classList.add('con-bloqueo-remoto');
@@ -186,6 +262,7 @@ window.ControlRemoto = (function () {
 
   function mostrarAviso(aviso) {
     avisoEnPantalla = true;
+    sonar('aviso');
 
     var capa = document.createElement('div');
     capa.className = 'aviso-remoto';

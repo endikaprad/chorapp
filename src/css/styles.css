@@ -909,9 +909,30 @@ button {
   min-height: 40px;
 }
 
-/* Icono de "tiene audio" en la tarjeta de canción */
-.cancion__audio { flex-shrink: 0; color: var(--color-acento); display: flex; }
-.cancion__audio svg { width: 15px; height: 15px; }
+/* Botón de reproducción rápida en la tarjeta de canción */
+.cancion__play {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--color-acento);
+  background: transparent;
+  transition: transform var(--dur-micro) var(--curva), background-color var(--dur-micro) var(--curva);
+}
+.cancion__play svg { width: 20px; height: 20px; }
+.cancion__play:active { transform: scale(0.9); }
+.cancion__play.is-sonando { background: var(--color-acento-suave); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .cancion__play.is-sonando { animation: cancion-play-pulso 1.6s var(--curva) infinite; }
+}
+@keyframes cancion-play-pulso {
+  0%, 100% { box-shadow: 0 0 0 0 var(--color-acento-suave); }
+  50% { box-shadow: 0 0 0 5px transparent; }
+}
 
 /* ============================================================
    Modo estudio (Fase 5)
@@ -1061,6 +1082,64 @@ button {
   width: 18px; height: 18px; border: none;
   border-radius: 50%; background: var(--color-acento); cursor: pointer;
 }
+
+/* Bucle A–B: repetir un trozo difícil sin parar */
+.player__bucle { margin-top: 14px; }
+.player__bucle-ctrl { display: flex; align-items: center; gap: 8px; }
+.player__bucle-etiqueta {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-texto-2);
+  flex-shrink: 0;
+}
+.player__bucle-ab {
+  min-width: 46px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texto-2);
+  background: var(--color-fondo);
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  transition: transform var(--dur-micro) var(--curva),
+              background var(--dur-micro) var(--curva),
+              color var(--dur-micro) var(--curva),
+              border-color var(--dur-micro) var(--curva);
+}
+.player__bucle-ab:active { transform: scale(0.94); }
+.player__bucle-ab:disabled { opacity: 0.4; }
+.player__bucle-ab.is-set {
+  color: #fff;
+  background: var(--color-acento);
+  border-color: var(--color-acento);
+}
+.player__bucle-quitar {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-acento-oscuro);
+  padding: 6px 4px;
+}
+.player__bucle-quitar[hidden] { display: none; }
+.player__bucle-info {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-texto-2);
+}
+.player__bucle-zona {
+  position: absolute;
+  top: 50%;
+  height: 6px;
+  transform: translateY(-50%);
+  background: color-mix(in srgb, var(--color-acento) 24%, transparent);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.player__bucle-zona[hidden] { display: none; }
+
 .player__play {
   width: 60px;
   height: 60px;
@@ -1163,7 +1242,7 @@ body.sin-scroll { overflow: hidden; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 14px;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 10px;
   border-bottom: 1px solid var(--color-borde);
   background: var(--color-superficie);
 }
@@ -1275,6 +1354,22 @@ body.sin-scroll { overflow: hidden; }
   transition: transform var(--dur-micro) var(--curva);
 }
 .ficha__quitar:active { transform: scale(0.85); }
+
+.ficha__bucle {
+  flex-shrink: 0;
+  align-self: flex-start;
+  min-width: 34px;
+  height: 28px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--color-acento-oscuro);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.ficha__bucle:active { transform: scale(0.82); }
+.ficha--solo .ficha__bucle { align-self: auto; min-width: 28px; height: 26px; }
 
 /* Fragmento que solo guarda el minuto: chip compacto, varios por fila */
 .ficha--solo {
@@ -1652,6 +1747,83 @@ body.sin-scroll { overflow: hidden; }
 .grabacion__titulo { font-family: var(--fuente-titulo); font-weight: 600; font-size: 16px; }
 .grabacion__fecha { font-size: 12px; color: var(--color-texto-2); }
 .grabacion__fila { display: flex; align-items: center; gap: 10px; }
+.grabacion__ref {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-borde);
+}
+.grabacion__ref-etiqueta {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-texto-2);
+}
+/* Elegir qué escuchar: solo la voz o la voz con la pista original. */
+.ref-modo {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.ref-modo__b {
+  flex: 1;
+  padding: 9px 8px;
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  background: var(--color-superficie);
+  color: var(--color-texto-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 140ms var(--curva), background-color 140ms var(--curva), color 140ms var(--curva);
+}
+.ref-modo__b:active { transform: scale(0.97); }
+.ref-modo__b.is-activo {
+  background: var(--color-acento-suave);
+  border-color: var(--color-acento);
+  color: var(--color-acento);
+}
+
+/* Volumen de la pista original al comparar. */
+.ref-vol {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.ref-vol__et { font-size: 12px; color: var(--color-texto-2); white-space: nowrap; }
+.ref-vol input[type="range"] { flex: 1; accent-color: var(--color-acento); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ref-modo__b { transition: none; }
+  .ref-modo__b:active { transform: none; }
+}
+
+/* Pista original sincronizada: solo el trozo grabado, la mueve el
+   reproductor de la toma (no tiene botón propio). */
+.pista-trozo { display: flex; align-items: center; gap: 10px; }
+.pista-trozo[hidden], .ref-vol[hidden] { display: none; }
+.pista-trozo__barra {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-acento-suave);
+  overflow: hidden;
+}
+.pista-trozo__barra i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left;
+  border-radius: 999px;
+  background: var(--color-acento);
+}
+.pista-trozo__t {
+  font-size: 12px;
+  color: var(--color-texto-2);
+  font-variant-numeric: tabular-nums;
+}
 
 /* Mini reproductor personalizado (grabaciones) */
 .mini-player {
@@ -1949,6 +2121,207 @@ body.sin-scroll { overflow: hidden; }
   .transporte:not(.is-visible) { transform: translate(-50%, 0); }
   .transporte__btn:active { transform: none; }
   .transporte__play.is-sonando { animation: none; }
+}
+
+/* ============================================================
+   Barra de canción en curso — window.CancionActiva
+
+   Cuando Maite sale del modo estudio con una canción sonando,
+   aparece esta barra fija justo encima del bottom nav: título,
+   −5 s, play/pausa y velocidad. Al tocar el título vuelve al
+   modo estudio. Portal al <body>; solo anima transform/opacity.
+   ============================================================ */
+.barra-repro {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--alto-nav) + env(safe-area-inset-bottom) + 8px);
+  width: calc(100% - 24px);
+  max-width: 456px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--color-borde);
+  background: transparent;
+  box-shadow: 0 8px 28px rgba(7, 7, 7, 0.22);
+  opacity: 0;
+  transform: translate(-50%, 14px);
+  pointer-events: none;
+  transition: transform 240ms var(--curva), opacity 240ms var(--curva);
+}
+/* El desenfoque va en una capa propia sin hijos: si se pone en .barra-repro,
+   Chrome (WebView) no lo aplica detrás de los botones/inputs hijos y queda
+   medio sólido. La pseudo-capa lo resuelve. */
+.barra-repro::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--color-superficie) 80%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+}
+.barra-repro.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+/* Línea de progreso, pegada al borde superior. Es un <input range>
+   arrastrable: zona táctil ancha, pista fina de 3 px centrada. */
+.barra-repro__prog {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  top: -8px;
+  left: 10px;
+  right: 10px;
+  width: auto;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.barra-repro__prog::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background:
+    linear-gradient(var(--color-acento), var(--color-acento)) 0 / var(--pct, 0%) 100% no-repeat,
+    var(--color-acento-suave);
+}
+.barra-repro__prog::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-acento-suave);
+}
+.barra-repro__prog::-moz-range-progress {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-acento);
+}
+.barra-repro__prog::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--color-acento);
+  border: 2px solid var(--color-superficie);
+  opacity: 0;
+  transition: opacity var(--dur-micro) var(--curva);
+}
+.barra-repro__prog::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--color-acento);
+  border: 2px solid var(--color-superficie);
+  opacity: 0;
+}
+.barra-repro__prog:active::-webkit-slider-thumb,
+.barra-repro__prog:focus-visible::-webkit-slider-thumb { opacity: 1; }
+.barra-repro__prog:active::-moz-range-thumb,
+.barra-repro__prog:focus-visible::-moz-range-thumb { opacity: 1; }
+
+.barra-repro__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 4px 6px 4px 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.barra-repro__tit,
+.barra-repro__sub {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.barra-repro__tit { font-size: 13.5px; font-weight: 600; color: var(--color-texto); }
+.barra-repro__sub { font-size: 11px; color: var(--color-texto-2); }
+
+.barra-repro__btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-texto);
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.barra-repro__btn svg { width: 21px; height: 21px; }
+.barra-repro__btn:active { transform: scale(0.9); }
+.barra-repro__btn span { font-size: 9px; font-weight: 700; margin-left: 1px; }
+.barra-repro__play {
+  background: var(--color-acento);
+  color: #fff;
+}
+.barra-repro__play svg { width: 20px; height: 20px; fill: currentColor; }
+
+.barra-repro__bucle {
+  flex: none;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--color-acento);
+}
+.barra-repro__bucle[hidden] { display: none; }
+
+.barra-repro__vel {
+  flex: none;
+  min-width: 42px;
+  height: 32px;
+  margin-left: 2px;
+  padding: 0 8px;
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-texto);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.barra-repro__vel:active { transform: scale(0.94); }
+
+.barra-repro__cerrar {
+  flex: none;
+  width: 30px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-texto-2);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barra-repro {
+    transition: opacity 120ms linear;
+    transform: translate(-50%, 0);
+  }
+  .barra-repro:not(.is-visible) { transform: translate(-50%, 0); }
+  .barra-repro__btn:active,
+  .barra-repro__vel:active { transform: none; }
+  .barra-repro__play.is-sonando { animation: none; }
+  .barra-repro__prog i { transition: none; }
 }
 
 /* Opción "sonar la canción mientras grabo" — bajo el botón de grabar

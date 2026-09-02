@@ -12,6 +12,12 @@ android/
 *.jks
 keystore.properties
 
+# APK generado (no versionar binarios de build)
+*.apk
+
+# Firebase (cache local del deploy del panel)
+.firebase/
+
 # Sistema / editores
 .DS_Store
 Thumbs.db

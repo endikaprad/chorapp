@@ -19,6 +19,7 @@ window.Pagina_songs = (function () {
 
   // Cambios de archivo pendientes de guardar: { audio: File|null|'quitar', ... }
   var archivosPendientes = {};
+  var offPlay = null;   // baja de la suscripción a CancionActiva
 
   function iniciar(contenedor) {
     limpiarRestos();
@@ -74,12 +75,21 @@ window.Pagina_songs = (function () {
     // Al salir de la sección, retiramos FAB y hoja del <body>.
     var vista = document.getElementById('vista');
     var obs = new MutationObserver(function () {
-      if (!document.body.contains(raiz)) { limpiarRestos(); obs.disconnect(); }
+      if (!document.body.contains(raiz)) {
+        limpiarRestos();
+        if (offPlay) { offPlay(); offPlay = null; }
+        obs.disconnect();
+      }
     });
     obs.observe(vista, { childList: true, subtree: true });
 
     primeraCarga = true;
     pintarLista();
+
+    if (offPlay) offPlay();
+    offPlay = window.CancionActiva
+      ? window.CancionActiva.suscribir(pintarEstadoPlay)
+      : null;
 
     if (pendienteEditar) {
       var id = pendienteEditar;
@@ -129,6 +139,7 @@ window.Pagina_songs = (function () {
     contenido.innerHTML = '';
     contenido.appendChild(lista);
     primeraCarga = false;
+    if (window.CancionActiva) pintarEstadoPlay(window.CancionActiva.estado());
   }
 
   function tarjetaCancion(c) {
@@ -146,13 +157,27 @@ window.Pagina_songs = (function () {
       '<span class="cancion__cuerpo">' +
         '<span class="cancion__titulo">' + escapar(c.titulo) + '</span>' +
         (c.compositor ? '<span class="cancion__meta">' + escapar(c.compositor) + '</span>' : '') +
-      '</span>' +
-      (tieneAudio ? '<span class="cancion__audio" aria-label="Tiene audio">' +
-        '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg></span>' : '') +
       '</span>';
     abrir.addEventListener('click', function () {
       window.App.ir('estudio', { datos: { id: c.id } });
     });
+
+    // Botón de reproducción rápida: suena la canción sin entrar al modo estudio.
+    var reproducir = null;
+    if (tieneAudio) {
+      reproducir = document.createElement('button');
+      reproducir.type = 'button';
+      reproducir.className = 'cancion__play';
+      reproducir.setAttribute('data-play-id', c.id);
+      reproducir.setAttribute('aria-label', 'Reproducir «' + escapar(c.titulo) + '»');
+      reproducir.innerHTML =
+        '<svg class="cancion__play-ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg>' +
+        '<svg class="cancion__play-ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>';
+      reproducir.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        reproducirRapido(c);
+      });
+    }
 
     // Chip de estado: ahora es un botón que abre el selector rápido.
     var chip = document.createElement('button');
@@ -167,8 +192,39 @@ window.Pagina_songs = (function () {
     });
 
     fila.appendChild(abrir);
+    if (reproducir) fila.appendChild(reproducir);
     fila.appendChild(chip);
     return fila;
+  }
+
+  /* ---------- Reproducción rápida desde la lista ---------- */
+
+  // Suena la canción usando window.CancionActiva (la misma que el modo
+  // estudio). Si ya es la canción activa, alterna play/pausa.
+  function reproducirRapido(c) {
+    if (!window.CancionActiva) return;
+    if (window.CancionActiva.cancionId() === c.id && window.CancionActiva.hayCancion()) {
+      window.CancionActiva.alternar();
+      return;
+    }
+    window.Archivos.url(c.id + ':audio').then(function (u) {
+      if (!u) return;
+      window.CancionActiva.cargar(c, u).then(function () {
+        window.CancionActiva.alternar();
+      });
+    });
+  }
+
+  // Mantiene el icono play/pausa de la tarjeta activa al día.
+  function pintarEstadoPlay(s) {
+    if (!raiz || !document.body.contains(raiz)) return;
+    var activa = window.CancionActiva && window.CancionActiva.cancionId();
+    Array.prototype.forEach.call(raiz.querySelectorAll('[data-play-id]'), function (btn) {
+      var sonando = s.reproduciendo && btn.getAttribute('data-play-id') === activa;
+      btn.classList.toggle('is-sonando', sonando);
+      btn.querySelector('.cancion__play-ic-play').toggleAttribute('hidden', sonando);
+      btn.querySelector('.cancion__play-ic-pause').toggleAttribute('hidden', !sonando);
+    });
   }
 
   /* ---------- Selector rápido de estado (sin abrir la hoja) ---------- */

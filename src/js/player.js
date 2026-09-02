@@ -21,46 +21,69 @@ window.Reproductor = (function () {
   }
 
   /* Controles del sistema (pantalla de bloqueo / notificación estilo Spotify).
-     Usa la Media Session API: funciona en el WebView de Android y en Chrome.
+
+     OJO: el WebView de Android NO implementa la Media Session API de la web,
+     así que `navigator.mediaSession` no pinta ninguna notificación en el móvil.
+     Para eso hace falta el plugin nativo `@jofr/capacitor-media-session`, que
+     Capacitor expone en `window.Capacitor.Plugins.MediaSession`. Si está,
+     lo usamos; si no (navegador de escritorio), caemos a `navigator.mediaSession`.
+
      `meta` = { titulo, compositor }. `acciones` = { alternar, retroceder,
      adelantar, irA }. */
   function conectarMediaSession(audio, meta, acciones) {
-    if (!('mediaSession' in navigator)) return function () {};
-    var ms = navigator.mediaSession;
     meta = meta || {};
+    var nativo = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.MediaSession;
+    var web = ('mediaSession' in navigator) ? navigator.mediaSession : null;
+    if (!nativo && !web) return function () {};
 
-    try {
-      ms.metadata = new window.MediaMetadata({
-        title: meta.titulo || 'Canción',
-        artist: meta.compositor || 'Coro Bihotsak',
-        album: 'ChorApp',
+    var metadatos = {
+      title: meta.titulo || 'Canción',
+      artist: meta.compositor || 'Coro Bihotsak',
+      album: 'ChorApp',
+    };
+
+    var manejadores = {
+      play: function () { acciones.alternar(); },
+      pause: function () { acciones.alternar(); },
+      seekbackward: function (d) { acciones.retroceder((d && d.seekOffset) || 5); },
+      seekforward: function (d) { acciones.adelantar((d && d.seekOffset) || 5); },
+      previoustrack: function () { acciones.retroceder(5); },
+      nexttrack: function () { acciones.adelantar(5); },
+      seekto: function (d) { if (d && typeof d.seekTime === 'number') acciones.irA(d.seekTime); },
+    };
+    var acis = Object.keys(manejadores);
+
+    if (nativo) {
+      nativo.setMetadata(metadatos);
+      acis.forEach(function (a) {
+        nativo.setActionHandler({ action: a }, manejadores[a]);
       });
-    } catch (e) { /* MediaMetadata puede no existir */ }
-
-    function fija(accion, fn) {
-      try { ms.setActionHandler(accion, fn); } catch (e) {}
+    } else {
+      try {
+        web.metadata = new window.MediaMetadata(metadatos);
+      } catch (e) {}
+      acis.forEach(function (a) {
+        try { web.setActionHandler(a, manejadores[a]); } catch (e) {}
+      });
     }
-    fija('play', function () { acciones.alternar(); });
-    fija('pause', function () { acciones.alternar(); });
-    fija('seekbackward', function (d) { acciones.retroceder((d && d.seekOffset) || 5); });
-    fija('seekforward', function (d) { acciones.adelantar((d && d.seekOffset) || 5); });
-    fija('previoustrack', function () { acciones.retroceder(5); });
-    fija('nexttrack', function () { acciones.adelantar(5); });
-    fija('seekto', function (d) {
-      if (d && typeof d.seekTime === 'number') acciones.irA(d.seekTime);
-    });
 
     function sincronizar() {
-      ms.playbackState = (!audio.paused && !audio.ended) ? 'playing' : 'paused';
-      try {
-        if (isFinite(audio.duration) && audio.duration > 0) {
-          ms.setPositionState({
-            duration: audio.duration,
-            playbackRate: audio.playbackRate || 1,
-            position: Math.min(audio.currentTime || 0, audio.duration),
-          });
-        }
-      } catch (e) {}
+      var sonando = !audio.paused && !audio.ended;
+      var pos = null;
+      if (isFinite(audio.duration) && audio.duration > 0) {
+        pos = {
+          duration: audio.duration,
+          playbackRate: audio.playbackRate || 1,
+          position: Math.min(audio.currentTime || 0, audio.duration),
+        };
+      }
+      if (nativo) {
+        nativo.setPlaybackState({ playbackState: sonando ? 'playing' : 'paused' });
+        if (pos) nativo.setPositionState(pos);
+      } else {
+        web.playbackState = sonando ? 'playing' : 'paused';
+        try { if (pos) web.setPositionState(pos); } catch (e) {}
+      }
     }
     audio.addEventListener('play', sincronizar);
     audio.addEventListener('pause', sincronizar);
@@ -68,19 +91,28 @@ window.Reproductor = (function () {
     audio.addEventListener('loadedmetadata', sincronizar);
 
     return function desconectar() {
-      ['play', 'pause', 'seekbackward', 'seekforward', 'previoustrack',
-       'nexttrack', 'seekto'].forEach(function (a) { fija(a, null); });
-      try { ms.metadata = null; } catch (e) {}
       audio.removeEventListener('play', sincronizar);
       audio.removeEventListener('pause', sincronizar);
       audio.removeEventListener('timeupdate', sincronizar);
       audio.removeEventListener('loadedmetadata', sincronizar);
+      if (nativo) {
+        nativo.setPlaybackState({ playbackState: 'none' });
+        acis.forEach(function (a) {
+          try { nativo.setActionHandler({ action: a }, null); } catch (e) {}
+        });
+      } else {
+        acis.forEach(function (a) {
+          try { web.setActionHandler(a, null); } catch (e) {}
+        });
+        try { web.metadata = null; } catch (e) {}
+      }
     };
   }
 
   function crear(audio, cb) {
     cb = cb || {};
     var velocidad = 1;
+    var bucle = null;   // { a, b } en segundos: repite ese trozo sin parar
 
     function emitir() {
       if (cb.onEstado) cb.onEstado({
@@ -88,8 +120,17 @@ window.Reproductor = (function () {
         actual: audio.currentTime || 0,
         total: isFinite(audio.duration) ? audio.duration : 0,
         velocidad: velocidad,
+        bucle: bucle ? { a: bucle.a, b: bucle.b } : null,
       });
     }
+
+    // Bucle A–B: al llegar a B se vuelve a A. Se comprueba en cada
+    // timeupdate (~4/s), suficiente para estudiar un pasaje.
+    audio.addEventListener('timeupdate', function () {
+      if (bucle && (audio.currentTime || 0) >= bucle.b) {
+        audio.currentTime = bucle.a;
+      }
+    });
 
     audio.addEventListener('timeupdate', emitir);
     audio.addEventListener('play', emitir);
@@ -121,11 +162,27 @@ window.Reproductor = (function () {
       emitir();
       return velocidad;
     }
+    function fijarBucle(a, b) {
+      a = Math.max(0, Number(a) || 0);
+      b = Number(b) || 0;
+      if (!(b > a + 0.2)) return null;
+      bucle = { a: a, b: b };
+      if ((audio.currentTime || 0) < a || (audio.currentTime || 0) >= b) {
+        audio.currentTime = a;
+      }
+      emitir();
+      return { a: a, b: b };
+    }
+    function quitarBucle() {
+      bucle = null;
+      emitir();
+    }
     var desconectarMS = conectarMediaSession(audio, cb.meta, {
       alternar: alternar, retroceder: retroceder, adelantar: adelantar, irA: irA,
     });
 
     function destruir() {
+      bucle = null;
       desconectarMS();
       audio.pause();
       audio.removeAttribute('src');
@@ -138,6 +195,8 @@ window.Reproductor = (function () {
       adelantar: adelantar,
       irA: irA,
       fijarVelocidad: fijarVelocidad,
+      fijarBucle: fijarBucle,
+      quitarBucle: quitarBucle,
       destruir: destruir,
       get reproduciendo() { return !audio.paused && !audio.ended; },
     };
