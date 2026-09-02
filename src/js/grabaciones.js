@@ -46,6 +46,7 @@ window.Grabaciones = (function () {
       creado: Date.now(),
       mime: meta.mime || (blob && blob.type) || '',
       dur: meta.dur || 0,
+      picos: Array.isArray(meta.picos) ? meta.picos : [],
     };
     return window.Archivos.guardar('grab:' + g.id, blob).then(function () {
       var l = _leer();

@@ -355,7 +355,7 @@ window.Pagina_songs = (function () {
     });
     return Promise.all(tareas).catch(function (e) {
       console.error('No se pudo guardar un archivo:', e);
-      window.alert('No se pudo guardar uno de los archivos.');
+      window.UI.aviso('No se pudo guardar uno de los archivos.', { tipo: 'error' });
     });
   }
 
@@ -363,10 +363,15 @@ window.Pagina_songs = (function () {
     if (!idEditando) return;
     var c = window.Canciones.obtener(idEditando);
     var nombre = c ? c.titulo : 'esta canción';
-    if (!window.confirm('¿Eliminar «' + nombre + '»? No se puede deshacer.')) return;
-    window.Canciones.borrar(idEditando);
-    cerrarHoja();
-    pintarLista();
+    var id = idEditando;
+    window.UI.confirmar('¿Eliminar «' + nombre + '»? No se puede deshacer.', {
+      ok: 'Eliminar', peligro: true,
+    }).then(function (ok) {
+      if (!ok) return;
+      window.Canciones.borrar(id);
+      cerrarHoja();
+      pintarLista();
+    });
   }
 
   /* ---------- Utilidades ---------- */

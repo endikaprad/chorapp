@@ -45,23 +45,40 @@
    Acento: cobalto un punto más claro para que "encienda"
    sobre fondo oscuro y mantenga contraste AA con texto blanco.
    ============================================================ */
+/* Tokens del modo oscuro. Se aplican cuando:
+     - el sistema está en oscuro y la usuaria NO ha forzado el modo claro
+       (modo "automático", el comportamiento por defecto), o
+     - la usuaria ha elegido explícitamente el modo oscuro (data-theme="dark").
+   El botón de la cabecera (js/tema.js) escribe data-theme en <html>. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-acento: #5A67E8;         /* cobalto aclarado: contraste AA con texto blanco */
-    --color-acento-oscuro: #7C88FF;  /* usado como texto sobre fondos tenues: más claro */
-    --color-acento-suave: #1E1E3A;   /* chips y resaltados: cobalto muy apagado */
-    --color-texto: #F2EFEA;          /* crema muy claro, nunca blanco puro */
-    --color-texto-2: #A7A099;        /* metadatos, subtítulos */
-    --color-fondo: #12100E;          /* negro cálido, no azulado */
-    --color-superficie: #1C1917;     /* tarjetas: un peldaño sobre el fondo */
-    --color-borde: #322D28;          /* borde sutil cálido */
-
+  :root:not([data-theme="light"]) {
+    --color-acento: #5A67E8;
+    --color-acento-oscuro: #7C88FF;
+    --color-acento-suave: #1E1E3A;
+    --color-texto: #F2EFEA;
+    --color-texto-2: #A7A099;
+    --color-fondo: #12100E;
+    --color-superficie: #1C1917;
+    --color-borde: #322D28;
     --estado-aprendida: #7FB98E;
     --estado-progreso: #E0A857;
     --estado-pendiente: #8E877F;
-
     --sombra-sobre-acento: 0 1px 2px rgba(0, 0, 0, 0.35);
   }
+}
+:root[data-theme="dark"] {
+  --color-acento: #5A67E8;         /* cobalto aclarado: contraste AA con texto blanco */
+  --color-acento-oscuro: #7C88FF;  /* usado como texto sobre fondos tenues: más claro */
+  --color-acento-suave: #1E1E3A;   /* chips y resaltados: cobalto muy apagado */
+  --color-texto: #F2EFEA;          /* crema muy claro, nunca blanco puro */
+  --color-texto-2: #A7A099;        /* metadatos, subtítulos */
+  --color-fondo: #12100E;          /* negro cálido, no azulado */
+  --color-superficie: #1C1917;     /* tarjetas: un peldaño sobre el fondo */
+  --color-borde: #322D28;          /* borde sutil cálido */
+  --estado-aprendida: #7FB98E;
+  --estado-progreso: #E0A857;
+  --estado-pendiente: #8E877F;
+  --sombra-sobre-acento: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -204,8 +221,9 @@ button {
 }
 @media (prefers-color-scheme: dark) {
   /* Sobre fondo oscuro el "multiply" no aporta grano: se aclara y se sube */
-  .fondo-grano { mix-blend-mode: screen; opacity: 0.05; }
+  :root:not([data-theme="light"]) .fondo-grano { mix-blend-mode: screen; opacity: 0.05; }
 }
+:root[data-theme="dark"] .fondo-grano { mix-blend-mode: screen; opacity: 0.05; }
 
 /* ============================================================
    Cabecera contextual
@@ -258,6 +276,30 @@ button {
 @keyframes nota-flota {
   0%, 100% { transform: translateY(0) rotate(-4deg); }
   50%      { transform: translateY(-4px) rotate(4deg); }
+}
+
+/* Botón de tema (esquina superior derecha, solo en Inicio).
+   Cicla: automático → claro → oscuro → automático. */
+.header-tema {
+  margin-left: auto;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--color-acento);
+  background: var(--color-acento-suave);
+  transition: transform var(--dur-micro) var(--curva),
+              background var(--dur-micro) var(--curva);
+}
+.header-tema[hidden] { display: none; }
+.header-tema:active { transform: scale(0.9); }
+.header-tema svg { width: 22px; height: 22px; }
+.header-tema .tema-auto-arco { opacity: 0.45; }
+@media (prefers-reduced-motion: reduce) {
+  .header-tema { transition: none; }
 }
 
 /* ============================================================
@@ -356,6 +398,10 @@ button {
 .racha { display: flex; gap: 12px; }
 .racha__dato {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   background: var(--color-superficie);
   border: 1px solid var(--color-borde);
   border-radius: var(--radio);
@@ -1062,10 +1108,106 @@ button {
 }
 .visor-doc__abrir {
   display: inline-block;
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 14px;
   font-weight: 600;
   color: var(--color-acento);
+  background: var(--color-acento-suave);
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.visor-doc__abrir:active { transform: scale(0.97); }
+
+/* Visor de PDF propio (preview en línea) */
+.visor-pdf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  background: var(--color-superficie);
+  padding: 8px;
+  cursor: zoom-in;
+}
+.visor-pdf__pagina {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(7, 7, 7, 0.12);
+}
+.visor-pdf__cargando,
+.visor-pdf__resto,
+.visor-pdf__error {
+  font-size: 14px;
+  color: var(--color-texto-2);
+  text-align: center;
+  padding: 12px;
+}
+.visor-pdf__error { color: var(--estado-progreso); }
+
+/* Visor de PDF a pantalla completa */
+body.sin-scroll { overflow: hidden; }
+.visor-pdf-full {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-fondo);
+}
+.visor-pdf-full__barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-borde);
+  background: var(--color-superficie);
+}
+.visor-pdf-full__titulo {
+  font-weight: 700;
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.visor-pdf-full__cerrar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  line-height: 1;
+  border: 1px solid var(--color-borde);
+  border-radius: 10px;
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  cursor: pointer;
+}
+.visor-pdf-full__cerrar:active { transform: scale(0.95); }
+.visor-pdf-full__paginas {
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 16px;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.visor-pdf-full__lienzo {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+  will-change: transform;
+}
+.visor-pdf-full__lienzo .visor-pdf__pagina {
+  max-width: 900px;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(7, 7, 7, 0.18);
+  cursor: zoom-in;
 }
 .visor-partitura__img {
   display: block;
@@ -1087,30 +1229,39 @@ button {
 }
 
 /* Fichas de fragmentos difíciles */
+.fragmentos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
 .ficha {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  flex: 1 1 100%;
   background: var(--color-acento-suave);
   border-radius: 12px;
   padding: 12px 14px;
-  margin-bottom: 8px;
 }
 .ficha__texto { flex: 1; font-size: 15px; word-break: break-word; }
 .ficha__tiempo {
   flex-shrink: 0;
   align-self: flex-start;
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #fff;
   background: var(--color-acento);
   border-radius: 999px;
-  padding: 4px 9px;
-  margin-top: 1px;
+  padding: 5px 11px 5px 9px;
   transition: transform var(--dur-micro) var(--curva);
 }
-.ficha__tiempo:active { transform: scale(0.9); }
+.ficha__tiempo svg { width: 12px; height: 12px; }
+.ficha__tiempo:active { transform: scale(0.92); }
 .ficha__quitar {
   flex-shrink: 0;
   font-size: 15px;
@@ -1124,6 +1275,23 @@ button {
   transition: transform var(--dur-micro) var(--curva);
 }
 .ficha__quitar:active { transform: scale(0.85); }
+
+/* Fragmento que solo guarda el minuto: chip compacto, varios por fila */
+.ficha--solo {
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px 4px 5px;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+}
+.ficha--solo .ficha__tiempo { align-self: auto; }
+.ficha--solo .ficha__quitar {
+  min-width: 30px;
+  min-height: 30px;
+  font-size: 13px;
+}
 
 /* Notas de voz */
 .nota-voz {
@@ -1293,20 +1461,40 @@ button {
                          0 0 0 4px var(--color-acento-suave); }
 }
 
-.practica__pie {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 14px;
-  font-size: 14px;
-  color: var(--color-texto-2);
+.practica .racha { margin-bottom: 16px; }
+
+.practica__repasar {
+  width: 100%;
+  margin-bottom: 24px;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 16px;
 }
-.practica__sello {
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: var(--color-acento);
-  flex-shrink: 0;
+.practica__repasar .tarjeta__cuerpo { gap: 5px; }
+.practica__repasar .repasar__nota { margin-top: 0; white-space: normal; }
+.practica__repasar .chip { margin-top: 2px; }
+
+/* Curiosidades bajo el calendario — datitos sueltos, tono ligero */
+.practica__datos {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+.practica__datos li {
+  padding: 11px 4px;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--color-texto-2);
+  border-top: 1px solid var(--color-borde);
+  animation: dato-entra 260ms var(--curva) both;
+}
+.practica__datos li:first-child { border-top: 0; }
+@keyframes dato-entra {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .practica__datos li { animation: none; }
 }
 
 /* ============================================================
@@ -1525,6 +1713,33 @@ button {
   cursor: pointer;
 }
 .mini-player__barra:disabled { opacity: 0.55; }
+
+/* Onda de amplitud estilo nota de voz de WhatsApp */
+.mini-player__onda {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.mini-player__onda i {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--h, 30%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-acento) 26%, transparent);
+  transition: background-color var(--dur-micro) var(--curva);
+}
+.mini-player__onda i.is-hecho {
+  background: var(--color-acento);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mini-player__onda i { transition: none; }
+}
 .mini-player__tiempo {
   flex-shrink: 0;
   font-size: 12px;
@@ -1662,3 +1877,372 @@ button {
   .coro-post__card:active { transform: none; }
 }
 
+
+/* ============================================================
+   Transporte flotante — controles del reproductor "a mano"
+   mientras se mira la letra o la partitura a pantalla completa
+   (lightbox de imagen o visor de PDF). Portal al <body>, fijo
+   abajo y centrado, por encima de cualquier visor. No tapa la
+   partitura: es una píldora estrecha pegada al borde inferior.
+   ============================================================ */
+.transporte {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  transform: translate(-50%, 120%);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--color-borde);
+  background: color-mix(in srgb, var(--color-superficie) 82%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: blur(14px) saturate(1.1);
+  box-shadow: 0 6px 24px rgba(7, 7, 7, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 220ms var(--curva), opacity 220ms var(--curva);
+}
+.transporte.is-visible {
+  transform: translate(-50%, 0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.transporte__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-texto);
+  cursor: pointer;
+}
+.transporte__btn svg { width: 24px; height: 24px; }
+.transporte__btn:active { transform: scale(0.9); }
+.transporte__btn span {
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 1px;
+}
+.transporte__play {
+  background: var(--color-acento);
+  color: #fff;
+}
+.transporte__play svg { width: 22px; height: 22px; fill: currentColor; }
+.transporte__play.is-sonando { animation: player-pulso 2s var(--curva) infinite; }
+.transporte__tiempo {
+  min-width: 40px;
+  padding: 0 8px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-texto-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .transporte { transition: opacity 120ms linear; transform: translate(-50%, 0); }
+  .transporte:not(.is-visible) { transform: translate(-50%, 0); }
+  .transporte__btn:active { transform: none; }
+  .transporte__play.is-sonando { animation: none; }
+}
+
+/* Opción "sonar la canción mientras grabo" — bajo el botón de grabar
+   del modo estudio. Solo aparece si la canción tiene audio. */
+.grabar-opcion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 12px;
+  padding: 13px 15px;
+  font-size: 14.5px;
+  line-height: 1.35;
+  color: var(--color-texto);
+  cursor: pointer;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 14px;
+  transition: border-color 160ms var(--curva, cubic-bezier(0.4, 0, 0.2, 1)),
+              background-color 160ms var(--curva, cubic-bezier(0.4, 0, 0.2, 1));
+}
+.grabar-opcion:active { transform: scale(0.985); }
+.grabar-opcion input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.grabar-opcion__box {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--color-borde);
+  border-radius: 8px;
+  background: var(--color-fondo);
+  color: #fff;
+  transition: background-color 160ms var(--curva, cubic-bezier(0.4, 0, 0.2, 1)),
+              border-color 160ms var(--curva, cubic-bezier(0.4, 0, 0.2, 1));
+}
+.grabar-opcion__box svg {
+  width: 16px;
+  height: 16px;
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  transition: stroke-dashoffset 200ms var(--curva, cubic-bezier(0.4, 0, 0.2, 1));
+}
+.grabar-opcion input:checked ~ .grabar-opcion__box {
+  background: var(--color-acento);
+  border-color: var(--color-acento);
+}
+.grabar-opcion input:checked ~ .grabar-opcion__box svg { stroke-dashoffset: 0; }
+.grabar-opcion input:checked ~ .grabar-opcion__txt { color: var(--color-texto); }
+.grabar-opcion:has(input:checked) {
+  border-color: var(--color-acento);
+  background: var(--color-acento-suave);
+}
+.grabar-opcion input:focus-visible ~ .grabar-opcion__box {
+  outline: 2px solid var(--color-acento);
+  outline-offset: 2px;
+}
+.grabar-opcion.is-bloqueada { opacity: 0.55; cursor: default; }
+.grabar-opcion.is-bloqueada:active { transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .grabar-opcion, .grabar-opcion__box, .grabar-opcion__box svg { transition: none; }
+  .grabar-opcion:active { transform: none; }
+}
+
+/* ============================================================
+   Avisos y confirmaciones propias (js/ui.js)
+   Sustituyen a alert() / confirm() del navegador.
+   ============================================================ */
+
+/* --- Toast: mensajes efímeros sobre la barra de navegación --- */
+.ui-toasts {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--alto-nav) + env(safe-area-inset-bottom) + 14px);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  pointer-events: none;
+}
+.ui-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  padding: 13px 16px;
+  border-radius: 14px;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  color: var(--color-texto);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.35;
+  box-shadow: 0 12px 34px color-mix(in srgb, var(--color-texto) 22%, transparent);
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity var(--dur-micro) var(--curva), transform var(--dur-micro) var(--curva);
+}
+.ui-toast.is-visible { opacity: 1; transform: translateY(0); }
+.ui-toast__ic { flex-shrink: 0; width: 20px; height: 20px; color: var(--color-acento); }
+.ui-toast__ic svg { width: 100%; height: 100%; }
+.ui-toast__txt { min-width: 0; }
+.ui-toast--ok .ui-toast__ic { color: var(--estado-aprendida); }
+.ui-toast--error .ui-toast__ic { color: #b3261e; }
+[data-theme="dark"] .ui-toast--error .ui-toast__ic,
+:root:not([data-theme="light"]) .ui-toast--error .ui-toast__ic { color: #ff6b5e; }
+
+/* --- Modal de confirmación centrado --- */
+.ui-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.ui-modal__fondo {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-texto) 45%, transparent);
+  opacity: 0;
+  transition: opacity var(--dur-pagina) var(--curva);
+}
+.ui-modal.is-abierta .ui-modal__fondo { opacity: 1; }
+.ui-modal__panel {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  background: var(--color-fondo);
+  border: 1px solid var(--color-borde);
+  border-radius: 20px;
+  padding: 22px 20px 16px;
+  box-shadow: 0 20px 50px color-mix(in srgb, var(--color-texto) 28%, transparent);
+  opacity: 0;
+  transform: translateY(14px) scale(0.96);
+  transition: opacity var(--dur-pagina) var(--curva), transform var(--dur-pagina) var(--curva);
+}
+.ui-modal.is-abierta .ui-modal__panel { opacity: 1; transform: translateY(0) scale(1); }
+.ui-modal__titulo { font-size: 19px; margin: 0 0 8px; }
+.ui-modal__texto {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--color-texto-2);
+}
+.ui-modal__acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+}
+.ui-modal__acciones .btn--texto { margin-left: auto; }
+.btn--peligro {
+  background: #b3261e;
+  color: #fff;
+}
+.btn--peligro:active { background: #8f1e17; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-toast { transition: opacity 120ms linear; transform: none; }
+  .ui-toast.is-visible { transform: none; }
+  .ui-modal__fondo, .ui-modal__panel { transition: opacity 120ms linear; }
+  .ui-modal__panel { transform: none; }
+  .ui-modal.is-abierta .ui-modal__panel { transform: none; }
+}
+
+/* ============================================================
+   Control remoto — aviso y bloqueo lanzados desde el panel
+   privado (js/control-remoto.js). Solo transform y opacity.
+   ============================================================ */
+
+/* --- Overlay de bloqueo: tapa toda la app ------------------ */
+body.con-bloqueo-remoto { overflow: hidden; }
+
+.bloqueo-remoto {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: var(--color-fondo);
+  opacity: 0;
+  transition: opacity var(--dur-pagina) var(--curva);
+}
+.bloqueo-remoto.is-visible { opacity: 1; }
+
+.bloqueo-remoto__caja {
+  max-width: 340px;
+  text-align: center;
+  transform: translateY(10px) scale(0.98);
+  transition: transform var(--dur-pagina) var(--curva);
+}
+.bloqueo-remoto.is-visible .bloqueo-remoto__caja { transform: none; }
+
+.bloqueo-remoto__ic {
+  display: inline-flex;
+  width: 56px;
+  height: 56px;
+  color: var(--color-acento);
+}
+.bloqueo-remoto__ic svg { width: 100%; height: 100%; }
+
+.bloqueo-remoto__titulo {
+  margin: 14px 0 6px;
+  font-size: 21px;
+  color: var(--color-texto);
+}
+.bloqueo-remoto__texto {
+  margin: 0 0 18px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-texto-2);
+}
+.bloqueo-remoto__reloj {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-acento);
+}
+.bloqueo-remoto__pie {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--color-texto-2);
+}
+
+/* --- Aviso: tarjeta centrada que hay que cerrar a mano ---- */
+.aviso-remoto {
+  position: fixed;
+  inset: 0;
+  z-index: 19000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.aviso-remoto__fondo {
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 7, 7, 0.42);
+  opacity: 0;
+  transition: opacity var(--dur-micro) var(--curva);
+}
+.aviso-remoto.is-abierta .aviso-remoto__fondo { opacity: 1; }
+
+.aviso-remoto__panel {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  padding: 26px 22px 22px;
+  text-align: center;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  box-shadow: 0 18px 50px rgba(7, 7, 7, 0.22);
+  opacity: 0;
+  transform: translateY(12px) scale(0.96);
+  transition: opacity var(--dur-micro) var(--curva),
+              transform var(--dur-micro) var(--curva);
+}
+.aviso-remoto.is-abierta .aviso-remoto__panel { opacity: 1; transform: none; }
+
+.aviso-remoto__ic {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  color: var(--color-acento);
+}
+.aviso-remoto__ic svg { width: 100%; height: 100%; }
+
+.aviso-remoto__texto {
+  margin: 12px 0 20px;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--color-texto);
+}
+.aviso-remoto__ok { width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bloqueo-remoto, .aviso-remoto__fondo, .aviso-remoto__panel {
+    transition: opacity 120ms linear;
+  }
+  .bloqueo-remoto__caja,
+  .aviso-remoto.is-abierta .aviso-remoto__panel { transform: none; }
+  .bloqueo-remoto__caja { transition: none; }
+}

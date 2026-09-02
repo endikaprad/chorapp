@@ -1,0 +1,5 @@
+{
+  "dbUrl": "https://chorapp-d06a8-default-rtdb.europe-west1.firebasedatabase.app",
+  "segundosSondeo": 10,
+  "ventanaAvisoHoras": 6
+}

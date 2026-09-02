@@ -8,7 +8,7 @@ window.Pagina_recordings = (function () {
 
   var raiz, selCancion, btnRec, btnRecTxt, aviso, lista, vacio;
   var grabadora = null, crono = null, urls = [];
-  var obs = null;
+  var obs = null, vacioP = null, vacioTxt = '';
 
   function iniciar(contenedor) {
     limpiar();
@@ -20,6 +20,8 @@ window.Pagina_recordings = (function () {
     aviso = raiz.querySelector('[data-aviso]');
     lista = raiz.querySelector('[data-lista]');
     vacio = raiz.querySelector('[data-vacio]');
+    vacioP = vacio ? vacio.querySelector('p') : null;
+    vacioTxt = vacioP ? vacioP.innerHTML : '';
 
     // Rellena el desplegable con las canciones.
     (window.Canciones ? window.Canciones.listar() : []).forEach(function (c) {
@@ -37,6 +39,7 @@ window.Pagina_recordings = (function () {
     }
 
     btnRec.addEventListener('click', alternar);
+    selCancion.addEventListener('change', pintarLista);
     pintarLista();
 
     var vista = document.getElementById('vista');
@@ -102,6 +105,7 @@ window.Pagina_recordings = (function () {
         titulo: c ? c.titulo : 'Sin canción concreta',
         mime: blob.type,
         dur: Math.round(dur),
+        picos: g.picos(),
       }, blob).then(pintarLista);
     });
   }
@@ -112,8 +116,16 @@ window.Pagina_recordings = (function () {
     urls.forEach(function (u) { window.Archivos.liberar(u); });
     urls = [];
 
-    var grabs = window.Grabaciones ? window.Grabaciones.listar() : [];
+    var filtroId = selCancion && selCancion.value ? selCancion.value : null;
+    var grabs = window.Grabaciones
+      ? (filtroId ? window.Grabaciones.listarDeCancion(filtroId) : window.Grabaciones.listar())
+      : [];
     vacio.hidden = grabs.length > 0;
+    if (vacioP && filtroId) {
+      vacioP.textContent = 'Todavía no hay grabaciones de esta canción. Pulsa Empezar a grabar y canta.';
+    } else if (vacioP) {
+      vacioP.innerHTML = vacioTxt;
+    }
     lista.innerHTML = '';
     if (!grabs.length) return;
 
@@ -133,13 +145,16 @@ window.Pagina_recordings = (function () {
           '<button type="button" class="ficha__quitar" aria-label="Eliminar grabación">✕</button>' +
         '</div>';
       var audio = fila.querySelector('audio');
-      window.MiniPlayer.montar(fila.querySelector('[data-mp]'), g.dur || 0);
+      window.MiniPlayer.montar(fila.querySelector('[data-mp]'), g.dur || 0, g.picos);
       window.Grabaciones.url(g.id).then(function (u) {
         if (u) { urls.push(u); audio.src = u; }
       });
       fila.querySelector('.ficha__quitar').addEventListener('click', function () {
-        if (!window.confirm('¿Eliminar esta grabación? No se puede deshacer.')) return;
-        window.Grabaciones.borrar(g.id).then(pintarLista);
+        window.UI.confirmar('¿Eliminar esta grabación? No se puede deshacer.', {
+          ok: 'Eliminar', peligro: true,
+        }).then(function (ok) {
+          if (ok) window.Grabaciones.borrar(g.id).then(pintarLista);
+        });
       });
       cont.appendChild(fila);
     });

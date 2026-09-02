@@ -140,8 +140,11 @@ window.Pagina_home = (function () {
     var lista = raiz.querySelector('[data-repasar-lista]');
     if (!seccion || !lista) return;
 
+    // Si la canción ya está aprendida, sus fragmentos difíciles dejan de
+    // pesar: no tiene sentido invitar a repasarlos desde Inicio.
     var conFragmentos = canciones.filter(function (c) {
-      return Array.isArray(c.fragmentos) && c.fragmentos.length > 0;
+      return c.estado !== 'aprendida' &&
+             Array.isArray(c.fragmentos) && c.fragmentos.length > 0;
     }).sort(function (a, b) {
       return (b.actualizada || 0) - (a.actualizada || 0);
     }).slice(0, 3);

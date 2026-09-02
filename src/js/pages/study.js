@@ -15,8 +15,11 @@ window.Pagina_study = (function () {
   'use strict';
 
   var cont, cancion, reproductor, grabadora, obs;
+  var transporte = null;      // píldora flotante de controles (letra/partitura a pantalla completa)
+  var transObs = null;        // observa la apertura de visores a pantalla completa
   var urls = [];              // object URLs a revocar al salir
   var cronoNota = null;       // intervalo del contador de grabación
+  var estaGrabando = false;   // true mientras se graba (para mostrar el transporte a mano)
   var notaT0 = 0;             // inicio de la grabación de nota (ms)
   var tiempoActual = 0;       // posición del audio ahora mismo (s)
   var duracionAudio = 0;      // duración total del audio (s)
@@ -64,9 +67,12 @@ window.Pagina_study = (function () {
     if (reproductor) { reproductor.destruir(); reproductor = null; }
     if (grabadora) { grabadora.cancelar(); grabadora = null; }
     if (cronoNota) { clearInterval(cronoNota); cronoNota = null; }
+    estaGrabando = false;
     tiempoActual = 0; duracionAudio = 0;
     urls.forEach(function (u) { window.Archivos.liberar(u); });
     urls = [];
+    if (window.VisorPDF) window.VisorPDF.cerrar();
+    desmontarTransporte();
     desmontarLightbox();
   }
 
@@ -110,6 +116,7 @@ window.Pagina_study = (function () {
     });
 
     reproductor = window.Reproductor.crear(audio, {
+      meta: { titulo: cancion.titulo, compositor: cancion.compositor },
       onEstado: function (s) {
         // .hidden como propiedad no existe en <svg>: hay que tocar el atributo.
         icPlay.toggleAttribute('hidden', s.reproduciendo);
@@ -125,6 +132,7 @@ window.Pagina_study = (function () {
         }
         velValor.textContent = fmtVel(s.velocidad);
         if (!velBarra.matches(':active')) velBarra.value = String(s.velocidad);
+        sincronizarTransporte(s);
       },
     });
 
@@ -138,6 +146,92 @@ window.Pagina_study = (function () {
     barra.addEventListener('input', function () {
       if (audio.duration) reproductor.irA((barra.value / 1000) * audio.duration);
     });
+
+    montarTransporte();
+
+    // Opción "sonar la canción mientras grabo" (solo con audio disponible).
+    var opt = q('[data-grabar-con-audio]');
+    var chkAudio = q('[data-grabar-con-audio-chk]');
+    if (opt && chkAudio) {
+      opt.hidden = false;
+      chkAudio.checked = window.Almacen.leer('estudio:grabarConAudio', true) !== false;
+      chkAudio.addEventListener('change', function () {
+        window.Almacen.guardar('estudio:grabarConAudio', chkAudio.checked);
+      });
+    }
+  }
+
+  /* ---------- Transporte flotante ----------
+     Maite abre la letra o la partitura a pantalla completa mientras
+     escucha la canción. En ese modo el reproductor de la página queda
+     tapado, así que sacamos una píldora fija abajo con lo imprescindible:
+     −5 s, play/pausa y +5 s. Vale para imagen (lightbox) y para PDF
+     (visor-pdf-full), y no estorba: es estrecha y pegada al borde. */
+
+  function montarTransporte() {
+    if (transporte || !reproductor) return;
+
+    transporte = document.createElement('div');
+    transporte.className = 'transporte';
+    transporte.setAttribute('role', 'group');
+    transporte.setAttribute('aria-label', 'Controles de la canción');
+    transporte.innerHTML =
+      '<button type="button" class="transporte__btn" data-tp-retro aria-label="Retroceder 5 segundos">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4 4 11l7 7"/><path d="M4 11h10a6 6 0 0 1 0 12h-3"/></svg>' +
+        '<span>5</span>' +
+      '</button>' +
+      '<button type="button" class="transporte__btn transporte__play" data-tp-play aria-label="Reproducir">' +
+        '<svg class="tp-ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg>' +
+        '<svg class="tp-ic-pause" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>' +
+      '</button>' +
+      '<button type="button" class="transporte__btn" data-tp-adelante aria-label="Adelantar 5 segundos">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 4l7 7-7 7"/><path d="M20 11H10a6 6 0 0 0 0 12h3"/></svg>' +
+        '<span>5</span>' +
+      '</button>' +
+      '<span class="transporte__tiempo" data-tp-tiempo aria-hidden="true">0:00</span>';
+
+    document.body.appendChild(transporte);
+
+    transporte.querySelector('[data-tp-play]').addEventListener('click', function () { reproductor.alternar(); });
+    transporte.querySelector('[data-tp-retro]').addEventListener('click', function () { reproductor.retroceder(5); });
+    transporte.querySelector('[data-tp-adelante]').addEventListener('click', function () { reproductor.adelantar(5); });
+
+    // Mostrarlo solo cuando hay un visor a pantalla completa abierto.
+    transObs = new MutationObserver(evaluarTransporte);
+    transObs.observe(document.body, {
+      childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class'],
+    });
+    evaluarTransporte();
+  }
+
+  function visorAPantallaCompletaAbierto() {
+    return !!(document.querySelector('.visor-pdf-full') ||
+              document.querySelector('.lightbox:not([hidden])'));
+  }
+
+  function evaluarTransporte() {
+    if (!transporte) return;
+    // A mano cuando hay un visor a pantalla completa abierto o mientras se graba.
+    transporte.classList.toggle('is-visible',
+      visorAPantallaCompletaAbierto() || estaGrabando);
+  }
+
+  function sincronizarTransporte(s) {
+    if (!transporte) return;
+    var btn = transporte.querySelector('[data-tp-play]');
+    var icPlay = transporte.querySelector('.tp-ic-play');
+    var icPause = transporte.querySelector('.tp-ic-pause');
+    icPlay.toggleAttribute('hidden', s.reproduciendo);
+    icPause.toggleAttribute('hidden', !s.reproduciendo);
+    btn.classList.toggle('is-sonando', s.reproduciendo);
+    btn.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
+    transporte.querySelector('[data-tp-tiempo]').textContent = fmtTiempo(s.actual);
+  }
+
+  function desmontarTransporte() {
+    if (transObs) { transObs.disconnect(); transObs = null; }
+    if (transporte && transporte.parentNode) transporte.parentNode.removeChild(transporte);
+    transporte = null;
   }
 
   /* ---------- Letra ---------- */
@@ -163,9 +257,14 @@ window.Pagina_study = (function () {
     window.Archivos.obtener(cancion.id + ':letra').then(function (blob) {
       if (!blob) { vacio.hidden = false; return; }
       if (esPdf) {
-        var u = URL.createObjectURL(blob); urls.push(u);
-        doc.innerHTML = '<object data="' + u + '" type="application/pdf"></object>' +
-          '<a class="visor-doc__abrir" href="' + u + '" target="_blank" rel="noopener">Abrir la letra</a>';
+        doc.innerHTML = '<div class="visor-pdf" data-pdf-caja></div>' +
+          '<button type="button" class="visor-doc__abrir" data-pdf-abrir>Abrir la letra a pantalla completa</button>';
+        var caja = doc.querySelector('[data-pdf-caja]');
+        window.VisorPDF.render(caja, blob, { paginas: 3 }).catch(function () {});
+        caja.addEventListener('click', function () { window.VisorPDF.abrir(blob, 'Letra'); });
+        doc.querySelector('[data-pdf-abrir]').addEventListener('click', function () {
+          window.VisorPDF.abrir(blob, 'Letra');
+        });
         doc.hidden = false;
       } else if (esImagen) {
         var ui = URL.createObjectURL(blob); urls.push(ui);
@@ -194,31 +293,39 @@ window.Pagina_study = (function () {
     vacio.hidden = true;
 
     var esPdf = /pdf/i.test(meta.mime) || /\.pdf$/i.test(meta.nombre || '');
+    if (esPdf) {
+      window.Archivos.obtener(cancion.id + ':partitura').then(function (blob) {
+        if (!blob) { vacio.hidden = false; return; }
+        doc.innerHTML = '<div class="visor-pdf" data-pdf-caja></div>' +
+          '<button type="button" class="visor-doc__abrir" data-pdf-abrir>Abrir la partitura a pantalla completa</button>';
+        var caja = doc.querySelector('[data-pdf-caja]');
+        window.VisorPDF.render(caja, blob).catch(function () {});
+        caja.addEventListener('click', function () { window.VisorPDF.abrir(blob, 'Partitura'); });
+        doc.querySelector('[data-pdf-abrir]').addEventListener('click', function () {
+          window.VisorPDF.abrir(blob, 'Partitura');
+        });
+        doc.hidden = false;
+      });
+      return;
+    }
     window.Archivos.url(cancion.id + ':partitura').then(function (u) {
       if (!u) { vacio.hidden = false; return; }
       urls.push(u);
-      if (esPdf) {
-        doc.innerHTML = '<object data="' + u + '" type="application/pdf"></object>' +
-          '<a class="visor-doc__abrir" href="' + u + '" target="_blank" rel="noopener">Abrir la partitura</a>';
-        doc.hidden = false;
-      } else {
-        img.src = u;
-        cajaImg.hidden = false;
-        cajaImg.onclick = function () { abrirLightbox(u); };
-      }
+      img.src = u;
+      cajaImg.hidden = false;
+      cajaImg.onclick = function () { abrirLightbox(u); };
     });
   }
 
   /* ---------- Fragmentos difíciles ---------- */
 
   function marcarFragmento() {
-    var texto = window.prompt('Describe el fragmento difícil (compás, frase, qué cuesta…):', '');
-    if (texto == null) return;
-    texto = texto.trim();
-    if (!texto) return;
-    // Si hay audio cargado, guardamos también el momento en el que está sonando.
-    var seg = (reproductor && duracionAudio) ? tiempoActual : null;
-    window.Canciones.agregarFragmento(cancion.id, texto, seg);
+    // Solo se guarda el momento del audio: Maite no tiene que escribir nada.
+    if (!reproductor || !duracionAudio) {
+      window.UI.aviso('Carga el audio de la canción para poder marcar el minuto difícil.');
+      return;
+    }
+    window.Canciones.agregarFragmento(cancion.id, '', tiempoActual);
     refrescar();
     pintarFragmentos();
     pintarMarcas();
@@ -236,7 +343,7 @@ window.Pagina_study = (function () {
       var m = document.createElement('span');
       m.className = 'player__marca';
       m.style.left = pct + '%';
-      m.title = fmtTiempo(f.segundo) + ' · ' + f.texto;
+      m.title = f.texto ? (fmtTiempo(f.segundo) + ' · ' + f.texto) : fmtTiempo(f.segundo);
       caja.appendChild(m);
     });
   }
@@ -245,20 +352,22 @@ window.Pagina_study = (function () {
     var caja = q('[data-fragmentos]');
     var frags = cancion.fragmentos || [];
     if (!frags.length) {
-      caja.innerHTML = '<p class="visor-vacio">Marca las partes que se te resisten para tenerlas a mano.</p>';
+      caja.innerHTML = '<p class="visor-vacio">Mientras suena el audio, pulsa “Marcar este minuto” en las partes que se te resisten.</p>';
       return;
     }
     caja.innerHTML = '';
     frags.slice().reverse().forEach(function (f) {
       var fila = document.createElement('div');
-      fila.className = 'ficha';
       var tieneTiempo = typeof f.segundo === 'number' && isFinite(f.segundo);
+      var soloTiempo = tieneTiempo && !f.texto;
+      fila.className = soloTiempo ? 'ficha ficha--solo' : 'ficha';
       fila.innerHTML =
         (tieneTiempo
           ? '<button type="button" class="ficha__tiempo" aria-label="Ir a este momento del audio">' +
+              '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5a1 1 0 0 1 1.53-.85l9 6.5a1 1 0 0 1 0 1.7l-9 6.5A1 1 0 0 1 8 18.5z"/></svg>' +
               fmtTiempo(f.segundo) + '</button>'
           : '') +
-        '<p class="ficha__texto">' + escapar(f.texto) + '</p>' +
+        (f.texto ? '<p class="ficha__texto">' + escapar(f.texto) + '</p>' : '') +
         '<button type="button" class="ficha__quitar" aria-label="Quitar fragmento">✕</button>';
       if (tieneTiempo) {
         fila.querySelector('.ficha__tiempo').addEventListener('click', function () {
@@ -280,34 +389,50 @@ window.Pagina_study = (function () {
      window.Grabaciones, así que aparece aquí y también en el apartado
      Grabaciones de la app, todas juntas. */
 
+  /* ¿Hay audio de la canción para acompañar la grabación? */
+  function tieneAudio() {
+    return !!(reproductor && cancion.archivos && cancion.archivos.audio);
+  }
+
   function alternarGrabacion() {
     var btn = q('[data-grabar-nota]');
     var txt = q('[data-grabar-nota-txt]');
+    var opt = q('[data-grabar-con-audio]');
+    var chkAudio = q('[data-grabar-con-audio-chk]');
 
     if (grabadora && grabadora.grabando) {
       var g = grabadora; grabadora = null;
       if (cronoNota) { clearInterval(cronoNota); cronoNota = null; }
       btn.disabled = true;
+      // Al terminar la toma, parar la canción que la acompañaba.
+      if (reproductor && reproductor.reproduciendo) reproductor.alternar();
+      estaGrabando = false;
+      evaluarTransporte();
       var dur = Math.round((Date.now() - notaT0) / 1000);
       g.parar().then(function (blob) {
         btn.disabled = false;
         btn.classList.remove('is-grabando');
         txt.textContent = 'Grabar';
+        if (opt) opt.classList.remove('is-bloqueada');
+        if (chkAudio) chkAudio.disabled = false;
         if (!blob || !blob.size) return;
         return window.Grabaciones.crear({
           cancionId: cancion.id,
           titulo: cancion.titulo,
           mime: blob.type,
           dur: dur,
+          picos: g.picos(),
         }, blob).then(pintarGrabaciones);
       });
       return;
     }
 
     if (!window.Grabadora.soportado()) {
-      window.alert('Este dispositivo no permite grabar audio desde la app.');
+      window.UI.aviso('Este dispositivo no permite grabar audio desde la app.', { tipo: 'error' });
       return;
     }
+    var conAudio = tieneAudio() && chkAudio && chkAudio.checked;
+
     grabadora = window.Grabadora.crear();
     grabadora.iniciar().then(function () {
       btn.classList.add('is-grabando');
@@ -316,9 +441,20 @@ window.Pagina_study = (function () {
       cronoNota = setInterval(function () {
         txt.textContent = 'Detener (' + fmtTiempo((Date.now() - notaT0) / 1000) + ')';
       }, 500);
+
+      estaGrabando = true;
+      evaluarTransporte();               // saca el reproductor "a mano"
+      if (opt) opt.classList.add('is-bloqueada');
+      if (chkAudio) chkAudio.disabled = true;
+
+      // Acompañar la voz con la canción sonando desde el principio.
+      if (conAudio) {
+        reproductor.irA(0);
+        if (!reproductor.reproduciendo) reproductor.alternar();
+      }
     }).catch(function () {
       grabadora = null;
-      window.alert('No se pudo acceder al micrófono.');
+      window.UI.aviso('No se pudo acceder al micrófono.', { tipo: 'error' });
     });
   }
 
@@ -360,13 +496,16 @@ window.Pagina_study = (function () {
         window.MiniPlayer.plantilla() +
         '<button type="button" class="ficha__quitar" aria-label="Eliminar grabación">✕</button>';
       var audio = fila.querySelector('audio');
-      window.MiniPlayer.montar(fila.querySelector('[data-mp]'), g.dur || 0);
+      window.MiniPlayer.montar(fila.querySelector('[data-mp]'), g.dur || 0, g.picos);
       window.Grabaciones.url(g.id).then(function (u) {
         if (u) { urls.push(u); audio.src = u; }
       });
       fila.querySelector('.ficha__quitar').addEventListener('click', function () {
-        if (!window.confirm('¿Eliminar esta grabación? No se puede deshacer.')) return;
-        window.Grabaciones.borrar(g.id).then(pintarGrabaciones);
+        window.UI.confirmar('¿Eliminar esta grabación? No se puede deshacer.', {
+          ok: 'Eliminar', peligro: true,
+        }).then(function (ok) {
+          if (ok) window.Grabaciones.borrar(g.id).then(pintarGrabaciones);
+        });
       });
       caja.appendChild(fila);
     });

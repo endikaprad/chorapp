@@ -12,15 +12,20 @@
     </div>
   </div>
 
+  <button class="tarjeta practica__repasar stagger" type="button" data-repasar hidden>
+    <span class="tarjeta__cuerpo">
+      <span class="tarjeta__titulo" data-repasar-titulo></span>
+      <span class="repasar__nota" data-repasar-nota></span>
+    </span>
+    <span class="chip chip--progreso">Repasar</span>
+  </button>
+
   <h2 class="seccion-titulo">Tu mes</h2>
   <div class="tarjeta-lisa">
     <div data-calendario></div>
   </div>
 
-  <div class="practica__pie" data-pie hidden>
-    <span class="practica__sello" aria-hidden="true"></span>
-    <span data-pie-txt></span>
-  </div>
+  <ul class="practica__datos" data-datos hidden></ul>
 
   <div class="vacio" data-vacio hidden>
     <span class="vacio__icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18"/><path d="M8 2.5v4M16 2.5v4"/></svg></span>
