@@ -90,7 +90,7 @@ window.Pagina_songs = (function () {
 
   function limpiarRestos() {
     Array.prototype.forEach.call(
-      document.querySelectorAll('body > [data-hoja], body > [data-fab-songs]'),
+      document.querySelectorAll('body > [data-hoja], body > [data-fab-songs], body > .menu-estado'),
       function (el) { el.remove(); }
     );
   }
@@ -135,24 +135,106 @@ window.Pagina_songs = (function () {
     var est = window.Canciones.ESTADOS[c.estado] || window.Canciones.ESTADOS.pendiente;
     var tieneAudio = !!(c.archivos && c.archivos.audio);
 
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'cancion';
-    btn.setAttribute('data-id', c.id);
-    btn.innerHTML =
+    var fila = document.createElement('div');
+    fila.className = 'cancion';
+    fila.setAttribute('data-id', c.id);
+
+    var abrir = document.createElement('button');
+    abrir.type = 'button';
+    abrir.className = 'cancion__abrir';
+    abrir.innerHTML =
       '<span class="cancion__cuerpo">' +
         '<span class="cancion__titulo">' + escapar(c.titulo) + '</span>' +
         (c.compositor ? '<span class="cancion__meta">' + escapar(c.compositor) + '</span>' : '') +
       '</span>' +
       (tieneAudio ? '<span class="cancion__audio" aria-label="Tiene audio">' +
         '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg></span>' : '') +
-      '<span class="chip chip--' + est.token + '">' + est.etiqueta + '</span>';
-
-    // Al tocar: abrir el Modo estudio de esta canción.
-    btn.addEventListener('click', function () {
+      '</span>';
+    abrir.addEventListener('click', function () {
       window.App.ir('estudio', { datos: { id: c.id } });
     });
-    return btn;
+
+    // Chip de estado: ahora es un botón que abre el selector rápido.
+    var chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip chip--boton chip--' + est.token;
+    chip.setAttribute('aria-label', 'Estado: ' + est.etiqueta + '. Toca para cambiarlo');
+    chip.innerHTML = '<span>' + est.etiqueta + '</span>' +
+      '<svg class="chip__flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+    chip.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      abrirSelectorEstado(c, chip);
+    });
+
+    fila.appendChild(abrir);
+    fila.appendChild(chip);
+    return fila;
+  }
+
+  /* ---------- Selector rápido de estado (sin abrir la hoja) ---------- */
+
+  var menuEstado = null;
+
+  function cerrarSelectorEstado() {
+    if (!menuEstado) return;
+    var m = menuEstado;
+    menuEstado = null;
+    m.classList.remove('is-abierto');
+    document.removeEventListener('click', cerrarSelectorEstado);
+    window.removeEventListener('resize', cerrarSelectorEstado);
+    var vista = document.getElementById('vista');
+    if (vista) vista.removeEventListener('scroll', cerrarSelectorEstado, true);
+    setTimeout(function () { m.remove(); }, 160);
+  }
+
+  function abrirSelectorEstado(c, chip) {
+    if (menuEstado) { cerrarSelectorEstado(); return; }
+    var actual = window.Canciones.obtener(c.id);
+    var estadoActual = actual ? actual.estado : c.estado;
+
+    menuEstado = document.createElement('div');
+    menuEstado.className = 'menu-estado';
+    ['pendiente', 'progreso', 'aprendida'].forEach(function (k) {
+      var e = window.Canciones.ESTADOS[k];
+      var op = document.createElement('button');
+      op.type = 'button';
+      op.className = 'menu-estado__op menu-estado__op--' + e.token +
+        (k === estadoActual ? ' is-actual' : '');
+      op.innerHTML = '<span class="menu-estado__punto"></span>' + e.etiqueta;
+      op.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        cerrarSelectorEstado();
+        if (k === estadoActual) return;
+        window.Canciones.fijarEstado(c.id, k);
+        primeraCarga = false;
+        pintarLista();
+        if (k === 'aprendida') celebrar();
+      });
+      menuEstado.appendChild(op);
+    });
+
+    document.body.appendChild(menuEstado);
+
+    var r = chip.getBoundingClientRect();
+    var ancho = menuEstado.offsetWidth;
+    var izq = Math.min(r.right - ancho, window.innerWidth - ancho - 10);
+    menuEstado.style.left = Math.max(10, izq) + 'px';
+    var alto = menuEstado.offsetHeight;
+    if (r.bottom + alto + 8 > window.innerHeight) {
+      menuEstado.style.top = (r.top - alto - 6) + 'px';
+    } else {
+      menuEstado.style.top = (r.bottom + 6) + 'px';
+    }
+
+    void menuEstado.offsetHeight;
+    menuEstado.classList.add('is-abierto');
+
+    setTimeout(function () {
+      document.addEventListener('click', cerrarSelectorEstado);
+      window.addEventListener('resize', cerrarSelectorEstado);
+      var vista = document.getElementById('vista');
+      if (vista) vista.addEventListener('scroll', cerrarSelectorEstado, true);
+    }, 0);
   }
 
   function vacioInicial() {
@@ -193,7 +275,7 @@ window.Pagina_songs = (function () {
 
   var ETIQUETA_BASE = {
     audio: 'Audio (MP3)',
-    letra: 'Letra (PDF o texto)',
+    letra: 'Letra (PDF, imagen o texto)',
     partitura: 'Partitura (imagen o PDF)',
   };
 

@@ -11,13 +11,13 @@
        estado:     'pendiente' | 'progreso' | 'aprendida',
        notas:      string,
        letraTexto: string,                    // letra escrita a mano (Fase 5)
-       fragmentos: [ { id, texto, creado } ],  // fragmentos difíciles (Fase 5)
+       fragmentos: [ { id, texto, creado, segundo? } ],  // fragmentos difíciles (Fase 5); segundo = momento del audio
        archivos:   {                           // metadatos; el blob va en Archivos (Fase 4)
                      audio:     null | { nombre, mime, tamano, guardado },
                      letra:     null | { … },
                      partitura: null | { … }
                    },
-       notasVoz:   [ { id, creado } ],         // blob en Archivos "<id>:voz:<notaId>"
+       notasVoz:   [ { id, creado } ],         // OBSOLETO: solo para migrar notas antiguas a window.Grabaciones
        creada:     number (timestamp),
        actualizada:number (timestamp)
      }
@@ -118,6 +118,12 @@ window.Canciones = (function () {
     return res;
   }
 
+  // Cambia solo el estado. Útil para el selector rápido de la lista.
+  function fijarEstado(id, estado) {
+    if (!ESTADOS[estado]) return null;
+    return _mutar(id, function (c) { c.estado = estado; });
+  }
+
   function actualizar(id, cambios) {
     return _mutar(id, function (c) {
       if (cambios.titulo != null) c.titulo = String(cambios.titulo).trim();
@@ -135,8 +141,11 @@ window.Canciones = (function () {
   }
 
   // --- Fragmentos difíciles
-  function agregarFragmento(id, texto) {
+  function agregarFragmento(id, texto, segundo) {
     var frag = { id: 'f-' + Date.now().toString(36), texto: String(texto || '').trim(), creado: Date.now() };
+    if (typeof segundo === 'number' && isFinite(segundo) && segundo >= 0) {
+      frag.segundo = Math.round(segundo);   // momento del audio donde aparece el fragmento
+    }
     _mutar(id, function (c) { c.fragmentos.push(frag); });
     return frag;
   }
@@ -146,12 +155,9 @@ window.Canciones = (function () {
     });
   }
 
-  // --- Notas de voz (metadatos; el audio va en Archivos)
-  function agregarNotaVoz(id) {
-    var nota = { id: 'v-' + Date.now().toString(36), creado: Date.now() };
-    _mutar(id, function (c) { c.notasVoz.push(nota); });
-    return nota;
-  }
+  // --- Notas de voz: función retirada. Las grabaciones del modo estudio
+  //     viven ahora en window.Grabaciones. Se conserva el borrado para
+  //     migrar las notas antiguas (ver study.js › migrarNotasVozAntiguas).
   function borrarNotaVoz(id, notaId) {
     return _mutar(id, function (c) {
       c.notasVoz = c.notasVoz.filter(function (v) { return v.id !== notaId; });
@@ -173,10 +179,10 @@ window.Canciones = (function () {
     obtener: obtener,
     crear: crear,
     actualizar: actualizar,
+    fijarEstado: fijarEstado,
     fijarArchivo: fijarArchivo,
     agregarFragmento: agregarFragmento,
     borrarFragmento: borrarFragmento,
-    agregarNotaVoz: agregarNotaVoz,
     borrarNotaVoz: borrarNotaVoz,
     borrar: borrar,
   };

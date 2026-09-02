@@ -28,6 +28,7 @@ window.Pagina_recordings = (function () {
       op.textContent = c.titulo;
       selCancion.appendChild(op);
     });
+    if (window.Selector) window.Selector.mejorar(selCancion);
 
     if (!window.Grabadora.soportado()) {
       btnRec.disabled = true;
@@ -128,10 +129,11 @@ window.Pagina_recordings = (function () {
             (g.dur ? ' · ' + fmt(g.dur) : '') + '</span>' +
         '</div>' +
         '<div class="grabacion__fila">' +
-          '<audio controls preload="none"></audio>' +
+          window.MiniPlayer.plantilla() +
           '<button type="button" class="ficha__quitar" aria-label="Eliminar grabación">✕</button>' +
         '</div>';
       var audio = fila.querySelector('audio');
+      window.MiniPlayer.montar(fila.querySelector('[data-mp]'), g.dur || 0);
       window.Grabaciones.url(g.id).then(function (u) {
         if (u) { urls.push(u); audio.src = u; }
       });

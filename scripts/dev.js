@@ -36,6 +36,45 @@ createServer(async (req, res) => {
   let ruta = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
   if (ruta === '/' || ruta === '\\') ruta = '/index.html';
 
+  // Proxy solo-desarrollo: permite probar la tarjeta "Del coro" en el
+  // navegador sin el bloqueo CORS de Instagram. En el APK la app llama a
+  // Instagram directamente (CapacitorHttp), así que esta ruta no se usa
+  // en producción — y en la PWA publicada simplemente devuelve 404.
+  if (url.pathname === '/api/coro') {
+    const handle = url.searchParams.get('handle') || '';
+    try {
+      const r = await fetch(
+        'https://www.instagram.com/api/v1/feed/user/' +
+          encodeURIComponent(handle) + '/username/?count=3',
+        {
+          headers: {
+            'x-ig-app-id': '936619743392459',
+            'x-asbd-id': '129477',
+            'x-requested-with': 'XMLHttpRequest',
+            'x-ig-www-claim': '0',
+            'Referer': 'https://www.instagram.com/' + encodeURIComponent(handle) + '/',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Dest': 'empty',
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+              '(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+          },
+        }
+      );
+      const cuerpo = await r.text();
+      res.writeHead(r.status, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      res.end(cuerpo);
+    } catch (e) {
+      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('proxy coro: ' + e.message);
+    }
+    return;
+  }
+
   let archivo = join(base, ruta);
   if (!existsSync(archivo) && !extname(archivo)) archivo = join(base, 'index.html');
 

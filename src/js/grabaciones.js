@@ -7,6 +7,9 @@
 
    Modelo:
      { id, cancionId | null, titulo, creado, mime, dur }
+
+   Las grabaciones se crean tanto desde este apartado como desde el
+   modo estudio de cada canción; todas viven aquí y se ven juntas.
    ============================================================ */
 
 window.Grabaciones = (function () {
@@ -27,6 +30,11 @@ window.Grabaciones = (function () {
   // Más recientes primero.
   function listar() {
     return _leer().slice().sort(function (a, b) { return (b.creado || 0) - (a.creado || 0); });
+  }
+
+  // Todas las de una canción, más recientes primero.
+  function listarDeCancion(cancionId) {
+    return listar().filter(function (g) { return g.cancionId === cancionId; });
   }
 
   // meta: { cancionId, titulo, mime, dur }   blob: Blob
@@ -65,6 +73,7 @@ window.Grabaciones = (function () {
 
   return {
     listar: listar,
+    listarDeCancion: listarDeCancion,
     crear: crear,
     borrar: borrar,
     url: url,

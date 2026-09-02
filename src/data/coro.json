@@ -1,0 +1,6 @@
+{
+  "_ayuda": "Sección 'Del coro' de la pantalla de Inicio. La app lee automáticamente la última publicación del perfil PÚBLICO de Instagram indicado en 'instagram' (sin @). Funciona solo en el APK instalado (usa el plugin CapacitorHttp para saltarse el bloqueo del navegador); en 'npm run dev' saldrá solo el enlace al perfil, es normal. Es un endpoint no oficial de Instagram: si algún día deja de responder, la app seguirá mostrando la última publicación guardada. Para cambiar de cuenta, edita 'instagram', 'usuario' y 'perfil'.",
+  "usuario": "@bihotsak",
+  "instagram": "bihotsak",
+  "perfil": "https://www.instagram.com/bihotsak/"
+}

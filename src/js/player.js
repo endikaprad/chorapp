@@ -1,6 +1,7 @@
 /* ============================================================
    player.js — Reproductor de audio del modo estudio.
-   Controles: play/pausa, −5 s, velocidad 0.75x / 1x / 1.25x.
+   Controles: play/pausa, −5 s, velocidad regulable 0.25x – 2.5x
+   con una barra deslizante.
 
    window.Reproductor.crear(elAudio, callbacks) devuelve un
    controlador. La UI (botones, barra) la pinta pages/study.js;
@@ -10,18 +11,25 @@
 window.Reproductor = (function () {
   'use strict';
 
-  var VELOCIDADES = [0.75, 1, 1.25];
+  var VEL_MIN = 0.25;
+  var VEL_MAX = 2.5;
+  var VEL_PASO = 0.05;
+
+  function limitarVel(v) {
+    v = Math.round((v || 1) / VEL_PASO) * VEL_PASO;
+    return Math.min(VEL_MAX, Math.max(VEL_MIN, Number(v.toFixed(2))));
+  }
 
   function crear(audio, cb) {
     cb = cb || {};
-    var velIdx = 1;
+    var velocidad = 1;
 
     function emitir() {
       if (cb.onEstado) cb.onEstado({
         reproduciendo: !audio.paused && !audio.ended,
         actual: audio.currentTime || 0,
         total: isFinite(audio.duration) ? audio.duration : 0,
-        velocidad: VELOCIDADES[velIdx],
+        velocidad: velocidad,
       });
     }
 
@@ -38,17 +46,22 @@ window.Reproductor = (function () {
       audio.currentTime = Math.max(0, (audio.currentTime || 0) - (seg || 5));
       emitir();
     }
+    function adelantar(seg) {
+      var tope = isFinite(audio.duration) ? audio.duration : Infinity;
+      audio.currentTime = Math.min(tope, (audio.currentTime || 0) + (seg || 5));
+      emitir();
+    }
     function irA(seg) {
       if (isFinite(audio.duration)) {
         audio.currentTime = Math.min(audio.duration, Math.max(0, seg));
         emitir();
       }
     }
-    function ciclarVelocidad() {
-      velIdx = (velIdx + 1) % VELOCIDADES.length;
-      audio.playbackRate = VELOCIDADES[velIdx];
+    function fijarVelocidad(v) {
+      velocidad = limitarVel(v);
+      audio.playbackRate = velocidad;
       emitir();
-      return VELOCIDADES[velIdx];
+      return velocidad;
     }
     function destruir() {
       audio.pause();
@@ -59,12 +72,13 @@ window.Reproductor = (function () {
     return {
       alternar: alternar,
       retroceder: retroceder,
+      adelantar: adelantar,
       irA: irA,
-      ciclarVelocidad: ciclarVelocidad,
+      fijarVelocidad: fijarVelocidad,
       destruir: destruir,
       get reproduciendo() { return !audio.paused && !audio.ended; },
     };
   }
 
-  return { crear: crear, VELOCIDADES: VELOCIDADES };
+  return { crear: crear, VEL_MIN: VEL_MIN, VEL_MAX: VEL_MAX, VEL_PASO: VEL_PASO };
 })();

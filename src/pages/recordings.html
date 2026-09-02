@@ -5,12 +5,12 @@
 
   <!-- Grabador -->
   <div class="grabador">
-    <label class="grabador__para">
-      <span class="campo__label">Para</span>
-      <select data-cancion>
+    <div class="grabador__para">
+      <span class="campo__label" id="grabador-para-lbl">Para</span>
+      <select data-cancion aria-labelledby="grabador-para-lbl">
         <option value="">Sin canción concreta</option>
       </select>
-    </label>
+    </div>
 
     <button class="grabador__boton" type="button" data-rec>
       <span class="grabador__punto" aria-hidden="true"></span>
