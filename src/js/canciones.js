@@ -163,6 +163,7 @@ window.Canciones = (function () {
     if (!Array.isArray(lista)) lista = [];
     _guardarTodo(lista.filter(function (c) { return c.id !== id; }));
     if (window.Archivos) window.Archivos.borrarCancion(id);
+    if (window.Grabaciones) window.Grabaciones.desvincular(id);
   }
 
   return {

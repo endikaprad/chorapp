@@ -932,3 +932,179 @@ button {
   font-size: 18px;
 }
 
+/* ============================================================
+   Práctica — calendario y estadísticas (Fase 6)
+   ============================================================ */
+.tarjeta-lisa {
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  padding: 14px;
+}
+
+.cal__cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.cal__mes { font-family: var(--fuente-titulo); font-weight: 700; font-size: 16px; }
+.cal__nav {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 20px;
+  color: var(--color-acento);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--dur-micro) var(--curva), background var(--dur-micro) var(--curva);
+}
+.cal__nav:active { transform: scale(0.9); background: var(--color-acento-suave); }
+
+.cal__semana,
+.cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal__semana {
+  margin-bottom: 4px;
+}
+.cal__semana span {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-texto-2);
+}
+
+.cal__dia {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  border-radius: 10px;
+  color: var(--color-texto);
+}
+.cal__dia--vacio { visibility: hidden; }
+.cal__dia--futuro { color: color-mix(in srgb, var(--color-texto-2) 55%, transparent); }
+
+.cal__dia--hecho {
+  background: var(--color-acento);
+  color: #fff;
+  font-weight: 700;
+  animation: cal-sello 320ms var(--curva) both;
+}
+@keyframes cal-sello {
+  0%   { opacity: 0; transform: scale(0.4); }
+  60%  { opacity: 1; transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+.cal__dia--hoy {
+  box-shadow: inset 0 0 0 2px var(--color-acento);
+}
+.cal__dia--hoy:not(.cal__dia--hecho) {
+  color: var(--color-acento);
+  font-weight: 700;
+  animation: cal-late 2.4s var(--curva) infinite;
+}
+@keyframes cal-late {
+  0%, 100% { box-shadow: inset 0 0 0 2px var(--color-acento); }
+  50%      { box-shadow: inset 0 0 0 2px var(--color-acento),
+                         0 0 0 4px var(--color-acento-suave); }
+}
+
+.practica__pie {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--color-texto-2);
+}
+.practica__sello {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--color-acento);
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Grabaciones — grabadora personal (Fase 7)
+   ============================================================ */
+.grabador {
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  padding: 16px;
+  margin-bottom: 8px;
+}
+.grabador__para { display: block; margin-bottom: 14px; }
+.grabador__para select {
+  width: 100%;
+  font: inherit;
+  color: var(--color-texto);
+  background: var(--color-fondo);
+  border: 1px solid var(--color-borde);
+  border-radius: 12px;
+  padding: 12px 14px;
+  outline: none;
+}
+.grabador__para select:disabled { opacity: 0.5; }
+
+.grabador__boton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  font-weight: 700;
+  font-size: 16px;
+  color: #fff;
+  background: var(--color-acento);
+  border-radius: 14px;
+  padding: 16px;
+  transition: transform var(--dur-micro) var(--curva), background var(--dur-micro) var(--curva);
+}
+.grabador__boton:active { transform: scale(0.98); }
+.grabador__boton:disabled { background: var(--estado-pendiente); }
+.grabador__punto {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  flex-shrink: 0;
+}
+.grabador__boton.is-grabando {
+  background: #b3261e;
+}
+.grabador__boton.is-grabando .grabador__punto {
+  border-radius: 3px;
+  animation: grabando-late 1.4s ease-in-out infinite;
+}
+.grabador__aviso {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #b3261e;
+}
+
+.grabacion {
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  padding: 14px 16px;
+}
+.grabacion__cab {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+.grabacion__titulo { font-family: var(--fuente-titulo); font-weight: 600; font-size: 16px; }
+.grabacion__fecha { font-size: 12px; color: var(--color-texto-2); }
+.grabacion__fila { display: flex; align-items: center; gap: 10px; }
+.grabacion__fila audio { flex: 1; min-width: 0; height: 38px; }
+

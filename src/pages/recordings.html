@@ -1,5 +1,30 @@
-<!-- Grabaciones — grabadora personal (se completa en la Fase 7) -->
-<div class="vacio">
-  <span class="vacio__icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21M8.5 21h7"/></svg></span>
-  <p>Grábate cantando para escucharte y mejorar. Todavía no hay grabaciones.</p>
+<!-- Grabaciones — grabadora personal (Fase 7) -->
+<div class="grabaciones" data-modulo="recordings">
+
+  <p class="subsaludo">Grábate cantando para escucharte y notar cómo mejoras.</p>
+
+  <!-- Grabador -->
+  <div class="grabador">
+    <label class="grabador__para">
+      <span class="campo__label">Para</span>
+      <select data-cancion>
+        <option value="">Sin canción concreta</option>
+      </select>
+    </label>
+
+    <button class="grabador__boton" type="button" data-rec>
+      <span class="grabador__punto" aria-hidden="true"></span>
+      <span data-rec-txt>Empezar a grabar</span>
+    </button>
+    <p class="grabador__aviso" data-aviso hidden></p>
+  </div>
+
+  <h2 class="seccion-titulo">Tus grabaciones</h2>
+  <div data-lista></div>
+
+  <div class="vacio" data-vacio>
+    <span class="vacio__icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21M8.5 21h7"/></svg></span>
+    <p>Todavía no hay grabaciones. Pulsa <strong>Empezar a grabar</strong> y canta.</p>
+  </div>
+
 </div>
