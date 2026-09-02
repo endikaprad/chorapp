@@ -18,6 +18,10 @@ keystore.properties
 # Firebase (cache local del deploy del panel)
 .firebase/
 
+# Inventario de secretos / credenciales (nunca versionar)
+secretos/
+panel/config.local.js
+
 # Sistema / editores
 .DS_Store
 Thumbs.db

@@ -164,14 +164,14 @@
 
 <div class="aviso-flash" id="flash"></div>
 
+<!-- Configuración real (apiKey + dbUrl). NO versionada: copia de
+     config.local.js.ejemplo. Ver panel/README.md. -->
+<script src="config.local.js"></script>
 <script>
 /* ============================================================
-   Configuración — rellena estos dos valores (ver panel/README.md)
+   Configuración — se carga desde config.local.js (window.FIREBASE)
    ============================================================ */
-var FIREBASE = {
-  apiKey: "AIzaSyBaI9dJC0qjnd1YSuuFHsFKOryfG8ekXoY",
-  dbUrl: "https://chorapp-d06a8-default-rtdb.europe-west1.firebasedatabase.app"
-};
+var FIREBASE = window.FIREBASE || { apiKey: "", dbUrl: "" };
 
 /* ============================================================
    Avisos predefinidos — edítalos a tu gusto

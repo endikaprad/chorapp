@@ -1,0 +1,10 @@
+/* ============================================================
+   Plantilla de configuración del panel.
+
+   Cópiala a config.local.js (que NO se versiona) y rellena los
+   dos valores. Ver panel/README.md (pasos 4 y 5).
+   ============================================================ */
+window.FIREBASE = {
+  apiKey: "AIza...",                                                          // paso 4
+  dbUrl: "https://chorapp-xxxx-default-rtdb.europe-west1.firebasedatabase.app" // paso 2, sin barra final
+};

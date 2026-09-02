@@ -62,13 +62,14 @@ servidor cada ~10 s). No hay notificaciones con la app cerrada.
 
 ### 5. Rellenar la configuración
 
-**`panel/index.html`** (arriba del `<script>`):
+Copia `panel/config.local.js.ejemplo` a **`panel/config.local.js`** (no se versiona) y rellena:
 ```js
-var FIREBASE = {
+window.FIREBASE = {
   apiKey: "AIza...",                                   // paso 4
   dbUrl: "https://chorapp-xxxx-default-rtdb.europe-west1.firebasedatabase.app"  // paso 2, sin barra final
 };
 ```
+`config.local.js` debe desplegarse junto a `index.html` (Firebase Hosting lo sube solo).
 
 **`src/data/control.json`** (solo la URL, la app no necesita la clave):
 ```json
