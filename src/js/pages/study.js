@@ -14,10 +14,37 @@
 window.Pagina_study = (function () {
   'use strict';
 
-  var cont, cancion, reproductor, grabadora, obs;
+  var cont, sesion, marca, cancion, reproductor, grabadora, obs;
+
+  // Colores elegibles para el marcador de cada fragmento difícil.
+  // El id se guarda en el fragmento; aquí traducimos a color y nombre.
+  var COLORES_FRAG = {
+    cobalto: { hex: '#1512D6', nombre: 'Cobalto' },
+    verde:   { hex: '#4C7A5A', nombre: 'Verde' },
+    ambar:   { hex: '#C98A2E', nombre: 'Ámbar' },
+    rojo:    { hex: '#B4453C', nombre: 'Rojo' },
+    morado:  { hex: '#7A4CA0', nombre: 'Morado' },
+    gris:    { hex: '#6B6560', nombre: 'Gris' },
+  };
+  function colorFrag(f) {
+    return (f && f.color && COLORES_FRAG[f.color]) ? COLORES_FRAG[f.color].hex : COLORES_FRAG.rojo.hex;
+  }
+  var pendienteSalto = null;  // segundo de la sesión al que saltar al cargar el audio
+
+  // Segmento de la canción dentro del audio del ensayo. El reproductor
+  // enseña un carril de 0:00 a la duración de la canción, no de la sesión
+  // entera: así es más fácil moverse por ella.
+  var segIni = 0;             // segundo real donde empieza la canción
+  var segFinRaw = null;       // segundo real donde acaba (o null = hasta el final del audio)
+  var bucleClip = false;      // repetir la canción entera sin parar (botón "Bucle")
+  function segFin() { return (segFinRaw != null && segFinRaw > segIni) ? segFinRaw : duracionAudio; }
+  function segTotal() { return Math.max(0, segFin() - segIni); }
+  function rel(t) { return Math.min(segTotal(), Math.max(0, (t || 0) - segIni)); }
   var vistaSub = null;        // baja de window.CancionActiva mientras la pantalla vive
   var transporte = null;      // píldora flotante de controles (letra/partitura a pantalla completa)
   var transObs = null;        // observa la apertura de visores a pantalla completa
+  var playerObs = null;       // observa si el reproductor de la página está a la vista
+  var playerFuera = false;    // true cuando Maite ha bajado y ya no ve el reproductor
   var urls = [];              // object URLs a revocar al salir
   var cronoNota = null;       // intervalo del contador de grabación
   var estaGrabando = false;   // true mientras se graba (para mostrar el transporte a mano)
@@ -25,37 +52,84 @@ window.Pagina_study = (function () {
   var notaOffset = null;      // segundo de la canción original al empezar la toma (o null)
   var tiempoActual = 0;       // posición del audio ahora mismo (s)
   var duracionAudio = 0;      // duración total del audio (s)
+  var selEscucha = null;      // selector Altavoz/Auriculares (window.Sincronia)
+  var panelTono = null;       // panel "Dame el tono" (window.Tono)
 
   function iniciar(contenedor, datos) {
     destruir();   // por si se re-entra desde otra canción
     cont = contenedor;
-    var id = datos && datos.id;
-    cancion = id ? window.Canciones.obtener(id) : null;
+    datos = datos || {};
 
-    if (!cancion) {
+    // Resolver sesión + marca. Se puede entrar de dos formas:
+    //   { sesionId, marcaId }  -> directo
+    //   { id: cancionId }      -> la última vez que se marcó esa canción
+    if (datos.sesionId && datos.marcaId) {
+      sesion = window.Sesiones.obtener(datos.sesionId);
+      marca = sesion && (sesion.marcas || []).filter(function (m) { return m.id === datos.marcaId; })[0];
+    } else if (datos.id) {
+      var ref = window.Sesiones.ultimaMarcaDeCancion(datos.id);
+      if (ref) { sesion = ref.sesion; marca = ref.marca; }
+      else {
+        var c0 = window.Canciones.obtener(datos.id);
+        cont.querySelector('[data-modulo="study"]').innerHTML =
+          '<div class="vacio"><p>Aún no has marcado «' +
+          escapar(c0 ? c0.titulo : 'esta canción') +
+          '» en ninguna sesión.<br>Abre una sesión del coro y márcala mientras suena.</p>' +
+          '<button type="button" class="btn btn--primario" data-ir-sesiones>Ir a las sesiones</button></div>';
+        var b = cont.querySelector('[data-ir-sesiones]');
+        if (b) b.addEventListener('click', function () { window.App.ir('sesiones'); });
+        return;
+      }
+    }
+
+    if (!sesion || !marca) {
       cont.querySelector('[data-modulo="study"]').innerHTML =
         '<p class="vacio">No se encontró esta canción.</p>';
       return;
     }
 
+    cancion = marca.cancionId ? window.Canciones.obtener(marca.cancionId) : null;
+    segIni = marca.segundo || 0;
+    segFinRaw = (typeof marca.finSegundo === 'number' && marca.finSegundo > segIni) ? marca.finSegundo : null;
+    pendienteSalto = segIni;
+
+    // Recordar dónde estaba estudiando, para el botón "Continuar" de Inicio.
+    window.Almacen.guardar('estudio:ultimo', {
+      sesionId: sesion.id, marcaId: marca.id, titulo: marca.titulo, cuando: Date.now(),
+    });
+
     // Registrar sesión de práctica (silencioso).
-    if (window.Practica) window.Practica.registrar(cancion.id);
+    if (window.Practica) window.Practica.registrar(cancion ? cancion.id : 'marca:' + marca.id);
+    if (window.Diario) {
+      window.Diario.registrar('estudio', {
+        cancionId: cancion ? cancion.id : null,
+        sesionId: sesion.id,
+        marcaId: marca.id,
+        titulo: marca.titulo,
+      });
+    }
 
     pintarCabecera();
     montarAudio();
     pintarLetra();
     pintarPartitura();
     pintarFragmentos();
-    migrarNotasVozAntiguas();
+    montarTono();
+    pintarNotas();
+    if (cancion) migrarNotasVozAntiguas();
     pintarGrabaciones();
     montarLightbox();
 
     cont.querySelector('[data-editar]').addEventListener('click', function () {
-      window.Pagina_songs.editar(cancion.id);
+      if (cancion) window.Pagina_songs.editar(cancion.id);
+      else vincularMarca();
     });
     cont.querySelector('[data-marcar]').addEventListener('click', marcarFragmento);
     cont.querySelector('[data-grabar-nota]').addEventListener('click', alternarGrabacion);
     document.addEventListener('chorapp:bloqueo', pararGrabacionPorBloqueo);
+    // Si Maite cierra la barra flotante con la ✕, la canción se descarta:
+    // quitamos el hueco del final y volvemos el botón "Grabar" a su sitio.
+    document.addEventListener('chorapp:cancion-descartada', evaluarBarraFlotante);
 
     // Limpieza al abandonar la pantalla.
     var vista = document.getElementById('vista');
@@ -68,11 +142,16 @@ window.Pagina_study = (function () {
   function destruir() {
     if (obs) { obs.disconnect(); obs = null; }
     document.removeEventListener('chorapp:bloqueo', pararGrabacionPorBloqueo);
+    document.removeEventListener('chorapp:cancion-descartada', evaluarBarraFlotante);
     // La canción NO se para al salir: sigue sonando en window.CancionActiva
     // y aparece la barra flotante. Solo soltamos nuestra vista.
     if (vistaSub) { vistaSub(); vistaSub = null; }
     if (window.CancionActiva) window.CancionActiva.fijarVistaAbierta(false);
+    cerrarSelectoresTono();
+    if (panelTono) { panelTono.destruir(); panelTono = null; }
     reproductor = null;
+    selEscucha = null;
+    bucleClip = false;
     if (grabadora) { grabadora.cancelar(); grabadora = null; }
     if (cronoNota) { clearInterval(cronoNota); cronoNota = null; }
     estaGrabando = false;
@@ -85,26 +164,56 @@ window.Pagina_study = (function () {
   }
 
   function refrescar() {
-    cancion = window.Canciones.obtener(cancion.id) || cancion;
+    sesion = window.Sesiones.obtener(sesion.id) || sesion;
+    marca = (sesion.marcas || []).filter(function (m) { return m.id === marca.id; })[0] || marca;
+    cancion = marca.cancionId ? (window.Canciones.obtener(marca.cancionId) || cancion) : null;
+  }
+
+  // Marca sin ficha del repertorio: ofrecer vincularla (vuelve a la sesión).
+  function vincularMarca() {
+    window.UI.aviso('Vincula esta canción desde la sesión: toca ✎ en su marca.');
+    window.App.ir('sesion', { datos: { id: sesion.id } });
   }
 
   /* ---------- Cabecera ---------- */
 
   function pintarCabecera() {
-    var est = window.Canciones.ESTADOS[cancion.estado] || window.Canciones.ESTADOS.pendiente;
-    q('[data-titulo]').textContent = cancion.titulo;
+    q('[data-titulo]').textContent = marca.titulo;
     var meta = q('[data-meta]');
-    if (cancion.compositor) { meta.textContent = cancion.compositor; meta.hidden = false; }
+    var sub = cancion && cancion.compositor ? cancion.compositor : '';
+    if (sub) { meta.textContent = sub; meta.hidden = false; } else { meta.hidden = true; }
     var chip = q('[data-chip]');
-    chip.textContent = est.etiqueta;
-    chip.className = 'chip chip--' + est.token;
+    if (cancion) {
+      var est = window.Canciones.ESTADOS[cancion.estado] || window.Canciones.ESTADOS.pendiente;
+      chip.textContent = est.etiqueta;
+      chip.className = 'chip chip--' + est.token;
+      chip.hidden = false;
+    } else {
+      chip.hidden = true;
+    }
+  }
+
+  /* ---------- Notas personales ---------- */
+
+  function pintarNotas() {
+    // Apunte de la toma de este día (marca de la sesión).
+    var dia = marca && marca.nota ? marca.nota : '';
+    var tDia = q('[data-nota-dia]');
+    tDia.textContent = dia;
+    tDia.hidden = !dia;
+
+    // Nota general de la canción (ficha del repertorio).
+    var caja = q('[data-notas]');
+    var texto = cancion && cancion.notas ? cancion.notas : '';
+    caja.textContent = texto;
+    caja.hidden = !texto;
   }
 
   /* ---------- Audio ---------- */
 
   function montarAudio() {
     var seccion = q('[data-player]');
-    if (!cancion.archivos || !cancion.archivos.audio) { seccion.hidden = true; return; }
+    if (!sesion.archivo) { seccion.hidden = true; return; }
     window.CancionActiva.fijarVistaAbierta(true);   // mientras estemos aquí, sin barra flotante
 
     var barra = q('[data-barra]');
@@ -126,11 +235,28 @@ window.Pagina_study = (function () {
     // navegar). Aquí solo cargamos la canción y nos suscribimos a su estado.
     reproductor = window.CancionActiva;
 
-    window.Archivos.url(cancion.id + ':audio').then(function (u) {
+    var yaEsEstaSesion = window.CancionActiva.cancionId() === sesion.id &&
+                         window.CancionActiva.hayCancion();
+
+    window.Archivos.url(sesion.id + ':audio').then(function (u) {
       if (!u) { seccion.hidden = true; return; }
       seccion.hidden = false;
-      window.CancionActiva.cargar(cancion, u);
+      observarReproductor(seccion);
+      window.CancionActiva.cargar({
+        id: sesion.id,
+        titulo: marca.titulo,
+        compositor: (cancion && cancion.compositor) || sesion.lugar || 'Ensayo del coro',
+        abrir: { ruta: 'estudio', datos: { sesionId: sesion.id, marcaId: marca.id } },
+        // La "canción" es el trozo de la sesión entre estos segundos: la barra
+        // flotante debe medir eso, no la duración del ensayo completo.
+        recorte: { ini: segIni, fin: segFinRaw },
+      }, u);
       window.CancionActiva.fijarVistaAbierta(true);
+      // Si la sesión ya estaba cargada (otra marca), saltar ya al punto.
+      if (yaEsEstaSesion && pendienteSalto != null) {
+        window.CancionActiva.irA(pendienteSalto);
+        pendienteSalto = null;
+      }
     });
 
     vistaSub = window.CancionActiva.suscribir(function (s) {
@@ -141,10 +267,29 @@ window.Pagina_study = (function () {
       btnPlay.classList.toggle('is-sonando', s.reproduciendo);
       tiempoActual = s.actual || 0;
       if (s.total && s.total !== duracionAudio) { duracionAudio = s.total; pintarMarcas(); }
-      tAct.textContent = fmtTiempo(s.actual);
-      tTot.textContent = fmtTiempo(s.total);
-      if (s.total && !barra.matches(':active')) {
-        barra.value = String(Math.round((s.actual / s.total) * 1000));
+      // Colocar el audio al principio de la canción en cuanto haya duración.
+      if (s.total && pendienteSalto != null) {
+        var destino = Math.min(pendienteSalto, Math.max(0, s.total - 1));
+        pendienteSalto = null;
+        window.CancionActiva.irA(destino);
+      }
+      // Al llegar al final de la canción: si el bucle está activo, volver al
+      // principio y seguir; si no, parar ahí (no seguir con el resto del ensayo).
+      var finReal = (segFinRaw != null) ? segFinRaw : (s.total || 0);
+      if (finReal && s.reproduciendo && s.actual >= finReal - 0.15) {
+        if (bucleClip) {
+          window.CancionActiva.irA(segIni);
+        } else if (segFinRaw != null) {
+          window.CancionActiva.alternar();
+          window.CancionActiva.irA(segFinRaw);
+        }
+      }
+      // Carril relativo a la canción: 0:00 → duración de la canción.
+      var relAct = rel(s.actual), relTot = segTotal();
+      tAct.textContent = fmtTiempo(relAct);
+      tTot.textContent = fmtTiempo(relTot);
+      if (relTot && !barra.matches(':active')) {
+        barra.value = String(Math.round((relAct / relTot) * 1000));
       }
       velValor.textContent = fmtVel(s.velocidad);
       if (!velBarra.matches(':active')) velBarra.value = String(s.velocidad);
@@ -158,16 +303,16 @@ window.Pagina_study = (function () {
       if (bc) {
         bucleA = bc.a;
         btnBucleA.classList.add('is-set');
-        btnBucleA.textContent = 'A ' + fmtTiempo(bc.a);
+        btnBucleA.textContent = 'A ' + fmtTiempo(rel(bc.a));
         btnBucleB.disabled = false;
         btnBucleB.classList.add('is-set');
-        btnBucleB.textContent = 'B ' + fmtTiempo(bc.b);
+        btnBucleB.textContent = 'B ' + fmtTiempo(rel(bc.b));
         btnBucleOff.hidden = false;
-        bucleInfo.textContent = 'Sonando en bucle ' + fmtTiempo(bc.a) + ' – ' + fmtTiempo(bc.b) +
+        bucleInfo.textContent = 'Sonando en bucle ' + fmtTiempo(rel(bc.a)) + ' – ' + fmtTiempo(rel(bc.b)) +
           '. Pulsa B para mover el final o Quitar para salir.';
-        if (duracionAudio) {
-          var izq = Math.max(0, Math.min(100, (bc.a / duracionAudio) * 100));
-          var der = Math.max(0, Math.min(100, (bc.b / duracionAudio) * 100));
+        if (segTotal()) {
+          var izq = Math.max(0, Math.min(100, (rel(bc.a) / segTotal()) * 100));
+          var der = Math.max(0, Math.min(100, (rel(bc.b) / segTotal()) * 100));
           bucleZona.style.left = izq + '%';
           bucleZona.style.width = Math.max(0, der - izq) + '%';
           bucleZona.hidden = false;
@@ -186,7 +331,7 @@ window.Pagina_study = (function () {
       } else {
         // A ya marcada, esperando B.
         btnBucleA.classList.add('is-set');
-        btnBucleA.textContent = 'A ' + fmtTiempo(bucleA);
+        btnBucleA.textContent = 'A ' + fmtTiempo(rel(bucleA));
         btnBucleB.disabled = false;
         btnBucleB.textContent = 'B';
       }
@@ -213,15 +358,44 @@ window.Pagina_study = (function () {
       reproductor.quitarBucle();
     });
 
-    btnPlay.addEventListener('click', function () { reproductor.alternar(); });
-    q('[data-retro]').addEventListener('click', function () { reproductor.retroceder(5); });
-    q('[data-adelante]').addEventListener('click', function () { reproductor.adelantar(5); });
+    btnPlay.addEventListener('click', function () {
+      var st = window.CancionActiva.estado();
+      // Si al dar al play estamos fuera de la canción (antes del inicio o
+      // ya en el final), empezamos de nuevo por su principio.
+      if (!st.reproduciendo && duracionAudio) {
+        if (st.actual < segIni - 0.2 || st.actual >= segFin() - 0.2) {
+          window.CancionActiva.irA(segIni);
+        }
+      }
+      reproductor.alternar();
+    });
+    q('[data-retro]').addEventListener('click', function () {
+      reproductor.retroceder(5);
+      if (window.CancionActiva.estado().actual < segIni) window.CancionActiva.irA(segIni);
+    });
+
+    var btnReplay = q('[data-replay]');
+    function pintarReplay() {
+      btnReplay.classList.toggle('is-activo', bucleClip);
+      btnReplay.setAttribute('aria-pressed', bucleClip ? 'true' : 'false');
+    }
+    btnReplay.addEventListener('click', function () {
+      bucleClip = !bucleClip;
+      pintarReplay();
+      if (bucleClip) {
+        // Al activar: si estamos al final (o fuera), reiniciar la canción.
+        var st = window.CancionActiva.estado();
+        if (st.actual >= segFin() - 0.3 || st.actual < segIni) window.CancionActiva.irA(segIni);
+        if (!st.reproduciendo) reproductor.alternar();
+      }
+    });
+    pintarReplay();
     velBarra.addEventListener('input', function () {
       var v = reproductor.fijarVelocidad(parseFloat(velBarra.value));
       velValor.textContent = fmtVel(v);
     });
     barra.addEventListener('input', function () {
-      if (duracionAudio) reproductor.irA((barra.value / 1000) * duracionAudio);
+      if (segTotal()) reproductor.irA(segIni + (barra.value / 1000) * segTotal());
     });
 
     montarTransporte();
@@ -236,6 +410,7 @@ window.Pagina_study = (function () {
         window.Almacen.guardar('estudio:grabarConAudio', chkAudio.checked);
       });
     }
+
   }
 
   /* ---------- Transporte flotante ----------
@@ -261,17 +436,38 @@ window.Pagina_study = (function () {
         '<svg class="tp-ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg>' +
         '<svg class="tp-ic-pause" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>' +
       '</button>' +
-      '<button type="button" class="transporte__btn" data-tp-adelante aria-label="Adelantar 5 segundos">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 4l7 7-7 7"/><path d="M20 11H10a6 6 0 0 0 0 12h3"/></svg>' +
-        '<span>5</span>' +
+      '<button type="button" class="transporte__btn" data-tp-replay aria-label="Repetir la canción sin parar" aria-pressed="false">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>' +
       '</button>' +
       '<span class="transporte__tiempo" data-tp-tiempo aria-hidden="true">0:00</span>';
 
     document.body.appendChild(transporte);
 
-    transporte.querySelector('[data-tp-play]').addEventListener('click', function () { reproductor.alternar(); });
-    transporte.querySelector('[data-tp-retro]').addEventListener('click', function () { reproductor.retroceder(5); });
-    transporte.querySelector('[data-tp-adelante]').addEventListener('click', function () { reproductor.adelantar(5); });
+    transporte.querySelector('[data-tp-play]').addEventListener('click', function () {
+      var st = window.CancionActiva.estado();
+      if (!st.reproduciendo && duracionAudio &&
+          (st.actual < segIni - 0.2 || st.actual >= segFin() - 0.2)) {
+        window.CancionActiva.irA(segIni);
+      }
+      reproductor.alternar();
+    });
+    transporte.querySelector('[data-tp-retro]').addEventListener('click', function () {
+      reproductor.retroceder(5);
+      if (window.CancionActiva.estado().actual < segIni) window.CancionActiva.irA(segIni);
+    });
+    transporte.querySelector('[data-tp-replay]').addEventListener('click', function () {
+      bucleClip = !bucleClip;
+      var b = q('[data-replay]');
+      if (b) { b.classList.toggle('is-activo', bucleClip); b.setAttribute('aria-pressed', bucleClip ? 'true' : 'false'); }
+      var t = transporte.querySelector('[data-tp-replay]');
+      t.classList.toggle('is-activo', bucleClip);
+      t.setAttribute('aria-pressed', bucleClip ? 'true' : 'false');
+      if (bucleClip) {
+        var st = window.CancionActiva.estado();
+        if (st.actual >= segFin() - 0.3 || st.actual < segIni) window.CancionActiva.irA(segIni);
+        if (!st.reproduciendo) reproductor.alternar();
+      }
+    });
 
     // Mostrarlo solo cuando hay un visor a pantalla completa abierto.
     transObs = new MutationObserver(evaluarTransporte);
@@ -279,6 +475,18 @@ window.Pagina_study = (function () {
       childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class'],
     });
     evaluarTransporte();
+  }
+
+  // Vigila el reproductor de la página: en cuanto sale por arriba del viewport
+  // (Maite ha bajado a leer la letra), pedimos la barra flotante; al volver a
+  // verse, la retiramos. IntersectionObserver = sin escuchar el scroll a mano.
+  function observarReproductor(seccion) {
+    if (playerObs || !seccion || typeof IntersectionObserver !== 'function') return;
+    playerObs = new IntersectionObserver(function (entradas) {
+      playerFuera = !entradas[0].isIntersecting;
+      evaluarBarraFlotante();
+    }, { threshold: 0 });
+    playerObs.observe(seccion);
   }
 
   function visorAPantallaCompletaAbierto() {
@@ -291,6 +499,23 @@ window.Pagina_study = (function () {
     // A mano cuando hay un visor a pantalla completa abierto o mientras se graba.
     transporte.classList.toggle('is-visible',
       visorAPantallaCompletaAbierto() || estaGrabando);
+    evaluarBarraFlotante();
+  }
+
+  // La barra flotante de window.CancionActiva aparece dentro del modo estudio
+  // cuando Maite ha bajado y el reproductor de la página ya no se ve, para que
+  // no se quede sin controles con la letra escrita a mano. Se calla si ya hay
+  // un visor a pantalla completa (que trae su propia píldora) o si está grabando.
+  function evaluarBarraFlotante() {
+    if (!window.CancionActiva) return;
+    var hayCancion = typeof window.CancionActiva.hayCancion === 'function'
+      ? window.CancionActiva.hayCancion() : true;
+    var mostrar = playerFuera && hayCancion && !visorAPantallaCompletaAbierto() && !estaGrabando;
+    window.CancionActiva.fijarForzarBarra(mostrar);
+    // Hueco al final para que la barra no tape el botón "Grabar" ni las
+    // grabaciones cuando Maite llega abajo del todo.
+    var raiz = cont && cont.querySelector('[data-modulo="study"]');
+    if (raiz) raiz.classList.toggle('estudio--barra-repro', mostrar);
   }
 
   function sincronizarTransporte(s) {
@@ -302,13 +527,31 @@ window.Pagina_study = (function () {
     icPause.toggleAttribute('hidden', !s.reproduciendo);
     btn.classList.toggle('is-sonando', s.reproduciendo);
     btn.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
-    transporte.querySelector('[data-tp-tiempo]').textContent = fmtTiempo(s.actual);
+    var tRep = transporte.querySelector('[data-tp-replay]');
+    if (tRep) {
+      tRep.classList.toggle('is-activo', bucleClip);
+      tRep.setAttribute('aria-pressed', bucleClip ? 'true' : 'false');
+    }
+    transporte.querySelector('[data-tp-tiempo]').textContent = fmtTiempo(rel(s.actual));
   }
 
   function desmontarTransporte() {
     if (transObs) { transObs.disconnect(); transObs = null; }
+    if (playerObs) { playerObs.disconnect(); playerObs = null; }
+    playerFuera = false;
+    if (window.CancionActiva) window.CancionActiva.fijarForzarBarra(false);
     if (transporte && transporte.parentNode) transporte.parentNode.removeChild(transporte);
     transporte = null;
+  }
+
+  /* ---------- Dame el tono ---------- */
+
+  function montarTono() {
+    var caja = q('[data-tono]');
+    if (!caja || !window.Tono) return;
+    caja.innerHTML = '';
+    var clave = cancion ? ('cancion:' + cancion.id) : ('marca:' + marca.id);
+    panelTono = window.Tono.montarEn(caja, { clave: clave });
   }
 
   /* ---------- Letra ---------- */
@@ -318,6 +561,12 @@ window.Pagina_study = (function () {
     var pre = q('[data-letra-texto]');
     var doc = q('[data-letra-doc]');
     pre.hidden = true; doc.hidden = true;
+
+    if (!cancion) {
+      vacio.hidden = false;
+      vacio.innerHTML = 'Esta marca no tiene ficha. Vincúlala a una canción del repertorio desde la sesión (toca ✎ en su marca).';
+      return;
+    }
 
     if (cancion.letraTexto && cancion.letraTexto.trim()) {
       pre.textContent = cancion.letraTexto;
@@ -365,6 +614,7 @@ window.Pagina_study = (function () {
     var doc = q('[data-partitura-doc]');
     cajaImg.hidden = true; doc.hidden = true;
 
+    if (!cancion) { vacio.hidden = false; return; }
     var meta = cancion.archivos && cancion.archivos.partitura;
     if (!meta) { vacio.hidden = false; return; }
     vacio.hidden = true;
@@ -399,13 +649,66 @@ window.Pagina_study = (function () {
   function marcarFragmento() {
     // Solo se guarda el momento del audio: Maite no tiene que escribir nada.
     if (!reproductor || !duracionAudio) {
-      window.UI.aviso('Carga el audio de la canción para poder marcar el minuto difícil.');
+      window.UI.aviso('Carga el audio de la sesión para poder marcar el minuto difícil.');
       return;
     }
-    window.Canciones.agregarFragmento(cancion.id, '', tiempoActual);
+    window.Sesiones.agregarFragmento(sesion.id, marca.id, tiempoActual, '');
+    if (window.Diario) {
+      window.Diario.registrar('fragmento', {
+        cancionId: cancion ? cancion.id : null,
+        sesionId: sesion.id, marcaId: marca.id, titulo: marca.titulo,
+      });
+    }
     refrescar();
     pintarFragmentos();
     pintarMarcas();
+  }
+
+  function fragmentos() { return (marca && marca.fragmentos) || []; }
+
+  /* Selector de "tono de entrada" abierto bajo un fragmento (window.Tono). */
+  var fragSelector = null;
+
+  function cerrarSelectoresTono() {
+    if (fragSelector) {
+      if (fragSelector.sel) fragSelector.sel.destruir();
+      if (fragSelector.panel) { fragSelector.panel.hidden = true; fragSelector.panel.innerHTML = ''; }
+      if (fragSelector.card) fragSelector.card.classList.remove('is-abierto');
+      fragSelector = null;
+    }
+  }
+
+  function abrirSelectorTono(f, card, panel, btn) {
+    cerrarSelectoresTono();
+    panel.hidden = false;
+    if (card) card.classList.add('is-abierto');
+    var sel = window.Tono.selectorNota(panel, {
+      valor: f.nota || null,
+      onCambio: function (nota) {
+        window.Sesiones.fijarNotaFragmento(sesion.id, marca.id, f.id, nota);
+        refrescar();
+        f.nota = nota;   // reflejo local para el próximo toque
+        if (btn) {
+          btn.classList.add('is-set');
+          btn.querySelector('.frag__tono-txt').textContent = window.Tono.etiqueta(nota);
+        }
+      },
+      onCerrar: cerrarSelectoresTono,
+    });
+    // Botón para dejar el fragmento sin tono.
+    var quitar = document.createElement('button');
+    quitar.type = 'button';
+    quitar.className = 'frag__panel-quitar';
+    quitar.textContent = 'Sin tono';
+    quitar.addEventListener('click', function () {
+      window.Sesiones.fijarNotaFragmento(sesion.id, marca.id, f.id, null);
+      refrescar();
+      f.nota = null;
+      cerrarSelectoresTono();
+      pintarFragmentos();
+    });
+    panel.appendChild(quitar);
+    fragSelector = { sel: sel, panel: panel, card: card };
   }
 
   /* Marcas sobre la barra del reproductor que señalan cada fragmento difícil. */
@@ -413,14 +716,16 @@ window.Pagina_study = (function () {
     var caja = q('[data-marcas]');
     if (!caja) return;
     caja.innerHTML = '';
-    if (!duracionAudio) return;
-    (cancion.fragmentos || []).forEach(function (f) {
+    if (!segTotal()) return;
+    fragmentos().forEach(function (f) {
       if (typeof f.segundo !== 'number' || !isFinite(f.segundo)) return;
-      var pct = Math.min(100, Math.max(0, (f.segundo / duracionAudio) * 100));
+      if (f.segundo < segIni - 0.5 || f.segundo > segFin() + 0.5) return;
+      var pct = Math.min(100, Math.max(0, (rel(f.segundo) / segTotal()) * 100));
       var m = document.createElement('span');
       m.className = 'player__marca';
       m.style.left = pct + '%';
-      m.title = f.texto ? (fmtTiempo(f.segundo) + ' · ' + f.texto) : fmtTiempo(f.segundo);
+      m.style.background = colorFrag(f);
+      m.title = f.texto ? (fmtTiempo(rel(f.segundo)) + ' · ' + f.texto) : fmtTiempo(rel(f.segundo));
       caja.appendChild(m);
     });
   }
@@ -429,8 +734,8 @@ window.Pagina_study = (function () {
      siguiente fragmento cercano, o 15 s si no hay ninguno. */
   function bucleDesdeFragmento(seg) {
     if (!reproductor || !duracionAudio) return;
-    var fin = Math.min(duracionAudio, seg + 15);
-    (cancion.fragmentos || []).forEach(function (f) {
+    var fin = Math.min(segFin(), seg + 15);
+    fragmentos().forEach(function (f) {
       if (typeof f.segundo === 'number' && f.segundo > seg + 1.5 && f.segundo < fin) {
         fin = f.segundo;
       }
@@ -442,43 +747,105 @@ window.Pagina_study = (function () {
 
   function pintarFragmentos() {
     var caja = q('[data-fragmentos]');
-    var frags = cancion.fragmentos || [];
+    var frags = fragmentos();
     if (!frags.length) {
       caja.innerHTML = '<p class="visor-vacio">Mientras suena el audio, pulsa “Marcar este minuto” en las partes que se te resisten.</p>';
       return;
     }
     caja.innerHTML = '';
+    cerrarSelectoresTono();
     frags.slice().reverse().forEach(function (f) {
-      var fila = document.createElement('div');
+      var card = document.createElement('div');
       var tieneTiempo = typeof f.segundo === 'number' && isFinite(f.segundo);
-      var soloTiempo = tieneTiempo && !f.texto;
-      fila.className = soloTiempo ? 'ficha ficha--solo' : 'ficha';
-      fila.innerHTML =
-        (tieneTiempo
-          ? '<button type="button" class="ficha__tiempo" aria-label="Ir a este momento del audio">' +
-              '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5a1 1 0 0 1 1.53-.85l9 6.5a1 1 0 0 1 0 1.7l-9 6.5A1 1 0 0 1 8 18.5z"/></svg>' +
-              fmtTiempo(f.segundo) + '</button>'
-          : '') +
-        (tieneTiempo
-          ? '<button type="button" class="ficha__bucle" aria-label="Repetir este fragmento en bucle">⟲</button>'
-          : '') +
-        (f.texto ? '<p class="ficha__texto">' + escapar(f.texto) + '</p>' : '') +
-        '<button type="button" class="ficha__quitar" aria-label="Quitar fragmento">✕</button>';
+      var hayNota = !!(f.nota && window.Tono);
+      var etq = hayNota ? window.Tono.etiqueta(f.nota) : '';
+      card.className = 'frag' + (f.texto ? ' frag--ancho' : '');
+      card.style.setProperty('--frag-color', colorFrag(f));
+      var opcionesColor = Object.keys(COLORES_FRAG).map(function (id) {
+        return '<button type="button" class="frag__color-op' + (f.color === id || (!f.color && id === 'rojo') ? ' is-sel' : '') + '" ' +
+          'data-color="' + id + '" style="background:' + COLORES_FRAG[id].hex + '" ' +
+          'aria-label="Color ' + COLORES_FRAG[id].nombre + '"></button>';
+      }).join('');
+      card.innerHTML =
+        '<div class="frag__cab">' +
+          (tieneTiempo
+            ? '<button type="button" class="frag__tiempo" aria-label="Ir a este momento del audio">' +
+                '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5a1 1 0 0 1 1.53-.85l9 6.5a1 1 0 0 1 0 1.7l-9 6.5A1 1 0 0 1 8 18.5z"/></svg>' +
+                fmtTiempo(rel(f.segundo)) + '</button>'
+            : '<span></span>') +
+          '<button type="button" class="frag__quitar" aria-label="Quitar fragmento">✕</button>' +
+        '</div>' +
+        '<div class="frag__acciones">' +
+          (tieneTiempo
+            ? '<button type="button" class="frag__bucle" aria-label="Repetir este fragmento en bucle">⟲</button>'
+            : '') +
+          (window.Tono
+            ? '<button type="button" class="frag__tono' + (hayNota ? ' is-set' : '') + '" ' +
+                'aria-label="' + (hayNota ? 'Sonar el tono de entrada' : 'Poner el tono de entrada') + '">' +
+                '<span class="frag__tono-ic" aria-hidden="true">♪</span>' +
+                '<span class="frag__tono-txt">' + (hayNota ? escapar(etq) : 'Tono') + '</span>' +
+              '</button>'
+            : '') +
+          '<button type="button" class="frag__color" aria-label="Color del marcador">' +
+            '<span class="frag__color-punto" aria-hidden="true"></span>' +
+          '</button>' +
+        '</div>' +
+        '<div class="frag__colores" data-colores hidden>' + opcionesColor + '</div>' +
+        (f.texto ? '<p class="frag__texto">' + escapar(f.texto) + '</p>' : '') +
+        '<div class="frag__panel" data-tono-panel hidden></div>';
+
       if (tieneTiempo) {
-        fila.querySelector('.ficha__tiempo').addEventListener('click', function () {
+        card.querySelector('.frag__tiempo').addEventListener('click', function () {
           if (reproductor) reproductor.irA(f.segundo);
         });
-        fila.querySelector('.ficha__bucle').addEventListener('click', function () {
+        card.querySelector('.frag__bucle').addEventListener('click', function () {
           bucleDesdeFragmento(f.segundo);
         });
       }
-      fila.querySelector('.ficha__quitar').addEventListener('click', function () {
-        window.Canciones.borrarFragmento(cancion.id, f.id);
+
+      var btnTono = card.querySelector('.frag__tono');
+      var panel = card.querySelector('[data-tono-panel]');
+      if (btnTono) {
+        btnTono.addEventListener('click', function () {
+          if (f.nota && panel.hidden) {
+            // Con tono ya puesto: un toque lo hace sonar. Para cambiarlo,
+            // se abre el selector con un toque más (queda abierto abajo).
+            window.Tono.sonar(f.nota);
+            abrirSelectorTono(f, card, panel, btnTono);
+            return;
+          }
+          if (panel.hidden) abrirSelectorTono(f, card, panel, btnTono);
+          else cerrarSelectoresTono();
+        });
+      }
+
+      var btnColor = card.querySelector('.frag__color');
+      var cajaColores = card.querySelector('[data-colores]');
+      btnColor.addEventListener('click', function () {
+        cajaColores.hidden = !cajaColores.hidden;
+      });
+      cajaColores.querySelectorAll('.frag__color-op').forEach(function (op) {
+        op.addEventListener('click', function () {
+          var id = op.getAttribute('data-color');
+          window.Sesiones.fijarColorFragmento(sesion.id, marca.id, f.id, id);
+          f.color = id;
+          card.style.setProperty('--frag-color', colorFrag(f));
+          cajaColores.querySelectorAll('.frag__color-op').forEach(function (o) {
+            o.classList.toggle('is-sel', o === op);
+          });
+          cajaColores.hidden = true;
+          refrescar();
+          pintarMarcas();
+        });
+      });
+
+      card.querySelector('.frag__quitar').addEventListener('click', function () {
+        window.Sesiones.borrarFragmento(sesion.id, marca.id, f.id);
         refrescar();
         pintarFragmentos();
         pintarMarcas();
       });
-      caja.appendChild(fila);
+      caja.appendChild(card);
     });
   }
 
@@ -487,9 +854,14 @@ window.Pagina_study = (function () {
      window.Grabaciones, así que aparece aquí y también en el apartado
      Grabaciones de la app, todas juntas. */
 
-  /* ¿Hay audio de la canción para acompañar la grabación? */
+  /* ¿Hay audio de la sesión para acompañar la grabación? */
   function tieneAudio() {
-    return !!(reproductor && cancion.archivos && cancion.archivos.audio);
+    return !!(reproductor && sesion && sesion.archivo);
+  }
+
+  // Clave con la que se agrupan las grabaciones de esta canción/toma.
+  function claveGrab() {
+    return cancion ? cancion.id : ('sesion:' + sesion.id + ':' + marca.id);
   }
 
   // Si el hijo bloquea la app en mitad de una toma, la cerramos como si
@@ -521,12 +893,17 @@ window.Pagina_study = (function () {
         if (chkAudio) chkAudio.disabled = false;
         if (!blob || !blob.size) return;
         return window.Grabaciones.crear({
-          cancionId: cancion.id,
-          titulo: cancion.titulo,
+          cancionId: claveGrab(),
+          titulo: marca.titulo,
           mime: blob.type,
           dur: dur,
           picos: g.picos(),
           audioOffset: notaOffset,
+          // Si la toma llevó la canción de fondo, guardar la sesión: el audio
+          // que sonaba es "<sesionId>:audio" y así Grabaciones puede compararlos.
+          sesionId: notaOffset != null ? sesion.id : null,
+          syncLatencia: (notaOffset != null && window.Sincronia) ? window.Sincronia.latencia() : null,
+          syncPerfil: (notaOffset != null && window.Sincronia) ? window.Sincronia.perfilActivo() : null,
         }, blob).then(pintarGrabaciones);
       });
       return;
@@ -541,6 +918,9 @@ window.Pagina_study = (function () {
 
     grabadora = window.Grabadora.crear();
     grabadora.iniciar().then(function () {
+      // El botón flotante global "Detener grabación" para esta toma.
+      window.Grabadora.alParar(alternarGrabacion);
+
       btn.classList.add('is-grabando');
       notaT0 = Date.now();
       txt.textContent = 'Detener (0:00)';
@@ -563,7 +943,7 @@ window.Pagina_study = (function () {
       // porque Maite le dio al play), guardamos el segundo exacto: así en
       // Grabaciones se puede oír SOLO ese trozo de la pista original,
       // sincronizado con la voz (de tiempoActual a tiempoActual + duración).
-      if (reproductor && reproductor.reproduciendo && (cancion.archivos && cancion.archivos.audio)) {
+      if (reproductor && reproductor.reproduciendo && sesion.archivo) {
         notaOffset = Math.max(0, tiempoActual || 0);
       }
     }).catch(function () {
@@ -596,9 +976,13 @@ window.Pagina_study = (function () {
 
   function pintarGrabaciones() {
     var caja = q('[data-notas-voz]');
-    var grabs = window.Grabaciones.listarDeCancion(cancion.id);
+    var grabs = window.Grabaciones.listarDeCancion(claveGrab());
     if (!grabs.length) {
-      caja.innerHTML = '<p class="visor-vacio">Grábate cantando mientras estudias para escucharte luego.</p>';
+      caja.innerHTML =
+        '<p class="grab-est__vacio">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21M8.5 21h7"/></svg>' +
+          'Aún no hay grabaciones tuyas aquí.' +
+        '</p>';
       return;
     }
     caja.innerHTML = '';

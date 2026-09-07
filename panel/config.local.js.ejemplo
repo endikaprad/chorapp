@@ -8,3 +8,10 @@ window.FIREBASE = {
   apiKey: "AIza...",                                                          // paso 4
   dbUrl: "https://chorapp-xxxx-default-rtdb.europe-west1.firebasedatabase.app" // paso 2, sin barra final
 };
+
+// Push con la app cerrada (Cloudflare Worker). Opcional — ver worker/README.md.
+// Vacío = "Notificación al móvil" funciona como antes (solo con la app abierta).
+window.PUSH = {
+  workerUrl: "", // https://chorapp-push.<tu-subdominio>.workers.dev
+  secret: ""     // igual que: npx wrangler secret put PANEL_SECRET
+};

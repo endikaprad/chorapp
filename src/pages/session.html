@@ -1,0 +1,195 @@
+<!-- Sesión — escuchar el ensayo entero y marcar dónde está cada canción -->
+<div class="sesion-vista" data-modulo="session">
+
+  <div class="estudio__cab">
+    <div class="estudio__id">
+      <h2 class="estudio__titulo" data-titulo>—</h2>
+      <p class="estudio__meta" data-meta hidden></p>
+    </div>
+    <button class="estudio__editar" type="button" aria-label="Editar sesión" data-editar>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+      </svg>
+    </button>
+  </div>
+
+  <p class="sesion-vista__notas" data-notas hidden></p>
+
+  <!-- Reproductor del audio del ensayo -->
+  <section class="player" data-player hidden>
+    <div class="player__pista">
+      <input class="player__barra" type="range" min="0" max="1000" value="0" step="1"
+             aria-label="Posición del audio" data-barra />
+      <div class="player__marcas" data-marcas aria-hidden="true"></div>
+    </div>
+    <div class="player__tiempos">
+      <span data-t-actual>0:00</span>
+      <span data-t-total>0:00</span>
+    </div>
+    <div class="player__controles">
+      <button class="player__btn" type="button" aria-label="Retroceder 5 segundos" data-retro>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4 4 11l7 7"/><path d="M4 11h10a6 6 0 0 1 0 12h-3"/></svg>
+        <span>5s</span>
+      </button>
+      <button class="player__play" type="button" aria-label="Reproducir" data-play>
+        <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg>
+        <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>
+      </button>
+      <button class="player__btn" type="button" aria-label="Adelantar 5 segundos" data-adelante>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 4l7 7-7 7"/><path d="M20 11H10a6 6 0 0 0 0 12h3"/></svg>
+        <span>5s</span>
+      </button>
+    </div>
+    <div class="player__velocidad">
+      <span class="player__vel-etiqueta">Velocidad</span>
+      <input class="player__vel-barra" type="range" min="0.25" max="2.5" step="0.05" value="1"
+             aria-label="Velocidad de reproducción" data-vel-barra />
+      <span class="player__vel-valor" data-vel-valor>1×</span>
+    </div>
+  </section>
+
+  <p class="visor-vacio" data-sin-audio hidden>
+    Esta sesión aún no tiene audio. Añádelo desde <strong>✎ Editar</strong>.
+  </p>
+
+  <button class="btn-bloque btn-bloque--primario" type="button" data-marcar-aqui hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
+    Marcar canción aquí
+  </button>
+
+  <h3 class="seccion-titulo">Canciones de esta sesión</h3>
+  <div class="marcas-lista" data-marcas-lista></div>
+
+  <!-- Hoja: crear / editar una marca (= una canción de esta sesión) -->
+  <div class="hoja" hidden data-hoja>
+    <div class="hoja__fondo" data-cerrar></div>
+    <form class="hoja__panel" data-form-marca novalidate>
+      <div class="hoja__asa" aria-hidden="true"></div>
+      <h2 class="hoja__titulo" data-marca-titulo>Marcar canción</h2>
+
+      <!-- Reproductor a mano: adelantar el ensayo sin cerrar la hoja -->
+      <div class="hoja-repro" data-hoja-repro hidden>
+        <button type="button" class="hoja-repro__play" aria-label="Reproducir" data-hr-play>
+          <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg>
+          <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>
+        </button>
+        <button type="button" class="hoja-repro__salto" aria-label="Retroceder 10 segundos" data-hr-salto="-10">−10</button>
+        <div class="hoja-repro__pista">
+          <input class="hoja-repro__barra" type="range" min="0" max="1000" value="0" step="1"
+                 aria-label="Posición del audio del ensayo" data-hr-barra />
+          <span class="hoja-repro__t" data-hr-t>0:00 / 0:00</span>
+        </div>
+        <button type="button" class="hoja-repro__salto" aria-label="Adelantar 10 segundos" data-hr-salto="10">+10</button>
+      </div>
+
+      <!-- Inicio y fin de la canción dentro del audio del ensayo -->
+      <div class="tiempos">
+        <div class="tiempo" data-t="inicio">
+          <div class="tiempo__cab">
+            <span class="tiempo__etq">Empieza</span>
+            <span class="tiempo__val" data-inicio-val>0:00</span>
+          </div>
+          <div class="tiempo__nudge">
+            <button type="button" data-nudge="inicio" data-d="-5">−5s</button>
+            <button type="button" data-nudge="inicio" data-d="-1">−1s</button>
+            <button type="button" data-nudge="inicio" data-d="1">+1s</button>
+            <button type="button" data-nudge="inicio" data-d="5">+5s</button>
+          </div>
+          <button type="button" class="tiempo__ahora" data-ahora="inicio">
+            Poner donde suena ahora · <b data-pos-live>0:00</b>
+          </button>
+        </div>
+
+        <div class="tiempo" data-t="fin">
+          <div class="tiempo__cab">
+            <span class="tiempo__etq">Termina <span class="campo__opcional">(opcional)</span></span>
+            <span class="tiempo__val" data-fin-val>—</span>
+          </div>
+          <div class="tiempo__nudge" data-fin-nudge hidden>
+            <button type="button" data-nudge="fin" data-d="-5">−5s</button>
+            <button type="button" data-nudge="fin" data-d="-1">−1s</button>
+            <button type="button" data-nudge="fin" data-d="1">+1s</button>
+            <button type="button" data-nudge="fin" data-d="5">+5s</button>
+          </div>
+          <div class="tiempo__fila">
+            <button type="button" class="tiempo__ahora" data-ahora="fin">
+              Poner donde suena ahora · <b data-pos-live>0:00</b>
+            </button>
+            <button type="button" class="tiempo__quitar" data-quitar-fin hidden>Sin final</button>
+          </div>
+        </div>
+      </div>
+
+      <label class="campo">
+        <span class="campo__label">Nota de esta toma <span class="campo__opcional">(opcional)</span></span>
+        <input name="nota" type="text" maxlength="300" autocomplete="off" placeholder="Ej: entran tarde las sopranos" />
+      </label>
+
+      <!-- Qué canción del repertorio es esta marca -->
+      <div class="campo selcancion" data-selcancion>
+        <span class="campo__label">¿Qué canción es?</span>
+
+        <div class="selcancion__elegida" data-sel-elegida hidden>
+          <span class="selcancion__nom" data-sel-nom></span>
+          <button type="button" class="btn btn--texto selcancion__cambiar" data-sel-cambiar>Cambiar</button>
+        </div>
+
+        <div class="selcancion__buscar" data-sel-buscar>
+          <input type="search" data-sel-input autocomplete="off" maxlength="120"
+                 placeholder="Escribe el nombre de la canción…" />
+          <div class="selcancion__lista" data-sel-lista></div>
+        </div>
+      </div>
+
+      <div data-campos-ficha hidden>
+        <button type="button" class="selcancion__volver" data-sel-volver hidden>↩ Elegir una que ya existe</button>
+
+        <label class="campo">
+          <span class="campo__label">Título</span>
+          <input name="titulo" type="text" maxlength="120" autocomplete="off" placeholder="Nombre de la canción" />
+        </label>
+
+        <label class="campo">
+          <span class="campo__label">Compositor / artista <span class="campo__opcional">(opcional)</span></span>
+          <input name="compositor" type="text" maxlength="120" autocomplete="off" />
+        </label>
+
+        <label class="campo">
+          <span class="campo__label">Letra <span class="campo__opcional">(texto, opcional)</span></span>
+          <textarea name="letraTexto" rows="4" maxlength="8000" placeholder="Pega o escribe aquí la letra"></textarea>
+        </label>
+
+        <div class="campo">
+          <span class="campo__label">Archivos <span class="campo__opcional">(opcional)</span></span>
+
+        <div class="archivo-fila" data-fila="letra">
+          <svg class="archivo-fila__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v5h5"/><path d="M6 3h9l5 5v13H6z"/><path d="M9 13h6M9 17h6"/></svg>
+          <span class="archivo-fila__txt" data-nombre="letra">Letra (PDF, imagen o texto)</span>
+          <label class="archivo-fila__accion">Añadir
+            <input type="file" accept="application/pdf,.pdf,image/*,text/plain,.txt" data-input="letra" hidden />
+          </label>
+          <button type="button" class="archivo-fila__quitar" data-quitar="letra" hidden>Quitar</button>
+        </div>
+
+        <div class="archivo-fila" data-fila="partitura">
+          <svg class="archivo-fila__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m3 15 5-5 4 4 3-3 6 6"/><circle cx="8.5" cy="9" r="1.5"/></svg>
+          <span class="archivo-fila__txt" data-nombre="partitura">Partitura (imagen o PDF)</span>
+          <label class="archivo-fila__accion">Añadir
+            <input type="file" accept="image/*,application/pdf,.pdf" data-input="partitura" hidden />
+          </label>
+          <button type="button" class="archivo-fila__quitar" data-quitar="partitura" hidden>Quitar</button>
+        </div>
+        </div>
+      </div>
+
+      <div class="hoja__acciones">
+        <button type="button" class="btn btn--fantasma" data-borrar-marca hidden>Quitar</button>
+        <button type="button" class="btn btn--texto" data-cerrar>Cancelar</button>
+        <button type="submit" class="btn btn--primario">Guardar</button>
+      </div>
+    </form>
+  </div>
+
+</div>

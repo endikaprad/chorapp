@@ -29,6 +29,15 @@ window.Calendario = (function () {
       practicados = set;
     }
 
+    // Días con "algo que contar" (aunque no cuenten como práctica). Si se
+    // pasa `onDia`, esos días y los practicados se vuelven pulsables.
+    var conActividad = opts.conActividad || {};
+    if (Array.isArray(conActividad)) {
+      var setA = {};
+      conActividad.forEach(function (f) { setA[f] = true; });
+      conActividad = setA;
+    }
+
     var hoy = new Date();
     var isoHoy = iso(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
     var vistaAnio = hoy.getFullYear();
@@ -49,14 +58,29 @@ window.Calendario = (function () {
     var elMes = contenedor.querySelector('[data-mes]');
     var elGrid = contenedor.querySelector('[data-grid]');
 
+    if (opts.onDia) {
+      var abrir = function (el) {
+        var iso = el && el.getAttribute('data-dia');
+        if (iso) opts.onDia(iso);
+      };
+      elGrid.addEventListener('click', function (ev) {
+        abrir(ev.target.closest('.cal__dia--abrible'));
+      });
+      elGrid.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        var el = ev.target.closest && ev.target.closest('.cal__dia--abrible');
+        if (el) { ev.preventDefault(); abrir(el); }
+      });
+    }
+
     contenedor.querySelector('[data-prev]').addEventListener('click', function () {
-      vistaMes--; if (vistaMes < 0) { vistaMes = 11; vistaAnio--; } pintar();
+      vistaMes--; if (vistaMes < 0) { vistaMes = 11; vistaAnio--; } pintar(-1);
     });
     contenedor.querySelector('[data-next]').addEventListener('click', function () {
-      vistaMes++; if (vistaMes > 11) { vistaMes = 0; vistaAnio++; } pintar();
+      vistaMes++; if (vistaMes > 11) { vistaMes = 0; vistaAnio++; } pintar(1);
     });
 
-    function pintar() {
+    function pintar(dir) {
       elMes.textContent = MESES[vistaMes] + ' ' + vistaAnio;
 
       // Lunes = 0 … Domingo = 6
@@ -68,10 +92,16 @@ window.Calendario = (function () {
       for (var d = 1; d <= totalDias; d++) {
         var clave = iso(vistaAnio, vistaMes, d);
         var clases = 'cal__dia';
+        var pulsable = !!opts.onDia && clave <= isoHoy &&
+                       (practicados[clave] || conActividad[clave]);
         if (practicados[clave]) clases += ' cal__dia--hecho';
         if (clave === isoHoy) clases += ' cal__dia--hoy';
         if (clave > isoHoy) clases += ' cal__dia--futuro';
-        celdas += '<span class="' + clases + '">' + d + '</span>';
+        if (pulsable) clases += ' cal__dia--abrible';
+        celdas += '<span class="' + clases + '"' +
+          (pulsable ? ' role="button" tabindex="0" data-dia="' + clave + '"' +
+            ' aria-label="Ver lo que hiciste el ' + d + '"' : '') +
+          '>' + d + '</span>';
       }
       elGrid.innerHTML = celdas;
 
@@ -80,6 +110,21 @@ window.Calendario = (function () {
       Array.prototype.forEach.call(hechos, function (el, n) {
         el.style.animationDelay = (n * 35) + 'ms';
       });
+
+      // Transición al cambiar de mes: desliza según la dirección.
+      if (dir) {
+        elGrid.style.animation = 'none';
+        elMes.style.animation = 'none';
+        /* forzar reflow para reiniciar la animación */
+        void elGrid.offsetWidth;
+        elGrid.style.animation = '';
+        elMes.style.animation = '';
+        elGrid.classList.remove('cal__grid--der', 'cal__grid--izq');
+        elMes.classList.remove('cal__mes--der', 'cal__mes--izq');
+        void elGrid.offsetWidth;
+        elGrid.classList.add(dir > 0 ? 'cal__grid--der' : 'cal__grid--izq');
+        elMes.classList.add(dir > 0 ? 'cal__mes--der' : 'cal__mes--izq');
+      }
 
       if (opts.onMes) opts.onMes(iso(vistaAnio, vistaMes, 1));
     }

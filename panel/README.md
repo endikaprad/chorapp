@@ -3,8 +3,12 @@
 Canal privado **tú → Maite**: lanzar avisos cortos en su pantalla y bloquear
 la app durante X minutos. Ella no ve ni tiene acceso a este panel.
 
-Funciona **solo mientras Maite tiene la app abierta** (la app consulta el
-servidor cada ~10 s). No hay notificaciones con la app cerrada.
+Los **avisos** y el **bloqueo** funcionan solo mientras Maite tiene la app
+abierta (la app consulta el servidor cada ~10 s).
+
+Para **notificaciones con la app cerrada** hay un canal aparte por push (FCM):
+ver [`../worker/README.md`](../worker/README.md). Es opcional; si no lo montas,
+"Notificación al móvil" se comporta como los avisos.
 
 ---
 

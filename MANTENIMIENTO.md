@@ -70,7 +70,7 @@ CSS; animar solo `transform` y `opacity`; respetar `prefers-reduced-motion`.
 
 ## Generar el APK firmado (release)
 
-`appId`: `com.chorapp.mama` · `appName`: `ChorApp` (ver `capacitor.config.json`).
+`appId`: `com.chorapp.ama` · `appName`: `ChorApp` (ver `capacitor.config.json`).
 
 ### 1. Crear el keystore — SOLO LA PRIMERA VEZ
 

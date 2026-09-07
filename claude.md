@@ -154,7 +154,7 @@ La app debe sentirse **moderna, fluida y viva** — sin caer en efectos genéric
 ## Empaquetado como APK Android
 
 - La app se genera con **Capacitor** (sin Ionic UI), produciendo un APK real instalable en Android
-- Configurar `capacitor.config.ts` con el nombre de la app y el appId (ej: `com.chorapp.mama`)
+- Configurar `capacitor.config.ts` con el nombre de la app y el appId (ej: `com.chorapp.ama`)
 - Icono personalizado en `resources/icon.png` — basado en el corazón/claves del logo de Bihotsak sobre fondo crema o cobalto, no genérico
 - Splash screen configurado en `resources/splash.png`
 - El APK final se instala directamente en el móvil de la madre (activar "Instalar apps desconocidas" en Android)
@@ -202,7 +202,7 @@ Node.js, Capacitor CLI (`npx cap`), Android Studio + SDK, JDK 21. `ANDROID_HOME`
 
 ### Fase 2 — Capacitor y plataforma Android
 - Instalar `@capacitor/core`, `@capacitor/android` y plugins: `@capacitor/filesystem`, `@capacitor/preferences`, `@capacitor-community/media`.
-- `capacitor.config.ts` con `appId: com.chorapp.mama`, `appName: ChorApp`, `webDir: www`.
+- `capacitor.config.ts` con `appId: com.chorapp.ama`, `appName: ChorApp`, `webDir: www`.
 - `npx cap add android` + `npx cap sync`. Verificar que arranca en emulador/dispositivo.
 
 ### Fase 3 — Datos y biblioteca de canciones

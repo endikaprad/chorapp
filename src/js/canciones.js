@@ -118,20 +118,36 @@ window.Canciones = (function () {
     return res;
   }
 
+  // Apunta en la bitácora un cambio de estado (silencioso).
+  function _anotarEstado(cancion, de, a) {
+    if (!cancion || de === a || !window.Diario) return;
+    window.Diario.registrar('estado', {
+      cancionId: cancion.id,
+      titulo: cancion.titulo,
+      extra: { de: de, a: a },
+    });
+  }
+
   // Cambia solo el estado. Útil para el selector rápido de la lista.
   function fijarEstado(id, estado) {
     if (!ESTADOS[estado]) return null;
-    return _mutar(id, function (c) { c.estado = estado; });
+    var previo = (obtener(id) || {}).estado;
+    var res = _mutar(id, function (c) { c.estado = estado; });
+    _anotarEstado(res, previo, estado);
+    return res;
   }
 
   function actualizar(id, cambios) {
-    return _mutar(id, function (c) {
+    var previo = (obtener(id) || {}).estado;
+    var res = _mutar(id, function (c) {
       if (cambios.titulo != null) c.titulo = String(cambios.titulo).trim();
       if (cambios.compositor != null) c.compositor = String(cambios.compositor).trim();
       if (ESTADOS[cambios.estado]) c.estado = cambios.estado;
       if (cambios.notas != null) c.notas = String(cambios.notas).trim();
       if (cambios.letraTexto != null) c.letraTexto = String(cambios.letraTexto);
     });
+    if (res && ESTADOS[cambios.estado]) _anotarEstado(res, previo, res.estado);
+    return res;
   }
 
   // --- Archivos (metadatos). tipo: 'audio' | 'letra' | 'partitura'.
@@ -153,6 +169,11 @@ window.Canciones = (function () {
     return _mutar(id, function (c) {
       c.fragmentos = c.fragmentos.filter(function (f) { return f.id !== fragId; });
     });
+  }
+  // Los fragmentos difíciles viven ahora en las marcas de cada sesión
+  // (ver sesiones.js). Esto solo se usa al migrar el modelo antiguo.
+  function vaciarFragmentos(id) {
+    return _mutar(id, function (c) { c.fragmentos = []; });
   }
 
   // --- Notas de voz: función retirada. Las grabaciones del modo estudio
@@ -183,6 +204,7 @@ window.Canciones = (function () {
     fijarArchivo: fijarArchivo,
     agregarFragmento: agregarFragmento,
     borrarFragmento: borrarFragmento,
+    vaciarFragmentos: vaciarFragmentos,
     borrarNotaVoz: borrarNotaVoz,
     borrar: borrar,
   };

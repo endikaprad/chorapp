@@ -1,5 +1,5 @@
 {
-  "appId": "com.chorapp.mama",
+  "appId": "com.chorapp.ama",
   "appName": "ChorApp",
   "webDir": "www",
   "backgroundColor": "#FBF8F3",
@@ -9,6 +9,10 @@
   "plugins": {
     "CapacitorHttp": {
       "enabled": true
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_bihotsak",
+      "iconColor": "#1512D6"
     },
     "StatusBar": {
       "overlaysWebView": true,

@@ -135,6 +135,17 @@
       <div class="fila">
         <button class="primario" id="btn-aviso-libre" style="flex:1">Enviar aviso</button>
       </div>
+      <p class="pista">Tarjeta a pantalla completa. Solo la ve si tiene la app abierta.</p>
+    </section>
+
+    <section>
+      <h2>Notificación al móvil</h2>
+      <input type="text" id="notif-titulo" placeholder="Título (por defecto: ChorApp)" />
+      <textarea id="notif-texto" placeholder="Texto de la notificación…" style="margin-top:8px"></textarea>
+      <div class="fila">
+        <button class="primario" id="btn-notif" style="flex:1">Enviar notificación</button>
+      </div>
+      <p class="pista">Sale como notificación del sistema. Con el Worker configurado le llega aunque tenga la app cerrada; si no, solo con la app abierta o al abrirla.</p>
     </section>
 
     <section>
@@ -172,6 +183,7 @@
    Configuración — se carga desde config.local.js (window.FIREBASE)
    ============================================================ */
 var FIREBASE = window.FIREBASE || { apiKey: "", dbUrl: "" };
+var PUSH = window.PUSH || { workerUrl: "", secret: "" };
 
 /* ============================================================
    Avisos predefinidos — edítalos a tu gusto
@@ -275,6 +287,41 @@ function enviarAviso(texto) {
     .catch(function (e) { flash('No se pudo enviar: ' + e.message, true); });
 }
 
+function enviarNotif(titulo, texto) {
+  texto = (texto || '').trim();
+  if (!texto) { flash('Escribe el texto de la notificación', true); return; }
+  titulo = (titulo || '').trim();
+
+  // Con Worker configurado: push real (le llega con la app cerrada).
+  if (PUSH.workerUrl && PUSH.secret) {
+    fetch(PUSH.workerUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + PUSH.secret
+      },
+      body: JSON.stringify({ title: titulo || 'ChorApp', body: texto })
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (res.ok) { flash('Notificación enviada ✓'); }
+        else { flash('No se pudo enviar: ' + (res.d && res.d.error || 'error'), true); }
+      })
+      .catch(function (e) { flash('No se pudo enviar: ' + e.message, true); });
+    return;
+  }
+
+  // Sin Worker: modo antiguo (solo llega con la app abierta o al abrirla).
+  escribirControl({ notif: {
+    id: uid(),
+    titulo: titulo,
+    texto: texto,
+    fecha: Date.now()
+  } })
+    .then(function () { flash('Notificación enviada ✓ (solo con la app abierta)'); })
+    .catch(function (e) { flash('No se pudo enviar: ' + e.message, true); });
+}
+
 function bloquear(minutos, motivo) {
   minutos = Number(minutos);
   if (!minutos || minutos < 1) { flash('Minutos no válidos', true); return; }
@@ -373,6 +420,10 @@ $('pass').addEventListener('keydown', function (e) {
 $('btn-aviso-libre').addEventListener('click', function () {
   enviarAviso($('aviso-libre').value);
   $('aviso-libre').value = '';
+});
+$('btn-notif').addEventListener('click', function () {
+  enviarNotif($('notif-titulo').value, $('notif-texto').value);
+  $('notif-texto').value = '';
 });
 $('btn-bloqueo-libre').addEventListener('click', function () {
   bloquear($('min-libre').value, $('motivo-bloqueo').value);

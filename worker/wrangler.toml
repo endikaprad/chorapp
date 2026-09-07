@@ -1,0 +1,15 @@
+# Configuración del Worker que envía las push.
+# Despliegue:  cd worker && npm i && npx wrangler deploy
+# Ver worker/README.md para los secretos.
+
+name = "chorapp-push"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+[vars]
+# URL de la Realtime Database (la misma de src/data/control.json), sin barra final.
+DB_URL = "https://chorapp-d06a8-default-rtdb.europe-west1.firebasedatabase.app"
+
+# Secretos (NO van aquí, se ponen con wrangler):
+#   npx wrangler secret put SERVICE_ACCOUNT   -> pega el JSON del service account
+#   npx wrangler secret put PANEL_SECRET      -> una frase larga, igual que en el panel

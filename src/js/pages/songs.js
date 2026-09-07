@@ -9,7 +9,7 @@
 window.Pagina_songs = (function () {
   'use strict';
 
-  var TIPOS_ARCHIVO = ['audio', 'letra', 'partitura'];
+  var TIPOS_ARCHIVO = ['letra', 'partitura'];
 
   var raiz, contenido, buscador, inputBuscar, hoja, form, formTitulo, btnBorrar;
   var idEditando = null;   // null => alta; id => edición
@@ -17,9 +17,8 @@ window.Pagina_songs = (function () {
   var primeraCarga = true;
   var pendienteEditar = null;   // id a editar tras navegar desde otra pantalla
 
-  // Cambios de archivo pendientes de guardar: { audio: File|null|'quitar', ... }
+  // Cambios de archivo pendientes de guardar: { letra: File|null|'quitar', ... }
   var archivosPendientes = {};
-  var offPlay = null;   // baja de la suscripción a CancionActiva
 
   function iniciar(contenedor) {
     limpiarRestos();
@@ -37,6 +36,8 @@ window.Pagina_songs = (function () {
     // .pantalla se anima con transform y crea un bloque contenedor que
     // rompe `position: fixed`. Movemos FAB y hoja al <body>.
     fab.setAttribute('data-fab-songs', '');
+    // Marca propia: otras páginas también mueven una [data-hoja] al <body>.
+    hoja.setAttribute('data-hoja-songs', '');
     document.body.appendChild(fab);
     document.body.appendChild(hoja);
 
@@ -77,7 +78,6 @@ window.Pagina_songs = (function () {
     var obs = new MutationObserver(function () {
       if (!document.body.contains(raiz)) {
         limpiarRestos();
-        if (offPlay) { offPlay(); offPlay = null; }
         obs.disconnect();
       }
     });
@@ -85,11 +85,6 @@ window.Pagina_songs = (function () {
 
     primeraCarga = true;
     pintarLista();
-
-    if (offPlay) offPlay();
-    offPlay = window.CancionActiva
-      ? window.CancionActiva.suscribir(pintarEstadoPlay)
-      : null;
 
     if (pendienteEditar) {
       var id = pendienteEditar;
@@ -100,7 +95,7 @@ window.Pagina_songs = (function () {
 
   function limpiarRestos() {
     Array.prototype.forEach.call(
-      document.querySelectorAll('body > [data-hoja], body > [data-fab-songs], body > .menu-estado'),
+      document.querySelectorAll('body > [data-hoja-songs], body > [data-fab-songs], body > .menu-estado'),
       function (el) { el.remove(); }
     );
   }
@@ -139,12 +134,10 @@ window.Pagina_songs = (function () {
     contenido.innerHTML = '';
     contenido.appendChild(lista);
     primeraCarga = false;
-    if (window.CancionActiva) pintarEstadoPlay(window.CancionActiva.estado());
   }
 
   function tarjetaCancion(c) {
     var est = window.Canciones.ESTADOS[c.estado] || window.Canciones.ESTADOS.pendiente;
-    var tieneAudio = !!(c.archivos && c.archivos.audio);
 
     var fila = document.createElement('div');
     fila.className = 'cancion';
@@ -155,29 +148,15 @@ window.Pagina_songs = (function () {
     abrir.className = 'cancion__abrir';
     abrir.innerHTML =
       '<span class="cancion__cuerpo">' +
-        '<span class="cancion__titulo">' + escapar(c.titulo) + '</span>' +
-        (c.compositor ? '<span class="cancion__meta">' + escapar(c.compositor) + '</span>' : '') +
+        '<span class="cancion__texto">' +
+          '<span class="cancion__titulo">' + escapar(c.titulo) + '</span>' +
+          (c.compositor ? '<span class="cancion__meta">' + escapar(c.compositor) + '</span>' : '') +
+        '</span>' +
+        insigniasArchivos(c) +
       '</span>';
     abrir.addEventListener('click', function () {
-      window.App.ir('estudio', { datos: { id: c.id } });
+      window.App.ir('cancion', { datos: { id: c.id } });
     });
-
-    // Botón de reproducción rápida: suena la canción sin entrar al modo estudio.
-    var reproducir = null;
-    if (tieneAudio) {
-      reproducir = document.createElement('button');
-      reproducir.type = 'button';
-      reproducir.className = 'cancion__play';
-      reproducir.setAttribute('data-play-id', c.id);
-      reproducir.setAttribute('aria-label', 'Reproducir «' + escapar(c.titulo) + '»');
-      reproducir.innerHTML =
-        '<svg class="cancion__play-ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg>' +
-        '<svg class="cancion__play-ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>';
-      reproducir.addEventListener('click', function (ev) {
-        ev.stopPropagation();
-        reproducirRapido(c);
-      });
-    }
 
     // Chip de estado: ahora es un botón que abre el selector rápido.
     var chip = document.createElement('button');
@@ -192,39 +171,24 @@ window.Pagina_songs = (function () {
     });
 
     fila.appendChild(abrir);
-    if (reproducir) fila.appendChild(reproducir);
     fila.appendChild(chip);
     return fila;
   }
 
-  /* ---------- Reproducción rápida desde la lista ---------- */
-
-  // Suena la canción usando window.CancionActiva (la misma que el modo
-  // estudio). Si ya es la canción activa, alterna play/pausa.
-  function reproducirRapido(c) {
-    if (!window.CancionActiva) return;
-    if (window.CancionActiva.cancionId() === c.id && window.CancionActiva.hayCancion()) {
-      window.CancionActiva.alternar();
-      return;
+  // Insignias de archivos disponibles (letra / partitura). Solo si los tiene.
+  function insigniasArchivos(c) {
+    var arch = c && c.archivos ? c.archivos : {};
+    var items = [];
+    if ((c.letraTexto && c.letraTexto.trim()) || arch.letra) {
+      items.push('<span class="cancion__insignia" title="Tiene letra" aria-label="Tiene letra">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>');
     }
-    window.Archivos.url(c.id + ':audio').then(function (u) {
-      if (!u) return;
-      window.CancionActiva.cargar(c, u).then(function () {
-        window.CancionActiva.alternar();
-      });
-    });
-  }
-
-  // Mantiene el icono play/pausa de la tarjeta activa al día.
-  function pintarEstadoPlay(s) {
-    if (!raiz || !document.body.contains(raiz)) return;
-    var activa = window.CancionActiva && window.CancionActiva.cancionId();
-    Array.prototype.forEach.call(raiz.querySelectorAll('[data-play-id]'), function (btn) {
-      var sonando = s.reproduciendo && btn.getAttribute('data-play-id') === activa;
-      btn.classList.toggle('is-sonando', sonando);
-      btn.querySelector('.cancion__play-ic-play').toggleAttribute('hidden', sonando);
-      btn.querySelector('.cancion__play-ic-pause').toggleAttribute('hidden', !sonando);
-    });
+    if (arch.partitura) {
+      items.push('<span class="cancion__insignia" title="Tiene partitura" aria-label="Tiene partitura">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>');
+    }
+    if (!items.length) return '';
+    return '<span class="cancion__insignias">' + items.join('') + '</span>';
   }
 
   /* ---------- Selector rápido de estado (sin abrir la hoja) ---------- */
@@ -434,16 +398,35 @@ window.Pagina_songs = (function () {
 
   // Pequeña celebración al marcar una canción como "Aprendida".
   function celebrar() {
+    var frase = (window.Frases && window.Frases.enhorabuena)
+      ? window.Frases.enhorabuena() : '';
     var el = document.createElement('div');
-    el.className = 'celebra';
+    el.className = 'celebra' + (frase ? ' celebra--frase' : '');
     el.innerHTML =
       '<div class="celebra__circulo">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
           '<path d="m5 13 4 4L19 7"/>' +
         '</svg>' +
-      '</div>';
+      '</div>' +
+      (frase ? '<p class="celebra__frase"></p>' : '');
+    if (frase) el.querySelector('.celebra__frase').textContent = frase;
     document.body.appendChild(el);
-    setTimeout(function () { el.remove(); }, 1000);
+    var quita = function () { if (el.parentNode) el.remove(); };
+
+    if (!frase) { setTimeout(quita, 1000); return; }
+
+    // Con frase se queda un buen rato para leerla. Al tocar (dentro o
+    // fuera) no se corta de golpe: se va con la misma animación de salida.
+    var t = setTimeout(quita, 5200);
+    var cerrado = false;
+    el.addEventListener('click', function () {
+      if (cerrado) return;
+      cerrado = true;
+      clearTimeout(t);
+      el.classList.add('celebra--saliendo');
+      el.addEventListener('animationend', quita, { once: true });
+      setTimeout(quita, 400); // red de seguridad si no llega animationend
+    });
   }
 
   function escapar(s) {

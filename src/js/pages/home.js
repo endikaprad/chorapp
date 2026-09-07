@@ -11,45 +11,57 @@ window.Pagina_home = (function () {
 
     cargarCoro(raiz);
     pintarFecha(raiz);
+    pintarFrase(raiz);
 
     var canciones = window.Canciones ? window.Canciones.listar() : [];
+    var sesiones = window.Sesiones ? window.Sesiones.listar() : [];
     var total = canciones.length;
+    var hayContenido = sesiones.length > 0 || total > 0;
 
-    raiz.querySelector('[data-num-canciones]').textContent = String(total);
+    contarHasta(raiz.querySelector('[data-num-canciones]'), total);
 
     // Racha de días de estudio (practica.js).
     var racha = window.Practica ? window.Practica.racha() : 0;
     var elRacha = raiz.querySelector('[data-num-racha]');
-    if (elRacha) elRacha.textContent = String(racha);
+    if (elRacha) contarHasta(elRacha, racha);
     var elRachaLabel = raiz.querySelector('[data-racha-label]');
     if (elRachaLabel) elRachaLabel.textContent = racha === 1 ? 'día seguido' : 'días seguidos';
 
-    pintarHoy(raiz, total);
+    celebrarHito(racha);
+
+    pintarHoy(raiz, hayContenido);
     pintarSemana(raiz);
-    pintarRepasar(raiz, canciones);
+    pintarRepasar(raiz);
 
     var card = raiz.querySelector('[data-continuar]');
     var eyebrow = raiz.querySelector('[data-continuar-eyebrow]');
     var titulo = raiz.querySelector('[data-continuar-titulo]');
     var vacio = raiz.querySelector('[data-vacio]');
 
-    if (total === 0) {
+    if (!hayContenido) {
       card.disabled = true;
       return;
     }
-
-    // Última canción tocada por la usuaria (por ahora: la más reciente).
-    var ultima = canciones.slice().sort(function (a, b) {
-      return (b.actualizada || 0) - (a.actualizada || 0);
-    })[0];
-
-    card.disabled = false;
-    eyebrow.textContent = total === 1 ? 'Tu canción' : 'Seguir estudiando';
-    titulo.textContent = ultima.titulo;
     if (vacio) vacio.hidden = true;
 
+    // ¿Dónde se quedó estudiando? (lo guarda study.js)
+    var ultimo = window.Almacen ? window.Almacen.leer('estudio:ultimo', null) : null;
+    var destino = null;
+    if (ultimo && ultimo.sesionId && ultimo.marcaId && window.Sesiones) {
+      var m = window.Sesiones.obtenerMarca(ultimo.sesionId, ultimo.marcaId);
+      if (m) destino = { ruta: 'estudio', datos: { sesionId: ultimo.sesionId, marcaId: ultimo.marcaId }, titulo: m.titulo };
+    }
+    if (!destino && sesiones.length) {
+      var s0 = sesiones[0];
+      destino = { ruta: 'sesion', datos: { id: s0.id }, titulo: 'Última sesión del coro' };
+    }
+    if (!destino) { card.disabled = true; return; }
+
+    card.disabled = false;
+    eyebrow.textContent = destino.ruta === 'estudio' ? 'Seguir estudiando' : 'Escuchar el ensayo';
+    titulo.textContent = destino.titulo;
     card.addEventListener('click', function () {
-      window.App.ir('estudio', { datos: { id: ultima.id } });
+      window.App.ir(destino.ruta, { datos: destino.datos });
     });
   }
 
@@ -73,13 +85,45 @@ window.Pagina_home = (function () {
   }
 
   /* ----------------------------------------------------------
+     Racha redonda (7, 14, 30… días) — se felicita una sola vez
+     por hito con un aviso cálido.
+     ---------------------------------------------------------- */
+  function celebrarHito(racha) {
+    if (!window.Frases || !window.Frases.hito || !window.UI) return;
+    var msg = window.Frases.hito(racha);
+    if (!msg) return;
+    var CLAVE = 'chorapp:hito-racha';
+    var ultimo = 0;
+    try { ultimo = parseInt(localStorage.getItem(CLAVE), 10) || 0; } catch (e) {}
+    if (racha <= ultimo) return;
+    try { localStorage.setItem(CLAVE, String(racha)); } catch (e) {}
+    setTimeout(function () {
+      window.UI.aviso(msg, { tipo: 'ok', duracion: 5000 });
+    }, 600);
+  }
+
+  /* ----------------------------------------------------------
+     Frase del día — un mensaje cálido bajo el saludo. En fechas
+     marcadas (cumpleaños, concierto…) aparece resaltada.
+     ---------------------------------------------------------- */
+  function pintarFrase(raiz) {
+    var el = raiz.querySelector('[data-frase]');
+    if (!el || !window.Frases) return;
+    var f = window.Frases.delDia();
+    if (!f || !f.texto) return;
+    el.textContent = f.texto;
+    el.classList.toggle('frase-dia--especial', !!f.especial);
+    el.hidden = false;
+  }
+
+  /* ----------------------------------------------------------
      Estado de hoy — ¿ya ha estudiado? Recordatorio cálido.
      ---------------------------------------------------------- */
-  function pintarHoy(raiz, totalCanciones) {
+  function pintarHoy(raiz, hayContenido) {
     var caja = raiz.querySelector('[data-hoy]');
     var texto = raiz.querySelector('[data-hoy-texto]');
     if (!caja || !texto || !window.Practica) return;
-    if (totalCanciones === 0) return; // sin repertorio no hay nada que estudiar
+    if (!hayContenido) return; // sin sesiones ni repertorio no hay nada que estudiar
 
     var reg = window.Practica.leer();
     var hoyISO = window.Practica.hoyISO();
@@ -135,42 +179,72 @@ window.Pagina_home = (function () {
   /* ----------------------------------------------------------
      Repasar lo difícil — canciones con fragmentos marcados.
      ---------------------------------------------------------- */
-  function pintarRepasar(raiz, canciones) {
+  function pintarRepasar(raiz) {
     var seccion = raiz.querySelector('[data-repasar]');
     var lista = raiz.querySelector('[data-repasar-lista]');
-    if (!seccion || !lista) return;
+    if (!seccion || !lista || !window.Sesiones) return;
 
-    // Si la canción ya está aprendida, sus fragmentos difíciles dejan de
-    // pesar: no tiene sentido invitar a repasarlos desde Inicio.
-    var conFragmentos = canciones.filter(function (c) {
-      return c.estado !== 'aprendida' &&
-             Array.isArray(c.fragmentos) && c.fragmentos.length > 0;
-    }).sort(function (a, b) {
-      return (b.actualizada || 0) - (a.actualizada || 0);
-    }).slice(0, 3);
+    var pend = window.Sesiones.repasoPendiente().filter(function (p) {
+      // Si la canción ya está aprendida, sus difíciles dejan de pesar.
+      if (!p.cancionId) return true;
+      var c = window.Canciones.obtener(p.cancionId);
+      return !c || c.estado !== 'aprendida';
+    }).sort(function (a, b) { return b.trozos - a.trozos; }).slice(0, 3);
 
-    if (conFragmentos.length === 0) return;
+    if (pend.length === 0) return;
 
     lista.innerHTML = '';
-    conFragmentos.forEach(function (c) {
-      var n = c.fragmentos.length;
+    pend.forEach(function (p) {
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'tarjeta';
       btn.innerHTML =
         '<span class="tarjeta__cuerpo">' +
-          '<span class="tarjeta__titulo">' + escapar(c.titulo) + '</span>' +
+          '<span class="tarjeta__titulo">' + escapar(p.titulo) + '</span>' +
           '<span class="repasar__nota">' +
-            n + (n === 1 ? ' fragmento difícil' : ' fragmentos difíciles') +
+            p.trozos + (p.trozos === 1 ? ' fragmento difícil' : ' fragmentos difíciles') +
           '</span>' +
         '</span>' +
         '<span class="chip chip--progreso">Repasar</span>';
       btn.addEventListener('click', function () {
-        window.App.ir('estudio', { datos: { id: c.id } });
+        window.App.ir('estudio', { datos: { sesionId: p.ref.sesion.id, marcaId: p.ref.marca.id } });
       });
       lista.appendChild(btn);
     });
     seccion.hidden = false;
+  }
+
+  /* ----------------------------------------------------------
+     Conteo animado de 0 al valor final. Respeta
+     prefers-reduced-motion (pinta el número directamente).
+     ---------------------------------------------------------- */
+  function contarHasta(el, destino) {
+    if (!el) return;
+    destino = Math.max(0, Math.round(destino || 0));
+
+    var reduce = false;
+    try {
+      reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (e) {}
+    if (reduce || destino === 0 || !window.requestAnimationFrame) {
+      el.textContent = String(destino);
+      return;
+    }
+
+    var DURACION = Math.min(1100, 400 + destino * 90); // números pequeños, animación corta
+    var inicio = null;
+
+    function paso(t) {
+      if (inicio === null) inicio = t;
+      var p = Math.min(1, (t - inicio) / DURACION);
+      // ease-out cúbico
+      var e = 1 - Math.pow(1 - p, 3);
+      el.textContent = String(Math.round(e * destino));
+      if (p < 1) requestAnimationFrame(paso);
+      else el.textContent = String(destino);
+    }
+    el.textContent = '0';
+    requestAnimationFrame(paso);
   }
 
   function escapar(s) {

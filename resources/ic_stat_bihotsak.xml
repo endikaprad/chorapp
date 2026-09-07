@@ -1,0 +1,35 @@
+<!-- Icono de la barra de estado para las notificaciones (Android exige
+     monocromo blanco + transparencia; el sistema lo pinta de blanco).
+     Silueta del logo de Bihotsak: corazón trazado que baja a espiral de
+     clave de sol + dos puntos de clave de fa.
+     Lo copia scripts/android-fix.js a android/app/src/main/res/drawable/. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+  <path
+      android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="36"
+      android:strokeLineCap="round"
+      android:strokeLineJoin="round"
+      android:pathData="M256,168 C232,112 178,92 138,118 C92,148 88,214 128,262 L256,398 L300,354" />
+  <path
+      android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="36"
+      android:strokeLineCap="round"
+      android:strokeLineJoin="round"
+      android:pathData="M256,168 C280,112 334,92 374,118 C420,148 424,214 384,262 L330,316" />
+  <path
+      android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="36"
+      android:strokeLineCap="round"
+      android:strokeLineJoin="round"
+      android:pathData="M300,354 C344,330 356,388 322,408 C292,426 262,402 274,366 C282,344 312,340 322,362" />
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M393,150 a17,17 0 1,0 34,0 a17,17 0 1,0 -34,0 Z" />
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M393,206 a17,17 0 1,0 34,0 a17,17 0 1,0 -34,0 Z" />
+</vector>

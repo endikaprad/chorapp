@@ -15,6 +15,10 @@
     </button>
   </div>
 
+  <!-- Notas: apunte del día (marca) y nota general de la canción -->
+  <div class="estudio__notas" data-nota-dia hidden></div>
+  <div class="estudio__notas" data-notas hidden></div>
+
   <!-- Reproductor de audio -->
   <section class="player" data-player hidden>
     <div class="player__pista">
@@ -38,11 +42,11 @@
         <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg>
         <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>
       </button>
-      <button class="player__btn" type="button" aria-label="Adelantar 5 segundos" data-adelante>
+      <button class="player__btn" type="button" aria-label="Repetir la canción sin parar" aria-pressed="false" data-replay>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M13 4l7 7-7 7"/><path d="M20 11H10a6 6 0 0 0 0 12h3"/>
+          <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/>
+          <path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
         </svg>
-        <span>5s</span>
       </button>
     </div>
     <div class="player__velocidad">
@@ -61,6 +65,10 @@
       <p class="player__bucle-info" data-bucle-info>Repite un trozo difícil: pulsa <strong>A</strong> donde empieza y <strong>B</strong> donde acaba.</p>
     </div>
   </section>
+
+  <!-- Dame el tono: nota de entrada para repasar un trozo suelto -->
+  <h3 class="seccion-titulo">Dame el tono</h3>
+  <div data-tono></div>
 
   <!-- Letra -->
   <h3 class="seccion-titulo">Letra</h3>
@@ -91,14 +99,15 @@
   </button>
 
   <!-- Grabaciones de la canción (se sincronizan con el apartado Grabaciones) -->
-  <h3 class="seccion-titulo">Grabaciones</h3>
+  <section class="grab-est">
+  <h3 class="seccion-titulo grab-est__tit">Grabaciones</h3>
   <div class="notas-voz" data-notas-voz></div>
   <label class="grabar-opcion" data-grabar-con-audio hidden>
     <input type="checkbox" data-grabar-con-audio-chk checked />
     <span class="grabar-opcion__box" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
     </span>
-    <span class="grabar-opcion__txt">Sonar la canción mientras grabo (desde donde esté)</span>
+    <span class="grabar-opcion__txt">Sonar la canción mientras grabo</span>
   </label>
   <button class="btn-bloque" type="button" data-grabar-nota>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -106,6 +115,7 @@
     </svg>
     <span data-grabar-nota-txt>Grabar</span>
   </button>
+  </section>
 
   <!-- Visor a pantalla completa (partitura ampliada) -->
   <div class="lightbox" data-lightbox hidden>

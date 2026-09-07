@@ -30,8 +30,25 @@ window.CancionActiva = (function () {
   var urlActual = null;     // object URL del MP3 en curso (se libera aquí)
   var subs = [];
   var vistaAbierta = false; // true mientras el modo estudio de ESTA canción está montado
+  var forzarBarra = false;  // el modo estudio pide la barra aunque su vista esté abierta
+                            // (p. ej. Maite ha bajado y ya no ve el reproductor de la página)
   var ultimoEstado = { reproduciendo: false, actual: 0, total: 0, velocidad: 1, bucle: null };
   var barra = null;         // UI flotante (o null si aún no se creó)
+  var arrastrandoBarra = false; // Maite tiene el dedo en la barra de progreso
+  var recorte = null;       // { ini, fin } en segundos: la canción es un TROZO
+                            // del audio (una marca dentro del ensayo). La barra
+                            // flotante trabaja relativa a esa ventana, no al
+                            // ensayo entero. fin == null => hasta el final.
+
+  // Ventana real de la canción dentro del audio, resolviendo el fin abierto
+  // con la duración total conocida.
+  function ventana(s) {
+    var total = (s && s.total) || ultimoEstado.total || 0;
+    if (!recorte) return { ini: 0, fin: total, span: total };
+    var ini = Math.max(0, recorte.ini || 0);
+    var fin = (recorte.fin != null && recorte.fin > ini) ? recorte.fin : total;
+    return { ini: ini, fin: fin, span: Math.max(0, fin - ini) };
+  }
 
   /* ---------- Suscripción / difusión de estado ---------- */
 
@@ -43,6 +60,13 @@ window.CancionActiva = (function () {
   }
 
   function emitir(s) {
+    // Anota en la bitácora cada vez que la canción PASA a sonar (no cada tick).
+    if (s && s.reproduciendo && !ultimoEstado.reproduciendo && cancionActual && window.Diario) {
+      window.Diario.registrar('reproduccion', {
+        sesionId: cancionActual.id,
+        titulo: cancionActual.titulo,
+      });
+    }
     ultimoEstado = s;
     for (var i = 0; i < subs.length; i++) {
       try { subs[i](s); } catch (e) {}
@@ -56,16 +80,23 @@ window.CancionActiva = (function () {
 
   /* ---------- Carga / descarte de la canción ---------- */
 
-  // cancion: objeto con { id, titulo, compositor }.
+  // cancion: objeto con { id, titulo, compositor, abrir? }.
+  //   abrir: { ruta, datos } al que vuelve la barra flotante al tocar el
+  //          título (por defecto, el modo estudio con { id }).
   // fuenteUrl: object URL del MP3, o una promesa que resuelve a él.
   function cargar(cancion, fuenteUrl) {
     if (!cancion || !cancion.id) return Promise.resolve();
+
+    var abrir = cancion.abrir || { ruta: 'estudio', datos: { id: cancion.id } };
 
     // Ya está cargada y sonando: no la reiniciamos, solo refrescamos metadatos.
     if (mismaCancion(cancion.id) && audio) {
       cancionActual.titulo = cancion.titulo;
       cancionActual.compositor = cancion.compositor;
+      cancionActual.abrir = abrir;
+      recorte = cancion.recorte || null;
       metaBarra();
+      pintarBarra(ultimoEstado);
       return Promise.resolve();
     }
 
@@ -75,7 +106,9 @@ window.CancionActiva = (function () {
       id: cancion.id,
       titulo: cancion.titulo || 'Canción',
       compositor: cancion.compositor || '',
+      abrir: abrir,
     };
+    recorte = cancion.recorte || null;
 
     audio = document.createElement('audio');
     audio.preload = 'metadata';
@@ -104,8 +137,13 @@ window.CancionActiva = (function () {
     audio = null;
     if (urlActual) { window.Archivos.liberar(urlActual); urlActual = null; }
     cancionActual = null;
+    recorte = null;
+    forzarBarra = false;
     ultimoEstado = { reproduciendo: false, actual: 0, total: 0, velocidad: 1, bucle: null };
     ocultarBarra();
+    // Avisar a quien esté escuchando (p. ej. el modo estudio, para recolocar
+    // su contenido ahora que ya no hay barra flotante).
+    try { document.dispatchEvent(new CustomEvent('chorapp:cancion-descartada')); } catch (e) {}
   }
 
   /* ---------- Control (proxys; no hacen nada sin canción) ---------- */
@@ -132,6 +170,17 @@ window.CancionActiva = (function () {
 
   function fijarVistaAbierta(abierta) {
     vistaAbierta = !!abierta;
+    if (!vistaAbierta) forzarBarra = false;
+    evaluarBarra();
+  }
+
+  // El modo estudio pide (o retira) la barra flotante aunque su vista siga
+  // montada: se usa cuando Maite baja y el reproductor de la página deja de
+  // verse. La barra entra con su misma animación de deslizar + fundido.
+  function fijarForzarBarra(f) {
+    f = !!f;
+    if (f === forzarBarra) return;
+    forzarBarra = f;
     evaluarBarra();
   }
 
@@ -153,23 +202,36 @@ window.CancionActiva = (function () {
         '<svg class="br-ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg>' +
         '<svg class="br-ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>' +
       '</button>' +
-      '<span class="barra-repro__bucle" data-br-bucle hidden aria-label="Bucle activo">⟲</span>' +
       '<button type="button" class="barra-repro__vel" data-br-vel aria-label="Cambiar velocidad">1×</button>' +
       '<button type="button" class="barra-repro__cerrar" data-br-cerrar aria-label="Cerrar y detener">✕</button>';
 
     document.body.appendChild(barra);
 
     barra.querySelector('[data-br-abrir]').addEventListener('click', function () {
-      if (cancionActual && window.App) window.App.ir('estudio', { datos: { id: cancionActual.id } });
+      if (cancionActual && window.App) {
+        var a = cancionActual.abrir || { ruta: 'estudio', datos: { id: cancionActual.id } };
+        window.App.ir(a.ruta, { datos: a.datos });
+      }
     });
     barra.querySelector('[data-br-play]').addEventListener('click', function () { proxy('alternar')(); });
 
     var prog = barra.querySelector('[data-br-prog]');
+    // Mientras Maite arrastra NO tocamos audio.currentTime en cada 'input':
+    // el timeupdate seguiría llegando con la posición vieja y pintarBarra
+    // devolvería el pulgar al inicio. Solo movemos la reproducción al soltar.
     prog.addEventListener('input', function () {
-      var t = ultimoEstado.total;
+      arrastrandoBarra = true;
       prog.style.setProperty('--pct', (prog.value / 10) + '%');
-      if (t) proxy('irA')((prog.value / 1000) * t);
     });
+    var soltar = function () {
+      if (!arrastrandoBarra) return;
+      arrastrandoBarra = false;
+      var w = ventana(ultimoEstado);
+      if (w.span) proxy('irA')(w.ini + (prog.value / 1000) * w.span);
+    };
+    prog.addEventListener('change', soltar);
+    prog.addEventListener('pointerup', soltar);
+    prog.addEventListener('touchend', soltar);
     barra.querySelector('[data-br-vel]').addEventListener('click', siguienteVelocidad);
     barra.querySelector('[data-br-cerrar]').addEventListener('click', descartar);
 
@@ -197,10 +259,10 @@ window.CancionActiva = (function () {
     play.classList.toggle('is-sonando', s.reproduciendo);
     play.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
     barra.querySelector('[data-br-vel]').textContent = fmtVel(s.velocidad);
-    barra.querySelector('[data-br-bucle]').toggleAttribute('hidden', !s.bucle);
     var prog = barra.querySelector('[data-br-prog]');
-    var pct = s.total ? Math.max(0, Math.min(1, s.actual / s.total)) : 0;
-    if (!prog.matches(':active')) {
+    var w = ventana(s);
+    var pct = w.span ? Math.max(0, Math.min(1, (s.actual - w.ini) / w.span)) : 0;
+    if (!arrastrandoBarra && !prog.matches(':active')) {
       prog.value = String(Math.round(pct * 1000));
       prog.style.setProperty('--pct', (pct * 100).toFixed(1) + '%');
     }
@@ -209,12 +271,12 @@ window.CancionActiva = (function () {
   // ¿Debe verse la barra? Hay canción cargada y el modo estudio de esa
   // canción NO está en pantalla.
   function evaluarBarra() {
-    if (audio && urlActual && cancionActual && !vistaAbierta) mostrarBarra();
+    if (audio && urlActual && cancionActual && (!vistaAbierta || forzarBarra)) mostrarBarra();
     else ocultarBarra();
   }
 
   function debeVerse() {
-    return !!(barra && audio && urlActual && cancionActual && !vistaAbierta);
+    return !!(barra && audio && urlActual && cancionActual && (!vistaAbierta || forzarBarra));
   }
 
   function mostrarBarra() {
@@ -223,11 +285,17 @@ window.CancionActiva = (function () {
     metaBarra();
     if (recienCreada) void barra.offsetWidth;   // reflow: que la transición de entrada arranque
     // pequeño respiro y revalidación por si volvió a abrirse el modo estudio.
-    setTimeout(function () { if (debeVerse()) barra.classList.add('is-visible'); }, 20);
+    setTimeout(function () {
+      if (debeVerse()) {
+        barra.classList.add('is-visible');
+        document.body.classList.add('con-barra-repro');
+      }
+    }, 20);
   }
 
   function ocultarBarra() {
     if (barra) barra.classList.remove('is-visible');
+    document.body.classList.remove('con-barra-repro');
   }
 
   /* ---------- API pública ---------- */
@@ -237,6 +305,7 @@ window.CancionActiva = (function () {
     descartar: descartar,
     suscribir: suscribir,
     fijarVistaAbierta: fijarVistaAbierta,
+    fijarForzarBarra: fijarForzarBarra,
     estado: function () { return ultimoEstado; },
     cancionId: function () { return cancionActual && cancionActual.id; },
     hayCancion: function () { return !!(audio && urlActual); },

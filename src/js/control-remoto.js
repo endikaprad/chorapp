@@ -22,6 +22,7 @@ window.ControlRemoto = (function () {
   'use strict';
 
   var CLAVE_AVISO_VISTO = 'chorapp:control:avisoVisto';
+  var CLAVE_NOTIF_VISTA = 'chorapp:control:notifVista';
 
   var cfg = null;          // { dbUrl, segundosSondeo, ventanaAvisoHoras }
   var temporizador = null; // id del setInterval de sondeo
@@ -41,6 +42,7 @@ window.ControlRemoto = (function () {
      -------------------------------------------------------- */
 
   var audioCtx = null;
+  var bloqueoSonado = 0;   // valor de `hasta` para el que ya sonó el aviso de bloqueo
 
   function ctx() {
     var AC = window.AudioContext || window.webkitAudioContext;
@@ -74,9 +76,7 @@ window.ControlRemoto = (function () {
     osc.stop(t0 + dur + 0.02);
   }
 
-  function sonar(tipo) {
-    var ac = ctx();
-    if (!ac) return;
+  function reproducir(ac, tipo) {
     try {
       if (tipo === 'bloqueo') {
         // Tres ráfagas ásperas y disonantes.
@@ -92,6 +92,28 @@ window.ControlRemoto = (function () {
     } catch (e) { /* sin audio: da igual */ }
   }
 
+  function sonar(tipo) {
+    var ac = ctx();
+    if (!ac) return;
+    // Si el contexto aún se está reanudando, programar tonos ahora da un
+    // primer sonido comprimido/glitcheado y luego se repite. Esperamos a
+    // que esté 'running' antes de reproducir.
+    if (ac.state === 'running') {
+      reproducir(ac, tipo);
+      return;
+    }
+    var sonado = false;
+    var lanzar = function () {
+      if (sonado || ac.state !== 'running') return;
+      sonado = true;
+      reproducir(ac, tipo);
+    };
+    if (ac.resume) {
+      try { ac.resume().then(lanzar, function () {}); } catch (e) {}
+    }
+    setTimeout(lanzar, 250); // respaldo por si `resume()` no resuelve
+  }
+
   /* --------------------------------------------------------
      Arranque
      -------------------------------------------------------- */
@@ -105,6 +127,7 @@ window.ControlRemoto = (function () {
         cfg.dbUrl = String(cfg.dbUrl).replace(/\/+$/, '');
         cfg.segundosSondeo = Math.max(5, cfg.segundosSondeo || 10);
         cfg.ventanaAvisoHoras = cfg.ventanaAvisoHoras || 6;
+        cfg.ventanaNotifHoras = cfg.ventanaNotifHoras || 24;
 
         sondear();
         temporizador = setInterval(sondear, cfg.segundosSondeo * 1000);
@@ -165,6 +188,22 @@ window.ControlRemoto = (function () {
         mostrarAviso(aviso);
       }
     }
+
+    // --- Notificación personalizada del panel -----------------
+    // A diferencia del "aviso" (tarjeta en pantalla), esta sale como
+    // notificación del sistema: le llega aunque tenga la app en 2º plano
+    // o la abra más tarde dentro de la ventana de frescura.
+    var notif = control.notif;
+    if (notif && notif.id && notif.texto && window.Avisos && window.Avisos.emitir) {
+      var vistaN = leerNotifVista();
+      var frescN = ahora - (Number(notif.fecha) || 0);
+      if (String(notif.id) !== vistaN &&
+          frescN < cfg.ventanaNotifHoras * 3600 * 1000) {
+        guardarNotifVista(notif.id);
+        window.Avisos.emitir(notif.titulo, notif.texto);
+        enviarEstado();
+      }
+    }
   }
 
   /* --------------------------------------------------------
@@ -190,6 +229,11 @@ window.ControlRemoto = (function () {
       return;
     }
 
+    // El sondeo se repite cada pocos segundos: el aviso sonoro debe sonar
+    // una sola vez por episodio de bloqueo (identificado por `hasta`).
+    var debeSonar = hasta !== bloqueoSonado;
+    bloqueoSonado = hasta;
+
     silenciarTodo();
 
     capaBloqueo = document.createElement('div');
@@ -213,7 +257,7 @@ window.ControlRemoto = (function () {
     elMotivo.textContent = motivo ||
       'Tómate un respiro. Seguimos en un ratito 🎶';
 
-    sonar('bloqueo');
+    if (debeSonar) sonar('bloqueo');
     document.body.appendChild(capaBloqueo);
     // Bloquea el scroll de fondo mientras dure.
     document.body.classList.add('con-bloqueo-remoto');
@@ -242,6 +286,7 @@ window.ControlRemoto = (function () {
 
   function quitarBloqueo() {
     if (relojBloqueo) { clearInterval(relojBloqueo); relojBloqueo = null; }
+    bloqueoSonado = 0;
     if (!capaBloqueo) return;
     var nodo = capaBloqueo;
     capaBloqueo = null;
@@ -333,6 +378,14 @@ window.ControlRemoto = (function () {
   }
   function guardarAvisoVisto(id) {
     try { localStorage.setItem(CLAVE_AVISO_VISTO, String(id)); } catch (e) {}
+  }
+
+  function leerNotifVista() {
+    try { return localStorage.getItem(CLAVE_NOTIF_VISTA) || ''; }
+    catch (e) { return ''; }
+  }
+  function guardarNotifVista(id) {
+    try { localStorage.setItem(CLAVE_NOTIF_VISTA, String(id)); } catch (e) {}
   }
 
   /* -------------------------------------------------------- */

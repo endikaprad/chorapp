@@ -23,7 +23,10 @@
     "@capacitor/app": "^7.0.0",
     "@capacitor/core": "^7.0.0",
     "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/local-notifications": "^7.0.7",
     "@capacitor/preferences": "^7.0.0",
+    "@capacitor/push-notifications": "^7.0.0",
+    "@capacitor/share": "^7.0.4",
     "@capacitor/status-bar": "^7.0.6",
     "@jofr/capacitor-media-session": "^4.0.0"
   },

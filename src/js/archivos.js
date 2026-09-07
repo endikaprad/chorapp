@@ -81,9 +81,8 @@ window.Archivos = (function () {
     return tx('readwrite', function (s) { return s.delete(clave); });
   }
 
-  // Borra todos los archivos de una canción (audio, letra, partitura, voces).
-  function borrarCancion(cancionId) {
-    var prefijo = cancionId + ':';
+  // Borra todas las claves que empiezan por `prefijo`.
+  function borrarPrefijo(prefijo) {
     return tx('readwrite', function (s) {
       var cur = s.openCursor();
       cur.onsuccess = function () {
@@ -96,12 +95,30 @@ window.Archivos = (function () {
     });
   }
 
+  // Borra todos los archivos de una canción (letra, partitura, …).
+  function borrarCancion(cancionId) {
+    return borrarPrefijo(cancionId + ':');
+  }
+
+  // Mueve un blob de una clave a otra (para migraciones). No falla si no existe.
+  function mover(claveVieja, claveNueva) {
+    return obtener(claveVieja).then(function (blob) {
+      if (!blob) return null;
+      return tx('readwrite', function (s) {
+        s.put(blob, claveNueva);
+        return s.delete(claveVieja);
+      });
+    });
+  }
+
   return {
     guardar: guardar,
     obtener: obtener,
     url: url,
     liberar: liberar,
     borrar: borrar,
+    borrarPrefijo: borrarPrefijo,
     borrarCancion: borrarCancion,
+    mover: mover,
   };
 })();

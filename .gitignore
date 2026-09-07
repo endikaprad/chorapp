@@ -22,6 +22,12 @@ keystore.properties
 secretos/
 panel/config.local.js
 
+# Firebase FCM: config del proyecto para el APK (lleva ids, no versionar)
+resources/google-services.json
+worker/node_modules/
+worker/.wrangler/
+worker/.dev.vars
+
 # Sistema / editores
 .DS_Store
 Thumbs.db

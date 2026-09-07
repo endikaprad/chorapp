@@ -15,13 +15,19 @@
   //   raiz    : true si es una pestaña del bottom nav (sin botón atrás)
   var PANTALLAS = {
     inicio:      { archivo: 'home',       titulo: 'Kaixo, Ama <span class="emoji" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>', raiz: true },
-    canciones:   { archivo: 'songs',      titulo: 'Canciones',   raiz: true },
+    sesiones:    { archivo: 'sessions',   titulo: 'Sesiones',    raiz: true },
     practica:    { archivo: 'practice',   titulo: 'Práctica',    raiz: true },
     grabaciones: { archivo: 'recordings', titulo: 'Grabaciones', raiz: true },
+    sesion:      { archivo: 'session',    titulo: 'Sesión',       raiz: false },
+    canciones:   { archivo: 'songs',      titulo: 'Repertorio',   raiz: false },
+    cancion:     { archivo: 'song',       titulo: 'Canción',      raiz: false },
     estudio:     { archivo: 'study',      titulo: 'Modo estudio', raiz: false },
   };
 
-  var ORDEN_TABS = ['inicio', 'canciones', 'practica', 'grabaciones'];
+  var ORDEN_TABS = ['inicio', 'sesiones', 'practica', 'grabaciones'];
+
+  // Rutas que se pueden re-abrir con datos distintos sin bloquearse.
+  var REENTRANTES = ['estudio', 'sesion', 'cancion'];
 
   var vista = document.getElementById('vista');
   var header = document.getElementById('app-header');
@@ -49,7 +55,7 @@
     if (!pantalla || cargando) return;
     // Se puede volver a entrar en el modo estudio con otra canción;
     // el resto de rutas no se recargan si ya son la actual.
-    if (ruta === rutaActual && ruta !== 'estudio') return;
+    if (ruta === rutaActual && REENTRANTES.indexOf(ruta) === -1) return;
     cargando = true;
 
     var esPrimeraNav = rutaActual === null;
@@ -67,8 +73,17 @@
       var contenedor = vista.firstElementChild;
 
       // Historial: las pestañas raíz reinician la pila; el resto apila.
-      if (pantalla.raiz) historial = [ruta];
-      else if (rutaActual) historial.push(ruta);
+      // Cada entrada guarda su ruta Y sus datos, para poder volver a una
+      // pantalla de detalle (sesión, canción, estudio) sin perder el id.
+      // Durante un "atrás" (enPopstate) la pila la gestiona retroceder().
+      if (!enPopstate) {
+        var entrada = { ruta: ruta, datos: opts.datos || null };
+        var cima = historial[historial.length - 1];
+        var repetida = cima && cima.ruta === ruta &&
+          JSON.stringify(cima.datos) === JSON.stringify(entrada.datos);
+        if (pantalla.raiz) historial = [entrada];
+        else if (rutaActual && !repetida) historial.push(entrada);
+      }
 
       rutaActual = ruta;
       actualizarCabecera(pantalla);
@@ -109,11 +124,10 @@
   function retroceder() {
     if (historial.length <= 1) return;
     enPopstate = true;
-    historial.pop();
-    var destino = historial[historial.length - 1];
-    historial.pop(); // ir() volverá a apilarlo
+    historial.pop();                             // quita la pantalla actual
+    var destino = historial[historial.length - 1]; // la anterior se queda en la pila
     rutaActual = null;
-    var p = ir(destino);
+    var p = ir(destino.ruta, { datos: destino.datos });
     (p && p.then ? p : Promise.resolve()).then(function () { enPopstate = false; });
   }
 
@@ -208,6 +222,19 @@
      Arranque
      -------------------------------------------------------- */
   document.addEventListener('DOMContentLoaded', function () {
-    ir('inicio');
+    // Reorganización a "sesiones": convierte las canciones con audio del
+    // modelo antiguo en sesiones antes de pintar nada. Es una sola vez.
+    var arranque = (window.Sesiones && window.Sesiones.migrarDesdeCanciones)
+      ? window.Sesiones.migrarDesdeCanciones().catch(function () {})
+      : Promise.resolve();
+    arranque.then(function () { ir('inicio'); });
+    // Notificaciones en fechas señaladas (cumpleaños, fiestas…). Solo APK.
+    if (window.Avisos && window.Avisos.iniciar) {
+      setTimeout(function () { window.Avisos.iniciar(); }, 1500);
+    }
+    // Registro en FCM para recibir push con la app cerrada. Solo APK.
+    if (window.Push && window.Push.iniciar) {
+      setTimeout(function () { window.Push.iniciar(); }, 1800);
+    }
   });
 })();

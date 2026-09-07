@@ -117,41 +117,41 @@ window.Practica = (function () {
 
     if (total >= 4) {
       var maxDia = porDia.indexOf(Math.max.apply(null, porDia));
-      lista.push('📅 Sueles estudiar sobre todo ' + DIAS_SEMANA[maxDia]);
+      lista.push({ ico: 'calendario', texto: 'Sueles estudiar sobre todo ' + DIAS_SEMANA[maxDia] });
     }
 
     var mejor = mejorRacha();
     if (mejor >= 3) {
-      lista.push('🔥 Tu récord son ' + mejor + ' días seguidos sin fallar');
+      lista.push({ ico: 'racha', texto: 'Tu récord son ' + mejor + ' días seguidos sin fallar' });
     }
 
     // Días desde la primera sesión registrada.
     var primero = new Date(fechas[0] + 'T00:00:00');
     var diasDesde = Math.round((Date.now() - primero.getTime()) / 86400000);
     if (diasDesde >= 14) {
-      lista.push('🎵 Llevas ' + total + ' días de estudio; empezaste hace ' + diasDesde + ' días');
+      lista.push({ ico: 'nota', texto: 'Llevas ' + total + ' días de estudio; empezaste hace ' + diasDesde + ' días' });
     } else {
-      lista.push('🎵 Llevas ' + total + (total === 1 ? ' día' : ' días') + ' de estudio en total');
+      lista.push({ ico: 'nota', texto: 'Llevas ' + total + (total === 1 ? ' día' : ' días') + ' de estudio en total' });
     }
 
     // Mes más cantado (solo si destaca sobre el resto).
     var mesesOrden = Object.keys(porMes).sort(function (a, b) { return porMes[b] - porMes[a]; });
     if (mesesOrden.length >= 2 && porMes[mesesOrden[0]] >= porMes[mesesOrden[1]] + 2) {
-      lista.push('🗓️ ' + capitalizar(NOMBRE_MES[mesesOrden[0]]) + ' ha sido tu mes más cantado');
+      lista.push({ ico: 'mes', texto: capitalizar(NOMBRE_MES[mesesOrden[0]]) + ' ha sido tu mes más cantado' });
     }
 
     // Canción a la que más veces has vuelto.
     var idsOrden = Object.keys(porCancion).sort(function (a, b) { return porCancion[b] - porCancion[a]; });
     if (idsOrden.length && porCancion[idsOrden[0]] >= 3 && window.Canciones) {
       var c = window.Canciones.obtener(idsOrden[0]);
-      if (c) lista.push('⭐ «' + c.titulo + '» es la que más has trabajado (' + porCancion[idsOrden[0]] + ' veces)');
+      if (c) lista.push({ ico: 'estrella', texto: '«' + c.titulo + '» es la que más has trabajado (' + porCancion[idsOrden[0]] + ' veces)' });
     }
 
     // Constancia sobre el tiempo transcurrido.
     if (diasDesde >= 10) {
       var deCada7 = Math.round((total / (diasDesde + 1)) * 7);
       if (deCada7 >= 1 && deCada7 <= 6) {
-        lista.push('💪 De media practicas ' + deCada7 + ' de cada 7 días');
+        lista.push({ ico: 'constancia', texto: 'De media practicas ' + deCada7 + ' de cada 7 días' });
       }
     }
 
