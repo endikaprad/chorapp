@@ -101,8 +101,30 @@ if (hayFCM) {
   console.log('android-fix: sin resources/google-services.json — push (FCM) desactivada, APK compila igual.');
 }
 
+// Nota: el modo oscuro NO necesita tocar el MainActivity ni
+// setAlgorithmicDarkeningAllowed. Basta con que la web declare
+// `color-scheme` y ponga `data-theme` (lo hace el script del <head> de
+// index.html leyendo matchMedia). Así el WebView no aplica su propio
+// oscurecido y el fondo se ve con los mismos colores que en el navegador.
+
 let xml = readFileSync(manifest, 'utf8');
 let cambiado = false;
+
+// --- Rendimiento del WebView -------------------------------------------
+// hardwareAccelerated: fuerza composición por GPU de toda la app (es el
+//   valor por defecto, pero lo dejamos explícito para que no dependa de
+//   cambios de plantilla).
+// largeHeap: sube el techo de memoria del proceso. La app decodifica
+//   audio entero (waveforms, calibración), abre PDF con PDF.js y maneja
+//   blobs de imagen desde IndexedDB; con más heap el recolector de basura
+//   entra menos y se notan menos tirones al abrir una canción.
+if (!xml.includes('android:hardwareAccelerated')) {
+  xml = xml.replace(
+    /<application\b/,
+    '<application android:hardwareAccelerated="true" android:largeHeap="true"'
+  );
+  cambiado = true;
+}
 
 // Icono y color por defecto de las notificaciones push de FCM.
 if (hayFCM && !xml.includes('com.google.firebase.messaging.default_notification_icon')) {
@@ -145,4 +167,30 @@ if (cambiado) {
   console.log('android-fix: permisos de micrófono añadidos al AndroidManifest.');
 } else {
   console.log('android-fix: AndroidManifest ya está al día.');
+}
+
+// --- Botones de retroceder/adelantar en la vista COMPACTA del reproductor -
+// @jofr/capacitor-media-session sí añade los botones seekbackward/seekforward
+// a la notificación, pero SOLO en la vista expandida: su lista
+// `possibleCompactViewActions` no los incluye, así que la notificación
+// colapsada (la que ve Maite al salir de la app) enseña únicamente play/pause.
+// Parcheamos el fuente Java del plugin para meter seek(backward|forward) en la
+// vista compacta → quedan [−5s] [play/pause] [+5s]. Idempotente.
+const svcJava = resolve(
+  raiz,
+  'node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionService.java'
+);
+if (existsSync(svcJava)) {
+  let j = readFileSync(svcJava, 'utf8');
+  const viejo = 'Arrays.asList("previoustrack", "play", "pause", "nexttrack", "stop")';
+  const nuevo = 'Arrays.asList("previoustrack", "seekbackward", "play", "pause", "seekforward", "nexttrack", "stop")';
+  if (j.includes(viejo)) {
+    j = j.replace(viejo, nuevo);
+    writeFileSync(svcJava, j);
+    console.log('android-fix: MediaSessionService parcheado — seek en vista compacta.');
+  } else if (j.includes(nuevo)) {
+    console.log('android-fix: MediaSessionService ya parcheado (seek en vista compacta).');
+  } else {
+    console.log('android-fix: OJO — no se pudo parchear MediaSessionService (¿cambió el plugin?).');
+  }
 }

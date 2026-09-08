@@ -98,6 +98,47 @@ npx wrangler tail
 
 ---
 
+## Tarjeta "Del coro" (Instagram) — ruta `GET /coro`
+
+El mismo Worker sirve la última publicación de Instagram del coro para la
+pantalla de Inicio. **Instagram bloquea (401) las peticiones directas tanto
+desde el móvil como desde Cloudflare**, así que el Worker lee un *feed JSON*
+del perfil público generado con **RSS.app** (gratis), lo normaliza y lo
+cachea 30 min.
+
+### Montarlo
+
+1. **Crear el feed en RSS.app**
+   - Entra en <https://rss.app> y crea una cuenta gratis.
+   - *New Feed* → pega `https://www.instagram.com/bihotsak/` → *Generate*.
+   - Abre el feed creado → pestaña **API / JSON** → copia la **URL del JSON**
+     (algo como `https://rss.app/feeds/v1.1/XXXXXXXX.json`).
+
+2. **Dársela al Worker** (es un secreto, no va en `wrangler.toml`):
+   ```bash
+   cd worker
+   npx wrangler secret put CORO_FEED_URL
+   # pega la URL del JSON y Enter
+   npx wrangler deploy
+   ```
+
+3. **Conectar la app**: en **`src/data/coro.json`** pon la URL del Worker
+   (sin barra final) en `worker`:
+   ```json
+   { "worker": "https://chorapp-push.bihotsak-coro.workers.dev", ... }
+   ```
+
+4. `npm run sync`, regenera el APK y reinstala.
+
+Probar: `https://chorapp-push.bihotsak-coro.workers.dev/coro?handle=bihotsak`
+debe devolver un JSON con `imagen`, `texto`, `fecha`, `enlace`. Si da
+`{"error":"instagram no respondió"}` revisa `CORO_FEED_URL`.
+
+> Plan gratis de RSS.app: el feed se refresca cada pocas horas, suficiente
+> para esta tarjeta. Si el perfil del coro cambia de nombre, regenera el feed.
+
+---
+
 ## Ojo con el ahorro de batería (Xiaomi, Huawei, Samsung, Oppo…)
 
 Algunas capas de Android matan la app y bloquean las push si no la marcas como

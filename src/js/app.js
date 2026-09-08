@@ -99,6 +99,17 @@
       actualizarNav(ruta);
       window.scrollTo(0, 0);
 
+      // Rendimiento: el fondo animado solo "respira" en las pestañas raíz y
+      // en reposo. `navegando` lo congela durante la transición de pantalla
+      // (evita que fondo + slide + backdrop-filter compitan por el compositor
+      // justo cuando se nota el tirón). Se libera al acabar la animación.
+      document.body.classList.toggle('ruta-raiz', !!pantalla.raiz);
+      document.body.classList.add('navegando');
+      clearTimeout(ir._tNaveg);
+      ir._tNaveg = setTimeout(function () {
+        document.body.classList.remove('navegando');
+      }, 320);
+
       // Espejar la profundidad de `historial` en el historial del navegador,
       // para que el gesto "atrás" de Android (y el del navegador) vuelva
       // dentro de la app en vez de cerrarla.

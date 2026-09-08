@@ -50,18 +50,24 @@ window.Tema = (function () {
 
   function aplicar(modo) {
     var raiz = document.documentElement;
-    if (modo === 'claro') raiz.setAttribute('data-theme', 'light');
-    else if (modo === 'oscuro') raiz.setAttribute('data-theme', 'dark');
-    else raiz.removeAttribute('data-theme');
+    // Siempre se escribe data-theme explícito (light|dark), incluso en 'auto'.
+    // Antes, 'auto' quitaba el atributo y confiaba en @media
+    // (prefers-color-scheme); pero algunos WebView de Android (Samsung) NO
+    // propagan esa media query al contenido y encima le aplican su propio
+    // "modo oscuro forzado", que oscurece los fondos sólidos pero deja los
+    // degradados claros → la app se ve a medio pintar. Con data-theme
+    // explícito manda el selector [data-theme="..."], que sí funciona
+    // siempre, y las @media siguen coincidiendo cuando el sistema las honra.
+    var oscuro = oscuroEfectivo(modo);
+    raiz.setAttribute('data-theme', oscuro ? 'dark' : 'light');
 
     // theme-color: que la barra de estado acompañe al fondo real.
-    var color = oscuroEfectivo(modo) ? COLOR_OSCURO : COLOR_CLARO;
     document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
-      m.setAttribute('content', color);
+      m.setAttribute('content', oscuro ? COLOR_OSCURO : COLOR_CLARO);
     });
 
     if (window.BarraEstado && typeof window.BarraEstado.sincronizar === 'function') {
-      window.BarraEstado.sincronizar(oscuroEfectivo(modo));
+      window.BarraEstado.sincronizar(oscuro);
     }
   }
 

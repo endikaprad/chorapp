@@ -3,8 +3,10 @@
   "appName": "ChorApp",
   "webDir": "www",
   "backgroundColor": "#FBF8F3",
+  "loggingBehavior": "production",
   "android": {
-    "allowMixedContent": false
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
   },
   "plugins": {
     "CapacitorHttp": {

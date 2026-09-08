@@ -5,12 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#FBF8F3" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#12100E" media="(prefers-color-scheme: dark)" />
+  <meta name="color-scheme" content="light dark" />
   <meta name="description" content="App de estudio de Maite para el coro Bihotsak." />
   <title>ChorApp · Bihotsak</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- La fuente se carga SIN bloquear el primer pintado: en el móvil, con
+       conexión lenta, esperar a Google Fonts congelaba el arranque. Hasta que
+       llega, se ve la fuente de sistema (font-display: swap). -->
+  <link rel="stylesheet" media="print" onload="this.media='all'"
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" /></noscript>
+
+  <!-- Tema aplicado ANTES de pintar (sin destello) y con data-theme
+       explícito: los WebView que fuerzan su propio modo oscuro y no
+       propagan prefers-color-scheme dejaban la app a medio teñir. -->
+  <script>
+    (function () {
+      try {
+        var v = localStorage.getItem('chorapp:tema');
+        var oscuro = v === 'oscuro' ||
+          ((v === 'auto' || !v) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', oscuro ? 'dark' : 'light');
+      } catch (e) {}
+    })();
+  </script>
 
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -18,10 +38,6 @@
   <!-- Fondo animado cálido con auroras cobalto (decorativo) -->
   <div class="fondo-animado" aria-hidden="true">
     <span class="fondo-lineas"></span>
-    <span class="fondo-blob fondo-blob--1"></span>
-    <span class="fondo-blob fondo-blob--2"></span>
-    <span class="fondo-blob fondo-blob--3"></span>
-    <span class="fondo-grano"></span>
   </div>
 
   <!-- Cabecera contextual (saludo en Inicio, título + atrás en el resto) -->
@@ -70,49 +86,49 @@
     <span id="nav-indicador" class="nav-indicador" aria-hidden="true"></span>
   </nav>
 
-  <script src="js/statusbar.js"></script>
-  <script src="js/tema.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/frases.js"></script>
-  <script src="js/avisos.js"></script>
-  <script src="js/storage.js"></script>
-  <script src="js/conciertos.js"></script>
-  <script src="js/control-remoto.js"></script>
-  <script src="js/push.js"></script>
-  <script src="js/archivos.js"></script>
-  <script src="js/visorpdf.js"></script>
-  <script src="js/fechapicker.js"></script>
-  <script src="js/canciones.js"></script>
-  <script src="js/traducir.js"></script>
-  <script src="js/sesiones.js"></script>
-  <script src="js/grabaciones.js"></script>
-  <script src="vendor/lame.min.js"></script>
-  <script src="js/audiomp3.js"></script>
-  <script src="js/compartir.js"></script>
-  <script src="js/compartircancion.js"></script>
-  <script src="js/sincronia.js"></script>
-  <script src="js/practica.js"></script>
-  <script src="js/logros.js"></script>
-  <script src="js/diario.js"></script>
-  <script src="js/resumenmes.js"></script>
-  <script src="js/progreso.js"></script>
-  <script src="js/tono.js"></script>
-  <script src="js/player.js"></script>
-  <script src="js/cancion-activa.js"></script>
-  <script src="js/miniplayer.js"></script>
-  <script src="js/selector.js"></script>
-  <script src="js/hojacancion.js"></script>
-  <script src="js/recorder.js"></script>
-  <script src="js/calendar.js"></script>
-  <script src="js/pages/songs.js"></script>
-  <script src="js/pages/song.js"></script>
-  <script src="js/pages/sessions.js"></script>
-  <script src="js/pages/session.js"></script>
-  <script src="js/pages/home.js"></script>
-  <script src="js/pages/study.js"></script>
-  <script src="js/pages/practice.js"></script>
-  <script src="js/pages/conciertos.js"></script>
-  <script src="js/pages/recordings.js"></script>
-  <script src="js/app.js"></script>
+  <script defer src="js/statusbar.js"></script>
+  <script defer src="js/tema.js"></script>
+  <script defer src="js/ui.js"></script>
+  <script defer src="js/frases.js"></script>
+  <script defer src="js/avisos.js"></script>
+  <script defer src="js/storage.js"></script>
+  <script defer src="js/conciertos.js"></script>
+  <script defer src="js/control-remoto.js"></script>
+  <script defer src="js/push.js"></script>
+  <script defer src="js/archivos.js"></script>
+  <script defer src="js/visorpdf.js"></script>
+  <script defer src="js/fechapicker.js"></script>
+  <script defer src="js/canciones.js"></script>
+  <script defer src="js/traducir.js"></script>
+  <script defer src="js/sesiones.js"></script>
+  <script defer src="js/grabaciones.js"></script>
+  <script defer src="vendor/lame.min.js"></script>
+  <script defer src="js/audiomp3.js"></script>
+  <script defer src="js/compartir.js"></script>
+  <script defer src="js/compartircancion.js"></script>
+  <script defer src="js/sincronia.js"></script>
+  <script defer src="js/practica.js"></script>
+  <script defer src="js/logros.js"></script>
+  <script defer src="js/diario.js"></script>
+  <script defer src="js/resumenmes.js"></script>
+  <script defer src="js/progreso.js"></script>
+  <script defer src="js/tono.js"></script>
+  <script defer src="js/player.js"></script>
+  <script defer src="js/cancion-activa.js"></script>
+  <script defer src="js/miniplayer.js"></script>
+  <script defer src="js/selector.js"></script>
+  <script defer src="js/hojacancion.js"></script>
+  <script defer src="js/recorder.js"></script>
+  <script defer src="js/calendar.js"></script>
+  <script defer src="js/pages/songs.js"></script>
+  <script defer src="js/pages/song.js"></script>
+  <script defer src="js/pages/sessions.js"></script>
+  <script defer src="js/pages/session.js"></script>
+  <script defer src="js/pages/home.js"></script>
+  <script defer src="js/pages/study.js"></script>
+  <script defer src="js/pages/practice.js"></script>
+  <script defer src="js/pages/conciertos.js"></script>
+  <script defer src="js/pages/recordings.js"></script>
+  <script defer src="js/app.js"></script>
 </body>
 </html>

@@ -5,6 +5,11 @@
    ============================================================ */
 
 :root {
+  /* Declaramos que la página gestiona ella misma claro/oscuro: así el
+     WebView de Android desactiva su "modo oscuro forzado" (que teñía a
+     medias los degradados del fondo) y nos deja mandar con data-theme. */
+  color-scheme: light dark;
+
   /* --- Paleta del coro Bihotsak (logo: images/bihotsak_logo.jpg) --- */
   --color-acento: #1512D6;         /* azul cobalto: todo lo tocable/activo */
   --color-acento-oscuro: #0E0B9E;  /* pulsado / hover */
@@ -88,6 +93,9 @@
   --sombra-sobre-acento: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
@@ -101,6 +109,9 @@ body {
   margin: 0 auto;
   position: relative;
   overflow-x: hidden;
+  /* Corta el "efecto goma" y el pull-to-refresh del WebView: cada rebote
+     forzaba un repintado a pantalla completa sobre el fondo. */
+  overscroll-behavior-y: none;
   background: transparent;          /* deja ver el fondo animado */
   color: var(--color-texto);
   font-family: var(--fuente-texto);
@@ -124,6 +135,8 @@ button {
   background: none;
   border: none;
   cursor: pointer;
+  /* Sin retardo de 300 ms al tocar y menos trabajo de gestos en el WebView */
+  touch-action: manipulation;
 }
 
 [hidden] { display: none !important; }
@@ -135,72 +148,50 @@ button {
    Todo es muy tenue: el contenido vive en tarjetas blancas,
    así que las letras siempre se leen con holgura.
    ============================================================ */
+/* Los halos cobalto se pintan como radial-gradients sobre el propio
+   .fondo-animado — NADA de filter:blur ni mix-blend-mode: el emulador de
+   Android (y algunos WebView) los renderizan flojos o clipados y el fondo
+   salía descolorido respecto al navegador. Un degradado suave se ve igual
+   en todos lados y encima es más rápido (no hay capa que desenfocar). */
 .fondo-animado {
   position: fixed;
-  inset: 0;
+  inset: -14%;
   z-index: -1;
   overflow: hidden;
-  /* Papel crema con esquinas ligeramente teñidas de cobalto */
-  background:
-    radial-gradient(120% 80% at 12% 0%,
-      color-mix(in srgb, var(--color-acento-suave) 85%, var(--color-fondo)) 0%,
-      transparent 55%),
-    radial-gradient(120% 80% at 92% 100%,
-      color-mix(in srgb, var(--color-acento-suave) 65%, var(--color-fondo)) 0%,
-      transparent 55%),
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--color-acento-suave) 30%, var(--color-fondo)) 0%,
-      var(--color-fondo) 50%,
-      color-mix(in srgb, var(--color-acento-suave) 22%, var(--color-fondo)) 100%);
+  background-color: var(--color-fondo);
+  background-image:
+    radial-gradient(48% 40% at 4% 0%,
+      color-mix(in srgb, var(--color-acento) 55%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(46% 36% at 102% 5%,
+      color-mix(in srgb, var(--color-acento) 45%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(52% 42% at 92% 52%,
+      color-mix(in srgb, var(--color-acento) 40%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(56% 44% at 100% 102%,
+      color-mix(in srgb, var(--color-acento-oscuro) 52%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(50% 42% at 2% 98%,
+      color-mix(in srgb, var(--color-acento) 44%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(64% 50% at 42% 40%,
+      color-mix(in srgb, var(--color-acento) 26%, var(--color-fondo)) 0%, transparent 80%);
+  animation: fondo-deriva 44s ease-in-out infinite alternate;
+}
+@keyframes fondo-deriva {
+  from { transform: translate3d(-1.5%, -1%, 0); }
+  to   { transform: translate3d(1.5%, 1.5%, 0); }
 }
 
-/* Halos cobalto grandes y muy difusos que se desplazan despacio */
-.fondo-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(72px);
-  will-change: transform;
-  opacity: 0.9;
-}
-.fondo-blob--1 {
-  width: 90vw; height: 90vw; max-width: 460px; max-height: 460px;
-  top: -24%; left: -32%;
-  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-acento) 30%, transparent), transparent 70%);
-  animation: fondo-flota-1 34s ease-in-out infinite alternate;
-}
-.fondo-blob--2 {
-  width: 85vw; height: 85vw; max-width: 420px; max-height: 420px;
-  bottom: -26%; right: -30%;
-  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-acento-oscuro) 26%, transparent), transparent 70%);
-  animation: fondo-flota-2 40s ease-in-out infinite alternate;
-}
-.fondo-blob--3 {
-  display: block;
-  width: 70vw; height: 70vw; max-width: 340px; max-height: 340px;
-  top: 34%; left: 45%;
-  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-acento) 16%, transparent), transparent 70%);
-  animation: fondo-flota-3 30s ease-in-out infinite alternate;
+/* El fondo solo respira en las pestañas raíz y en reposo; durante la
+   navegación o dentro de una canción/sesión/estudio se congela. */
+body.navegando .fondo-animado,
+body.navegando .fondo-lineas,
+body:not(.ruta-raiz) .fondo-animado,
+body:not(.ruta-raiz) .fondo-lineas {
+  animation-play-state: paused;
 }
 
-@keyframes fondo-flota-1 {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(8%, 6%, 0) scale(1.08); }
-}
-@keyframes fondo-flota-2 {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(-7%, -5%, 0) scale(1.1); }
-}
-@keyframes fondo-flota-3 {
-  0%   { transform: translate3d(-6%, 0, 0) scale(0.95); }
-  100% { transform: translate3d(6%, -4%, 0) scale(1.05); }
-}
-
-/* Pentagrama sutil: líneas horizontales finas que reptan muy despacio.
-   Cobalto a baja opacidad sobre el crema; nunca cruza texto porque
-   está detrás de las tarjetas. */
+/* Pentagrama sutil: líneas horizontales finas que reptan muy despacio. */
 .fondo-lineas {
   position: absolute;
-  inset: -20% -10%;
+  inset: 0;
   background-image: repeating-linear-gradient(
     0deg,
     color-mix(in srgb, var(--color-acento) 22%, transparent) 0 1px,
@@ -208,29 +199,32 @@ button {
   );
   -webkit-mask-image: radial-gradient(120% 70% at 50% 20%, #000 0%, transparent 75%);
           mask-image: radial-gradient(120% 70% at 50% 20%, #000 0%, transparent 75%);
-  opacity: 0.5;
-  will-change: transform;
-  animation: fondo-lineas-deriva 60s linear infinite;
+  opacity: 0.45;
+  animation: fondo-lineas-deriva 90s linear infinite;
 }
 @keyframes fondo-lineas-deriva {
   from { transform: translate3d(0, 0, 0); }
   to   { transform: translate3d(0, -26px, 0); }
 }
 
-/* Grano fino de papel: da textura y mata el banding de los degradados */
-.fondo-grano {
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  opacity: 0.035;
-  mix-blend-mode: multiply;
-  pointer-events: none;
+/* En oscuro el cobalto (#5A67E8) sobre negro luce más: se sube un pelín la
+   mezcla para que se note, sin llegar a molestar. */
+:root[data-theme="dark"] .fondo-animado {
+  background-image:
+    radial-gradient(48% 40% at 4% 0%,
+      color-mix(in srgb, var(--color-acento) 60%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(46% 36% at 102% 5%,
+      color-mix(in srgb, var(--color-acento) 46%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(52% 42% at 92% 52%,
+      color-mix(in srgb, var(--color-acento) 40%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(56% 44% at 100% 102%,
+      color-mix(in srgb, var(--color-acento-oscuro) 52%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(50% 42% at 2% 98%,
+      color-mix(in srgb, var(--color-acento) 44%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(64% 50% at 42% 40%,
+      color-mix(in srgb, var(--color-acento) 26%, var(--color-fondo)) 0%, transparent 80%);
 }
-@media (prefers-color-scheme: dark) {
-  /* Sobre fondo oscuro el "multiply" no aporta grano: se aclara y se sube */
-  :root:not([data-theme="light"]) .fondo-grano { mix-blend-mode: screen; opacity: 0.05; }
-}
-:root[data-theme="dark"] .fondo-grano { mix-blend-mode: screen; opacity: 0.05; }
+:root[data-theme="dark"] .fondo-lineas { opacity: 0.28; }
 
 /* ============================================================
    Cabecera contextual
@@ -255,8 +249,8 @@ button {
     color-mix(in srgb, var(--color-fondo) 55%, transparent) 70%,
     transparent 100%
   );
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 .app-header.con-borde {
   box-shadow: 0 8px 18px -14px color-mix(in srgb, var(--color-texto) 35%, transparent);
@@ -277,7 +271,9 @@ button {
   display: inline-flex;
   vertical-align: -3px;
   color: var(--color-acento);
-  animation: nota-flota 3.2s var(--curva) infinite;
+  /* Saludo breve al entrar en cada pantalla; luego se queda quieta para no
+     forzar al header (backdrop-filter) a recomponerse sin parar. */
+  animation: nota-flota 3.2s var(--curva) 2;
 }
 .header-titulo .emoji svg { width: 22px; height: 21px; transform: translate(3px, 1px); }
 @keyframes nota-flota {
@@ -1149,23 +1145,9 @@ button {
   .pantalla { animation: fundido-simple 120ms linear both; }
   @keyframes fundido-simple { from { opacity: 0; } to { opacity: 1; } }
 
-  /* El fondo mantiene una deriva mínima de opacidad, muy lenta:
-     compatible con "reducir movimiento". */
-  .fondo-blob {
-    animation-duration: 12s !important;
-    animation-iteration-count: infinite !important;
-    animation-name: fondo-latido !important;
-    animation-timing-function: ease-in-out !important;
-    animation-direction: alternate !important;
-    transform: none !important;
-  }
-  .fondo-blob--2 { animation-delay: -6s !important; }
-  .fondo-blob--3 { animation-delay: -3s !important; }
+  /* Con "reducir movimiento" el fondo se queda quieto del todo. */
+  .fondo-animado { animation: none !important; transform: none !important; }
   .fondo-lineas { animation: none !important; transform: none !important; }
-  @keyframes fondo-latido {
-    from { opacity: 0.55; }
-    to   { opacity: 1; }
-  }
   .hoja__panel { transition: opacity 120ms linear !important; transform: none !important; }
 }
 
@@ -1207,6 +1189,10 @@ button {
   border: 1px solid var(--color-borde);
   border-radius: var(--radio);
   padding: 6px 10px 6px 6px;
+  /* Listas largas (repertorio, canciones de una sesión): el WebView se salta
+     el maquetado/pintado de las filas que quedan fuera de pantalla. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px;
 }
 .cancion__abrir {
   flex: 1;
@@ -2712,8 +2698,8 @@ body.sin-scroll { overflow: hidden; }
   padding: 20px;
   /* Solo se difumina el fondo: nada de velo oscuro. */
   background: color-mix(in srgb, var(--color-fondo) 55%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(1.1);
-  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   overflow: hidden;
   touch-action: none;
   animation: fundido 160ms var(--curva) both;
@@ -2920,6 +2906,8 @@ body.sin-scroll { overflow: hidden; }
   border: 1px solid var(--color-borde);
   border-radius: var(--radio);
   transition: transform var(--dur-micro) var(--curva), border-color var(--dur-micro) var(--curva);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 92px;
 }
 .conc-card:active { transform: scale(0.985); }
 .conc-card--prox {
@@ -3936,6 +3924,8 @@ body.reordenando { cursor: grabbing; user-select: none; }
   border: 1px solid var(--color-borde);
   border-radius: var(--radio);
   padding: 14px 16px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
 }
 .grabacion__cab {
   display: flex;
@@ -4761,8 +4751,8 @@ body.reordenando { cursor: grabbing; user-select: none; }
   border-radius: 999px;
   border: 1px solid var(--color-borde);
   background: color-mix(in srgb, var(--color-superficie) 82%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
-  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(9px);
+  backdrop-filter: blur(9px);
   box-shadow: 0 6px 24px rgba(7, 7, 7, 0.22);
   opacity: 0;
   pointer-events: none;
@@ -4853,8 +4843,8 @@ body.reordenando { cursor: grabbing; user-select: none; }
   z-index: -1;
   border-radius: inherit;
   background: color-mix(in srgb, var(--color-superficie) 80%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 .barra-repro.is-visible {
   opacity: 1;

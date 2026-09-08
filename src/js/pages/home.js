@@ -400,53 +400,108 @@ window.Pagina_home = (function () {
           return;
         }
 
-        return pedirInstagram(handle)
-          .then(function (json) {
-            var pub = extraerDeInstagram(json, cfg);
+        return obtenerPublicacion(cfg, handle)
+          .then(function (pub) {
             if (!pub) throw new Error('sin publicaciones');
             guardarCache(pub);
             pintarCoro(seccion, pub);
           })
           .catch(function () {
-            // Instagram no respondió (CORS en dev, sin red, bloqueo,
-            // o cambió el endpoint): nos quedamos con la cache o el enlace.
+            // Nadie respondió (sin red, Instagram pide login, Worker sin
+            // configurar…): nos quedamos con la cache o con el enlace.
             if (!cacheado) pintarSoloEnlace(seccion, cfg);
           });
       })
       .catch(function () { /* sin config: la sección no aparece */ });
   }
 
-  // Pide el feed público del usuario de Instagram. Devuelve { items: [...] }.
-  //  - En el APK: petición directa; CapacitorHttp la hace nativa y evita CORS.
-  //  - En el navegador (npm run dev): pasa por el proxy de scripts/dev.js.
-  //    En la PWA publicada ese proxy no existe (404) y se cae al enlace.
-  function pedirInstagram(handle) {
+  // Devuelve la última publicación ya normalizada
+  // ({ imagen, texto, fecha, enlace, usuario }) probando por orden:
+  //   1) el Cloudflare Worker (cfg.worker) — recomendado: Instagram
+  //      responde al Worker aunque bloquee al móvil ("login_required");
+  //   2) el proxy local de scripts/dev.js (solo en "npm run dev");
+  //   3) Instagram directo desde el APK (CapacitorHttp) — puede fallar.
+  function obtenerPublicacion(cfg, handle) {
     var esNativo = !!(window.Capacitor &&
       typeof window.Capacitor.isNativePlatform === 'function' &&
       window.Capacitor.isNativePlatform());
 
-    var url = esNativo
-      ? 'https://www.instagram.com/api/v1/feed/user/' +
-          encodeURIComponent(handle) + '/username/?count=3'
-      : 'api/coro?handle=' + encodeURIComponent(handle);
+    var intentos = [];
 
-    var opciones = esNativo ? {
-      headers: {
+    var worker = cfg.worker
+      ? String(cfg.worker).replace(/\/+$/, '') : '';
+    if (worker) {
+      intentos.push(function () {
+        return fetch(worker + '/coro?handle=' + encodeURIComponent(handle))
+          .then(function (r) {
+            if (!r || !r.ok) throw new Error('worker ' + (r && r.status));
+            return r.json();          // el Worker ya devuelve el objeto pub
+          })
+          .then(function (pub) {
+            if (!pub || !pub.enlace) throw new Error('worker sin datos');
+            if (!pub.usuario) pub.usuario = cfg.usuario || ('@' + handle);
+            return pub;
+          });
+      });
+    }
+
+    if (!esNativo) {
+      intentos.push(function () {
+        return fetch('api/coro?handle=' + encodeURIComponent(handle))
+          .then(function (r) {
+            if (!r || !r.ok) throw new Error('proxy ' + (r && r.status));
+            return r.json();
+          })
+          .then(function (json) { return exigir(extraerDeInstagram(json, cfg)); });
+      });
+    }
+
+    if (esNativo) {
+      // Instagram directo. Sin User-Agent de navegador (con ella aplica su
+      // "SecFetch policy" y exige sesión). Se prueban los dos endpoints.
+      var opciones = { headers: {
         'x-ig-app-id': IG_APP_ID,
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 ' +
-                      '(KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36'
-      }
-    } : {};
+        'x-asbd-id': '129477',
+        'x-ig-www-claim': '0'
+      } };
+      var urls = [
+        'https://www.instagram.com/api/v1/feed/user/' +
+          encodeURIComponent(handle) + '/username/?count=3',
+        'https://www.instagram.com/api/v1/users/web_profile_info/?username=' +
+          encodeURIComponent(handle)
+      ];
+      urls.forEach(function (u) {
+        intentos.push(function () {
+          return fetch(u, opciones)
+            .then(function (r) {
+              if (!r || !r.ok) throw new Error('instagram ' + (r && r.status));
+              return r.json();
+            })
+            .then(function (json) { return exigir(extraerDeInstagram(json, cfg)); });
+        });
+      });
+    }
 
-    return fetch(url, opciones).then(function (r) {
-      if (!r || !r.ok) throw new Error('instagram ' + (r && r.status));
-      return r.json();
-    });
+    // Ejecuta los intentos en cadena; el primero que dé una publicación gana.
+    return intentos.reduce(function (cadena, intento) {
+      return cadena.catch(function () { return intento(); });
+    }, Promise.reject(new Error('sin intentos')));
+  }
+
+  function exigir(pub) {
+    if (!pub) throw new Error('sin publicaciones');
+    return pub;
   }
 
   // Saca la publicación más reciente del feed y la deja como
   // { imagen, texto, fecha, enlace, usuario }.
   function extraerDeInstagram(json, cfg) {
+    // Shape de web_profile_info: data.user.edge_owner_to_timeline_media.edges
+    var edges = json && json.data && json.data.user &&
+      json.data.user.edge_owner_to_timeline_media &&
+      json.data.user.edge_owner_to_timeline_media.edges;
+    if (edges && edges.length) return extraerDeWebProfile(edges, json, cfg);
+
     var items = (json && json.items) || [];
     if (!items.length) return null;
 
@@ -475,6 +530,43 @@ window.Pagina_home = (function () {
         : (cfg.perfil || '#'),
       usuario: cfg.usuario ||
                (it.user && it.user.username ? '@' + it.user.username : '')
+    };
+  }
+
+  // Publicación más reciente a partir del shape de web_profile_info.
+  function extraerDeWebProfile(edges, json, cfg) {
+    var nodos = edges.map(function (e) { return e.node; }).filter(Boolean);
+    var n = nodos.slice().sort(function (a, b) {
+      return (b.taken_at_timestamp || 0) - (a.taken_at_timestamp || 0);
+    })[0];
+    if (!n) return null;
+
+    // Carrusel: primera foto hija; si no, la imagen del propio nodo.
+    var hijo = n.edge_sidecar_to_children &&
+      n.edge_sidecar_to_children.edges &&
+      n.edge_sidecar_to_children.edges[0] &&
+      n.edge_sidecar_to_children.edges[0].node;
+    var imagen = (hijo && hijo.display_url) || n.display_url ||
+      n.thumbnail_src || '';
+
+    var texto = (n.edge_media_to_caption &&
+      n.edge_media_to_caption.edges &&
+      n.edge_media_to_caption.edges[0] &&
+      n.edge_media_to_caption.edges[0].node &&
+      n.edge_media_to_caption.edges[0].node.text) || 'Nueva publicación del coro';
+    texto = texto.replace(/(\s*#[\wÀ-ÿ]+)+\s*$/u, '').trim();
+
+    var usuarioIG = json.data && json.data.user && json.data.user.username;
+
+    return {
+      imagen: imagen,
+      texto: texto || 'Nueva publicación del coro',
+      fecha: n.taken_at_timestamp
+        ? new Date(n.taken_at_timestamp * 1000).toISOString() : '',
+      enlace: n.shortcode
+        ? 'https://www.instagram.com/p/' + n.shortcode + '/'
+        : (cfg.perfil || '#'),
+      usuario: cfg.usuario || (usuarioIG ? '@' + usuarioIG : '')
     };
   }
 

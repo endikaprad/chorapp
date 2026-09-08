@@ -55,9 +55,11 @@ window.Reproductor = (function () {
       // OJO: NO registramos previoustrack/nexttrack. En el reproductor de
       // Android (notificación / pantalla de bloqueo) esos handlers pintan los
       // iconos de "canción anterior / siguiente", que aquí no tienen sentido:
-      // no hay lista de reproducción, solo una canción que se estudia. Al dejar
-      // solo seek(backward|forward) Android muestra los botones de retroceder /
-      // adelantar 5 s, que es justo lo que Maite necesita.
+      // no hay lista de reproducción, solo una canción que se estudia. Dejamos
+      // solo seek(backward|forward) → botones de retroceder / adelantar 5 s.
+      // Para que esos botones salgan también en la vista COMPACTA de la
+      // notificación (la que se ve al salir de la app), scripts/android-fix.js
+      // parchea `possibleCompactViewActions` del plugin @jofr/capacitor-media-session.
     };
     var acis = Object.keys(manejadores);
 
