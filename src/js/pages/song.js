@@ -46,7 +46,8 @@ window.Pagina_song = (function () {
   function pintar() {
     q('[data-titulo]').textContent = cancion.titulo;
     var meta = q('[data-meta]');
-    if (cancion.compositor) { meta.textContent = cancion.compositor; meta.hidden = false; }
+    var partes = [cancion.compositor, window.Canciones.nombreIdioma(cancion.idioma)].filter(Boolean);
+    if (partes.length) { meta.textContent = partes.join(' · '); meta.hidden = false; }
     else meta.hidden = true;
 
     var est = window.Canciones.ESTADOS[cancion.estado] || window.Canciones.ESTADOS.pendiente;
@@ -73,29 +74,22 @@ window.Pagina_song = (function () {
     var caja = q('[data-ensayos]');
     var refs = window.Sesiones ? window.Sesiones.marcasDeCancion(cancion.id) : [];
     if (!refs.length) {
-      caja.innerHTML = '<p class="visor-vacio">Todavía no has marcado esta canción en ninguna sesión. ' +
-        'Abre una sesión del coro y márcala mientras suena — puedes elegir esta misma canción ' +
-        'en cada ensayo y aquí verás todos los días.</p>';
+      caja.innerHTML = '<p class="visor-vacio">Todavía no has marcado esta pieza en ningún ensayo. ' +
+        'Abre una sesión del coro y márcala mientras suena.</p>';
       return;
     }
-    caja.innerHTML = '';
-    refs.forEach(function (r) {
-      var fila = document.createElement('div');
-      fila.className = 'marca';
-      fila.innerHTML =
-        '<span class="marca__cuerpo">' +
-          '<span class="marca__tit">' + escapar(fechaCorta(r.sesion.fecha)) + '</span>' +
-          '<span class="marca__sub">minuto ' + fmtTiempo(r.marca.segundo) +
-            (r.marca.fragmentos && r.marca.fragmentos.length
-              ? ' · ' + r.marca.fragmentos.length + ' difícil' + (r.marca.fragmentos.length === 1 ? '' : 'es')
-              : '') +
-          '</span>' +
-        '</span>' +
-        '<button type="button" class="btn btn--primario marca__estudiar">Escuchar</button>';
-      fila.querySelector('.marca__estudiar').addEventListener('click', function () {
-        window.App.ir('estudio', { datos: { sesionId: r.sesion.id, marcaId: r.marca.id } });
-      });
-      caja.appendChild(fila);
+    var n = refs.length;
+    caja.innerHTML =
+      '<button type="button" class="btn-bloque btn-bloque--primario" data-estudiar>' +
+        '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.53-.85l12 7.5a1 1 0 0 1 0 1.7l-12 7.5A1 1 0 0 1 7 19.5z"/></svg>' +
+        'Escuchar el ensayo' +
+      '</button>' +
+      '<p class="song-ensayos__pie">' +
+        (n === 1 ? 'Un ensayo · ' : n + ' ensayos · ') + 'último: ' + escapar(fechaCorta(refs[0].sesion.fecha)) +
+        (n > 1 ? '. Dentro del estudio puedes cambiar de día.' : '') +
+      '</p>';
+    caja.querySelector('[data-estudiar]').addEventListener('click', function () {
+      window.App.ir('estudio', { datos: { id: cancion.id } });
     });
   }
 

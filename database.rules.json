@@ -1,0 +1,12 @@
+{
+  "rules": {
+    "control": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "status": {
+      ".read": "auth != null",
+      ".write": true
+    }
+  }
+}

@@ -10,11 +10,16 @@
        compositor: string,
        estado:     'pendiente' | 'progreso' | 'aprendida',
        notas:      string,
+       idioma:     string,                    // código de IDIOMAS ('' = sin especificar)
+       etiquetas:  [string],                  // etiquetas libres para agrupar ("Navidad", "Misa"…)
        letraTexto: string,                    // letra escrita a mano (Fase 5)
+       letraFonetica: string,                 // cómo suena la letra (transcripción para cantar)
+       letraTraduccion: string,               // qué significa la letra (en español)
        fragmentos: [ { id, texto, creado, segundo? } ],  // fragmentos difíciles (Fase 5); segundo = momento del audio
        archivos:   {                           // metadatos; el blob va en Archivos (Fase 4)
                      audio:     null | { nombre, mime, tamano, guardado },
                      letra:     null | { … },
+                     fonetica:  null | { … },   // "cómo se pronuncia" como PDF/imagen
                      partitura: null | { … }
                    },
        notasVoz:   [ { id, creado } ],         // OBSOLETO: solo para migrar notas antiguas a window.Grabaciones
@@ -28,6 +33,22 @@ window.Canciones = (function () {
 
   var CLAVE = 'canciones';
 
+  // Idiomas del repertorio coral. Clave = código corto; valor = nombre en
+  // español para mostrar. '' significa "sin especificar" y no aparece aquí.
+  var IDIOMAS = {
+    es:  'Español',
+    eu:  'Euskera',
+    la:  'Latín',
+    de:  'Alemán',
+    en:  'Inglés',
+    fr:  'Francés',
+    it:  'Italiano',
+    pt:  'Portugués',
+    ca:  'Catalán',
+    otro: 'Otro',
+  };
+  function nombreIdioma(cod) { return IDIOMAS[cod] || ''; }
+
   var ESTADOS = {
     pendiente: { etiqueta: 'Pendiente',   token: 'pendiente' },
     progreso:  { etiqueta: 'En progreso', token: 'progreso' },
@@ -36,6 +57,24 @@ window.Canciones = (function () {
 
   function nuevoId() {
     return 'c-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+  }
+
+  // Etiquetas libres para agrupar ("Navidad", "Misa"…). Se guardan tal cual
+  // se escriben pero se deduplican sin distinguir mayúsculas/acentos.
+  var MAX_ETIQUETAS = 12;
+  function _saneaEtiquetas(arr) {
+    if (typeof arr === 'string') arr = arr.split(',');
+    if (!Array.isArray(arr)) return [];
+    var vistas = {}, salida = [];
+    arr.forEach(function (e) {
+      var t = String(e == null ? '' : e).trim().replace(/\s+/g, ' ').slice(0, 24);
+      if (!t) return;
+      var k = normalizar(t);
+      if (vistas[k]) return;
+      vistas[k] = true;
+      salida.push(t);
+    });
+    return salida.slice(0, MAX_ETIQUETAS);
   }
 
   // Minúsculas + sin acentos, para comparar en búsquedas.
@@ -61,8 +100,24 @@ window.Canciones = (function () {
     if (!q) return listar();
     return listar().filter(function (c) {
       return normalizar(c.titulo).indexOf(q) !== -1 ||
-             normalizar(c.compositor).indexOf(q) !== -1;
+             normalizar(c.compositor).indexOf(q) !== -1 ||
+             normalizar(nombreIdioma(c.idioma)).indexOf(q) !== -1 ||
+             (Array.isArray(c.etiquetas) && c.etiquetas.some(function (e) {
+               return normalizar(e).indexOf(q) !== -1;
+             }));
     });
+  }
+
+  // Todas las etiquetas usadas en el repertorio, ordenadas alfabéticamente.
+  function etiquetasTodas() {
+    var vistas = {}, salida = [];
+    listar().forEach(function (c) {
+      (c.etiquetas || []).forEach(function (e) {
+        var k = normalizar(e);
+        if (!vistas[k]) { vistas[k] = true; salida.push(e); }
+      });
+    });
+    return salida.sort(function (a, b) { return normalizar(a).localeCompare(normalizar(b)); });
   }
 
   function obtener(id) {
@@ -82,9 +137,13 @@ window.Canciones = (function () {
       compositor: (datos.compositor || '').trim(),
       estado: ESTADOS[datos.estado] ? datos.estado : 'pendiente',
       notas: (datos.notas || '').trim(),
+      idioma: IDIOMAS[datos.idioma] ? datos.idioma : '',
+      etiquetas: _saneaEtiquetas(datos.etiquetas),
       letraTexto: (datos.letraTexto || '').trim(),
+      letraFonetica: (datos.letraFonetica || '').trim(),
+      letraTraduccion: (datos.letraTraduccion || '').trim(),
       fragmentos: [],
-      archivos: { audio: null, letra: null, partitura: null },
+      archivos: { audio: null, letra: null, fonetica: null, partitura: null },
       notasVoz: [],
       creada: ahora,
       actualizada: ahora,
@@ -106,9 +165,13 @@ window.Canciones = (function () {
     lista = lista.map(function (c) {
       if (c.id !== id) return c;
       var copia = JSON.parse(JSON.stringify(c));
-      if (!copia.archivos) copia.archivos = { audio: null, letra: null, partitura: null };
+      if (!copia.archivos) copia.archivos = {};
+      ['audio', 'letra', 'fonetica', 'partitura'].forEach(function (k) {
+        if (!(k in copia.archivos)) copia.archivos[k] = null;
+      });
       if (!Array.isArray(copia.fragmentos)) copia.fragmentos = [];
       if (!Array.isArray(copia.notasVoz)) copia.notasVoz = [];
+      if (!Array.isArray(copia.etiquetas)) copia.etiquetas = [];
       fn(copia);
       if (marcarActualizada !== false) copia.actualizada = Date.now();
       res = copia;
@@ -144,7 +207,11 @@ window.Canciones = (function () {
       if (cambios.compositor != null) c.compositor = String(cambios.compositor).trim();
       if (ESTADOS[cambios.estado]) c.estado = cambios.estado;
       if (cambios.notas != null) c.notas = String(cambios.notas).trim();
+      if (cambios.idioma != null) c.idioma = IDIOMAS[cambios.idioma] ? cambios.idioma : '';
+      if (cambios.etiquetas != null) c.etiquetas = _saneaEtiquetas(cambios.etiquetas);
       if (cambios.letraTexto != null) c.letraTexto = String(cambios.letraTexto);
+      if (cambios.letraFonetica != null) c.letraFonetica = String(cambios.letraFonetica);
+      if (cambios.letraTraduccion != null) c.letraTraduccion = String(cambios.letraTraduccion);
     });
     if (res && ESTADOS[cambios.estado]) _anotarEstado(res, previo, res.estado);
     return res;
@@ -191,12 +258,25 @@ window.Canciones = (function () {
     _guardarTodo(lista.filter(function (c) { return c.id !== id; }));
     if (window.Archivos) window.Archivos.borrarCancion(id);
     if (window.Grabaciones) window.Grabaciones.desvincular(id);
+    // Las marcas de esta canción en los ensayos se van con ella (con sus
+    // notas y trozos difíciles). La sesión oculta de una "canción suelta"
+    // la borra quien llama, antes de esto (ver songs.js › onBorrar).
+    if (window.Sesiones && window.Sesiones.borrarMarcasDeCancion) {
+      window.Sesiones.borrarMarcasDeCancion(id);
+    }
+    // Y de los programas de concierto donde estuviera.
+    if (window.Conciertos && window.Conciertos.limpiarCancion) {
+      window.Conciertos.limpiarCancion(id);
+    }
   }
 
   return {
     ESTADOS: ESTADOS,
+    IDIOMAS: IDIOMAS,
+    nombreIdioma: nombreIdioma,
     listar: listar,
     buscar: buscar,
+    etiquetasTodas: etiquetasTodas,
     obtener: obtener,
     crear: crear,
     actualizar: actualizar,

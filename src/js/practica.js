@@ -13,6 +13,11 @@ window.Practica = (function () {
   'use strict';
 
   var CLAVE = 'practica';
+  // Escudos de racha (estilo Duolingo, pero amable): cubren UN día sin
+  // estudiar para que la racha no se rompa. Se gana uno por cada 7 días
+  // seguidos, con un máximo de 2 guardados.
+  var CLAVE_ESCUDOS = 'racha:escudos';
+  var MAX_ESCUDOS = 2;
 
   function hoyISO(d) {
     d = d || new Date();
@@ -41,19 +46,126 @@ window.Practica = (function () {
     return Object.keys(leer());
   }
 
-  // Racha de días consecutivos que termina hoy o ayer.
-  function racha() {
-    var dias = {};
-    diasPracticados().forEach(function (d) { dias[d] = true; });
+  /* --- Escudos de racha ---------------------------------------- */
+
+  function leerEscudos() {
+    var e = window.Almacen.leer(CLAVE_ESCUDOS, {});
+    if (!e || typeof e !== 'object') e = {};
+    e.saldo = Math.max(0, Math.min(MAX_ESCUDOS, Math.round(e.saldo || 0)));
+    e.hitoConcedido = Math.max(0, Math.round(e.hitoConcedido || 0));
+    if (!e.gastados || typeof e.gastados !== 'object') e.gastados = {};
+    return e;
+  }
+  function guardarEscudos(e) { window.Almacen.guardar(CLAVE_ESCUDOS, e); }
+
+  // Nº de escudos disponibles ahora mismo.
+  function escudos() { return leerEscudos().saldo; }
+
+  // Días que un escudo ha "tapado" (no se estudió, pero cuentan para la racha).
+  function _diasTapados() { return leerEscudos().gastados; }
+
+  function _ayerISO() {
+    var d = new Date();
+    d.setDate(d.getDate() - 1);
+    return hoyISO(d);
+  }
+
+  /* Mantenimiento diario de la racha. Se llama al abrir Inicio o Práctica:
+     1) si ayer no se estudió y había una racha viva, gasta un escudo para
+        salvarla; 2) concede un escudo nuevo al llegar a cada múltiplo de 7. */
+  function revisar() {
+    var e = leerEscudos();
+    var reg = leer();
+    var hechoReal = {};
+    Object.keys(reg).forEach(function (d) {
+      if (Array.isArray(reg[d]) && reg[d].length) hechoReal[d] = true;
+    });
+    var hecho = function (iso) { return hechoReal[iso] || !!e.gastados[iso]; };
+
+    var ayer = _ayerISO();
+    var anteayer = new Date();
+    anteayer.setDate(anteayer.getDate() - 2);
+    var anteayerISO = hoyISO(anteayer);
+
+    var cambiado = false;
+    // Salvar la racha: ayer sin estudiar, pero anteayer sí -> gasta escudo.
+    if (!hecho(ayer) && hecho(anteayerISO) && e.saldo > 0) {
+      e.gastados[ayer] = true;
+      e.saldo -= 1;
+      cambiado = true;
+    }
+
+    // Conceder escudos por hitos de 7 días (una sola vez por hito).
+    var n = _rachaCon(hechoReal, e.gastados);
+    var hito = n - (n % 7);
+    if (hito >= 7 && hito > e.hitoConcedido) {
+      e.saldo = Math.min(MAX_ESCUDOS, e.saldo + 1);
+      e.hitoConcedido = hito;
+      cambiado = true;
+    }
+    if (cambiado) guardarEscudos(e);
+  }
+
+  // Racha consecutiva contando días estudiados o tapados por un escudo.
+  function _rachaCon(hechoReal, tapados) {
+    var hecho = function (iso) { return hechoReal[iso] || !!tapados[iso]; };
     var cursor = new Date();
-    // Si hoy aún no se ha estudiado, la racha puede venir de ayer.
-    if (!dias[hoyISO(cursor)]) cursor.setDate(cursor.getDate() - 1);
+    if (!hecho(hoyISO(cursor))) cursor.setDate(cursor.getDate() - 1);
     var n = 0;
-    while (dias[hoyISO(cursor)]) {
+    while (hecho(hoyISO(cursor))) {
       n++;
       cursor.setDate(cursor.getDate() - 1);
     }
     return n;
+  }
+
+  // Racha de días consecutivos que termina hoy o ayer.
+  function racha() {
+    var reg = leer();
+    var hechoReal = {};
+    Object.keys(reg).forEach(function (d) {
+      if (Array.isArray(reg[d]) && reg[d].length) hechoReal[d] = true;
+    });
+    return _rachaCon(hechoReal, _diasTapados());
+  }
+
+  /* Todo lo que la pantalla de racha necesita de un vistazo. */
+  function rachaInfo() {
+    var reg = leer();
+    var hoy = hoyISO();
+    var hoyHecho = Array.isArray(reg[hoy]) && reg[hoy].length > 0;
+    var n = racha();
+    var tapados = _diasTapados();
+
+    // Tira de la semana (lunes a domingo).
+    var d0 = new Date();
+    var lunes = new Date(d0);
+    lunes.setDate(d0.getDate() - ((d0.getDay() + 6) % 7));
+    var NOMBRES = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+    var semana = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(lunes);
+      d.setDate(lunes.getDate() + i);
+      var iso = hoyISO(d);
+      semana.push({
+        nombre: NOMBRES[i],
+        iso: iso,
+        hecho: (Array.isArray(reg[iso]) && reg[iso].length > 0),
+        escudo: !!tapados[iso],
+        hoy: iso === hoy,
+        futuro: iso > hoy,
+      });
+    }
+
+    return {
+      dias: n,
+      hoyHecho: hoyHecho,
+      enPeligro: n > 0 && !hoyHecho,           // hay racha viva pero hoy pende
+      mejor: mejorRacha(),
+      escudos: escudos(),
+      escudoAyer: !!tapados[_ayerISO()],
+      semana: semana,
+    };
   }
 
   // Racha más larga de días consecutivos en todo el histórico.
@@ -70,6 +182,35 @@ window.Practica = (function () {
       } else {
         actual = 1;
       }
+    }
+    return mejor;
+  }
+
+  // Rango de la mejor racha: { dias, ini, fin } (o null si no hay).
+  // Cuenta días estudiados o tapados por un escudo, igual que racha().
+  function mejorRachaRango() {
+    var reg = leer();
+    var tapados = _diasTapados();
+    var set = {};
+    Object.keys(reg).forEach(function (d) {
+      if (Array.isArray(reg[d]) && reg[d].length) set[d] = true;
+    });
+    Object.keys(tapados).forEach(function (d) { set[d] = true; });
+    var dias = Object.keys(set).sort();
+    if (!dias.length) return null;
+
+    var mejor = { dias: 1, ini: dias[0], fin: dias[0] };
+    var iniAct = dias[0], nAct = 1;
+    for (var i = 1; i < dias.length; i++) {
+      var previo = new Date(dias[i - 1] + 'T00:00:00');
+      previo.setDate(previo.getDate() + 1);
+      if (hoyISO(previo) === dias[i]) {
+        nAct++;
+      } else {
+        iniAct = dias[i];
+        nAct = 1;
+      }
+      if (nAct > mejor.dias) mejor = { dias: nAct, ini: iniAct, fin: dias[i] };
     }
     return mejor;
   }
@@ -160,6 +301,16 @@ window.Practica = (function () {
 
   function capitalizar(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
+  // Nº de canciones distintas estudiadas en todo el histórico.
+  function cancionesDistintas() {
+    var reg = leer();
+    var vistas = {};
+    Object.keys(reg).forEach(function (d) {
+      (reg[d] || []).forEach(function (id) { if (id) vistas[id] = true; });
+    });
+    return Object.keys(vistas).length;
+  }
+
   // Nº de canciones distintas estudiadas en los últimos 7 días.
   function cancionesSemana() {
     var reg = leer();
@@ -180,8 +331,13 @@ window.Practica = (function () {
     registrar: registrar,
     diasPracticados: diasPracticados,
     racha: racha,
+    rachaInfo: rachaInfo,
+    revisar: revisar,
+    escudos: escudos,
     mejorRacha: mejorRacha,
+    mejorRachaRango: mejorRachaRango,
     sesionesTotales: sesionesTotales,
+    cancionesDistintas: cancionesDistintas,
     curiosidades: curiosidades,
     cancionesSemana: cancionesSemana,
   };

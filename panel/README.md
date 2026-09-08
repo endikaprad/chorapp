@@ -20,6 +20,11 @@ ver [`../worker/README.md`](../worker/README.md). Es opcional; si no lo montas,
   reacciona: muestra el aviso o pone la pantalla de pausa.
 - La app escribe de vuelta en `/status` (última vez abierta, si está bloqueada)
   para que veas el estado desde el panel.
+- La app también sube a **`/status/resumen`** un resumen de cómo va Maite
+  (`src/js/progreso.js`, máx. 1 vez cada 6 h): racha, días del mes, canciones
+  aprendidas, logros, grabaciones, último estudio y el resumen del mes anterior.
+  El panel lo muestra en la sección **"Cómo va Maite"**. No hace falta tocar
+  las reglas: `/status` ya es escribible por la app y solo lo lees tú.
 
 ---
 
@@ -34,7 +39,8 @@ ver [`../worker/README.md`](../worker/README.md). Es opcional; si no lo montas,
 2. Región: **Europa (europe-west1)**. Empezar en **modo bloqueado**.
 3. Copia la **URL** que aparece arriba (algo como
    `https://chorapp-xxxx-default-rtdb.europe-west1.firebasedatabase.app`).
-4. Pestaña **Reglas** → pega esto y **Publicar**:
+4. Pestaña **Reglas** → pega el contenido de [`../database.rules.json`](../database.rules.json)
+   y **Publicar** (o despliégalas con la CLI, ver más abajo):
 
 ```json
 {
@@ -53,7 +59,9 @@ ver [`../worker/README.md`](../worker/README.md). Es opcional; si no lo montas,
 
 > `control` lo lee cualquiera (solo contiene el texto del aviso y la hora de fin
 > del bloqueo — nada sensible) pero solo tú, autenticado, puedes escribirlo.
-> `status` solo lo puedes leer tú.
+> `status` (incluido `/status/resumen`, lo que hace Maite) solo lo puedes leer tú.
+> Estas reglas viven en `database.rules.json` en la raíz del repo, así que
+> `firebase deploy` (o `firebase deploy --only database`) las mantiene al día.
 
 ### 3. Autenticación (tu cuenta del panel)
 1. **Compilación → Authentication → Comenzar**.
@@ -94,9 +102,14 @@ Luego genera el APK como siempre y vuelve a instalarlo en su móvil.
 El panel es un único archivo. Opciones:
 
 - **Firebase Hosting** (mismo proyecto, gratis):
-  `npm i -g firebase-tools` → `firebase login` → `firebase init hosting`
-  (carpeta pública: `panel`) → `firebase deploy`. Te da una URL; guárdala en
-  favoritos del móvil.
+  `npm i -g firebase-tools` → `firebase login` → `firebase deploy`.
+  El `firebase.json` del repo ya está configurado (hosting = carpeta `panel`,
+  reglas de la base de datos = `database.rules.json`), así que `firebase deploy`
+  sube el panel **y** publica las reglas de la RTDB de una vez. Te da una URL;
+  guárdala en favoritos del móvil.
+  (Si es la primera vez y `firebase-tools` pide `firebase init`, elige
+  Hosting + Realtime Database y **no** sobrescribas `firebase.json` ni
+  `database.rules.json`.)
 - **Netlify Drop** (<https://app.netlify.com/drop>): arrastra la carpeta `panel`.
 - **En local**: abre `panel/index.html` en el navegador del móvil (por ejemplo
   compartiéndolo por tu almacenamiento en la nube). El login sigue protegiéndolo.

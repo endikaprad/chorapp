@@ -19,6 +19,7 @@
     practica:    { archivo: 'practice',   titulo: 'Práctica',    raiz: true },
     grabaciones: { archivo: 'recordings', titulo: 'Grabaciones', raiz: true },
     sesion:      { archivo: 'session',    titulo: 'Sesión',       raiz: false },
+    conciertos:  { archivo: 'conciertos', titulo: 'Conciertos',   raiz: false },
     canciones:   { archivo: 'songs',      titulo: 'Repertorio',   raiz: false },
     cancion:     { archivo: 'song',       titulo: 'Canción',      raiz: false },
     estudio:     { archivo: 'study',      titulo: 'Modo estudio', raiz: false },
@@ -43,6 +44,8 @@
   var rutaActual = null;
   var cargando = false;
   var enPopstate = false;  // true mientras servimos un "atrás" del navegador / Android
+  var ignorarPops = 0;     // popstates a ignorar (los provoca un salto de varias entradas)
+  var profBrowser = 0;     // nº de entradas de detalle nuestras en el historial del navegador
 
   /* --------------------------------------------------------
      Navegación
@@ -67,7 +70,9 @@
         return r.text();
       });
 
-      var claseAnim = esCambioDeTab ? 'fundido' : '';
+      // Cambio de pestaña o "reemplazar" (p. ej. cambiar de versión en el
+      // Modo estudio) → fundido suave, no deslizamiento de pantalla entera.
+      var claseAnim = (esCambioDeTab || opts.reemplazar) ? 'fundido' : '';
       vista.innerHTML =
         '<div class="pantalla ' + claseAnim + '" data-pantalla="' + pantalla.archivo + '">' + html + '</div>';
       var contenedor = vista.firstElementChild;
@@ -82,6 +87,10 @@
         var repetida = cima && cima.ruta === ruta &&
           JSON.stringify(cima.datos) === JSON.stringify(entrada.datos);
         if (pantalla.raiz) historial = [entrada];
+        // opts.reemplazar: misma pantalla lógica con otros datos (p. ej.
+        // cambiar de día en el Modo estudio). Sustituye la cima en vez de
+        // apilar, para que "atrás" no recorra cada cambio.
+        else if (opts.reemplazar && historial.length) historial[historial.length - 1] = entrada;
         else if (rutaActual && !repetida) historial.push(entrada);
       }
 
@@ -95,14 +104,36 @@
       // dentro de la app en vez de cerrarla.
       if (!enPopstate) {
         var estado = { ruta: ruta };
-        if (esPrimeraNav) window.history.replaceState(estado, '');
-        else window.history.pushState(estado, '');
+        if (esPrimeraNav || opts.reemplazar) {
+          window.history.replaceState(estado, '');
+        } else if (pantalla.raiz) {
+          // Volver a una pestaña raíz colapsa la pila: en vez de apilar otra
+          // entrada, descartamos de golpe las de detalle acumuladas.
+          window.history.replaceState(estado, '');
+          if (profBrowser > 0) {
+            var nAtras = profBrowser;
+            profBrowser = 0;
+            ignorarPops += 1;
+            window.history.go(-nAtras);
+          }
+        } else {
+          window.history.pushState(estado, '');
+          profBrowser++;
+        }
       }
 
       // Módulo opcional de la página: js/pages/<archivo>.js expone window.Pagina_<archivo>
       var modulo = window['Pagina_' + pantalla.archivo];
       if (modulo && typeof modulo.iniciar === 'function') {
         modulo.iniciar(contenedor, opts.datos);
+      }
+
+      // Aviso estilo Steam si acaba de caer algún logro nuevo (tras la
+      // acción que lo dispara, que casi siempre implica cambiar de pantalla).
+      if (window.Logros && window.Logros.revisarNuevos) {
+        setTimeout(function () {
+          try { window.Logros.revisarNuevos(); } catch (e) {}
+        }, 500);
       }
     } catch (e) {
       vista.innerHTML = '<div class="pantalla vacio">No se pudo cargar esta sección.</div>';
@@ -119,16 +150,47 @@
     window.history.back();
   }
 
+  // ¿La entrada del historial sigue apuntando a algo que existe? Tras
+  // eliminar una canción o una sesión, las pantallas de detalle que la
+  // mostraban quedan muertas y "atrás" no debe pararse en ellas.
+  function entradaViva(e) {
+    if (!e || !e.datos) return true;
+    var d = e.datos;
+    var S = window.Sesiones, C = window.Canciones;
+    if (d.id && (e.ruta === 'estudio' || e.ruta === 'cancion') && C && !C.obtener(d.id)) return false;
+    if (d.id && e.ruta === 'sesion' && S && !S.obtener(d.id)) return false;
+    if (d.sesionId && S) {
+      var s = S.obtener(d.sesionId);
+      if (!s) return false;
+      if (d.marcaId && !(s.marcas || []).some(function (m) { return m.id === d.marcaId; })) return false;
+    }
+    return true;
+  }
+
   // Sirve un "atrás" real: navega a la pantalla anterior de la pila sin
-  // volver a tocar el historial del navegador.
+  // volver a tocar el historial del navegador. Salta de golpe las entradas
+  // que hayan quedado muertas (canción/sesión eliminada).
   function retroceder() {
     if (historial.length <= 1) return;
     enPopstate = true;
     historial.pop();                             // quita la pantalla actual
-    var destino = historial[historial.length - 1]; // la anterior se queda en la pila
+    var saltadas = 0;
+    while (historial.length > 1 && !entradaViva(historial[historial.length - 1])) {
+      historial.pop();
+      saltadas++;
+    }
+    var destino = historial[historial.length - 1];
     rutaActual = null;
+    profBrowser = Math.max(0, profBrowser - 1 - saltadas);
     var p = ir(destino.ruta, { datos: destino.datos });
-    (p && p.then ? p : Promise.resolve()).then(function () { enPopstate = false; });
+    (p && p.then ? p : Promise.resolve()).then(function () {
+      enPopstate = false;
+      // Consumir de una vez las entradas muertas del historial del navegador.
+      if (saltadas > 0) {
+        ignorarPops += 1;
+        window.history.go(-saltadas);
+      }
+    });
   }
 
   // ¿Hay una capa a pantalla completa abierta (visor de PDF, lightbox)?
@@ -193,6 +255,7 @@
 
   // "Atrás" del navegador (y del WebView de Android en la web).
   window.addEventListener('popstate', function () {
+    if (ignorarPops > 0) { ignorarPops--; return; }
     if (cerrarCapaSuperior()) {
       // Reponemos la entrada que el navegador acaba de consumir.
       window.history.pushState({ ruta: rutaActual }, '');
@@ -235,6 +298,10 @@
     // Registro en FCM para recibir push con la app cerrada. Solo APK.
     if (window.Push && window.Push.iniciar) {
       setTimeout(function () { window.Push.iniciar(); }, 1800);
+    }
+    // Sube un resumen del progreso a Firebase para el panel del hijo.
+    if (window.Progreso && window.Progreso.iniciar) {
+      setTimeout(function () { window.Progreso.iniciar(); }, 2200);
     }
   });
 })();

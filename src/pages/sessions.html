@@ -1,7 +1,8 @@
 <!-- Sesiones — grabaciones de los ensayos del coro -->
 <div class="sesiones" data-modulo="sessions">
 
-  <!-- Acceso al repertorio (canciones con letra, partitura y estado).
+  <!-- Acceso al repertorio (todas las canciones: letra, partitura, estado
+       y, dentro de cada una, la grabación original y cada ensayo).
        Anclado arriba: siempre a mano por muchas sesiones que haya. -->
   <button class="enlace-bloque enlace-bloque--anclado" type="button" data-ir-repertorio hidden>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -59,12 +60,30 @@
   <!-- Aquí se pinta la lista o el estado vacío -->
   <div data-contenido></div>
 
-  <!-- Botón flotante para añadir sesión -->
-  <button class="fab" type="button" aria-label="Añadir sesión" data-nueva>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
-      <path d="M12 5v14M5 12h14"/>
-    </svg>
-  </button>
+  <!-- Botón flotante (+): al tocarlo se despliega en dos opciones -->
+  <div class="fab-menu" data-fab-menu>
+    <div class="fab-menu__acciones">
+      <button class="fab-menu__accion" type="button" data-crear="cancion">
+        <span class="fab-menu__etiqueta">Canción</span>
+        <span class="fab-menu__mini" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        </span>
+      </button>
+      <button class="fab-menu__accion" type="button" data-crear="sesion">
+        <span class="fab-menu__etiqueta">Sesión del coro</span>
+        <span class="fab-menu__mini" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h2l2-6 3 15 3-19 2.5 13 1.5-3H20"/></svg>
+        </span>
+      </button>
+    </div>
+    <button class="fab" type="button" aria-label="Añadir" aria-haspopup="true" aria-expanded="false" data-nueva>
+      <svg class="fab__mas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- El alta de "canción suelta" usa la hoja compartida window.HojaCancion. -->
 
   <!-- Formulario de alta / edición de sesión -->
   <div class="hoja" hidden data-hoja>

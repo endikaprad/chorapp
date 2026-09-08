@@ -84,6 +84,36 @@
 
   .estado { font-size: 13px; color: var(--texto-2); }
   .estado b { color: var(--texto); font-weight: 600; }
+
+  .progreso { font-size: 14px; }
+  .progreso .p-vacio { color: var(--texto-2); font-size: 13px; }
+  .progreso .p-racha {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-bottom: 12px;
+  }
+  .progreso .p-racha b { font-size: 26px; color: var(--acento); font-weight: 800; line-height: 1; }
+  .progreso .p-racha span { color: var(--texto-2); font-size: 13px; }
+  .progreso .p-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;
+  }
+  .progreso .p-dato {
+    background: var(--acento-suave); border-radius: 10px; padding: 10px 12px;
+  }
+  .progreso .p-dato b { display: block; font-size: 18px; color: var(--texto); }
+  .progreso .p-dato span { font-size: 12px; color: var(--texto-2); }
+  .progreso .p-mes {
+    border-top: 1px solid var(--borde); margin-top: 4px; padding-top: 12px;
+  }
+  .progreso .p-mes h3 {
+    margin: 0 0 6px; font-size: 13px; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--texto-2);
+  }
+  .progreso .p-mes ul { margin: 0 0 8px; padding-left: 18px; }
+  .progreso .p-mes li { font-size: 13px; margin-bottom: 2px; }
+  .progreso .p-frase {
+    font-style: italic; color: var(--texto-2); font-size: 13px; margin: 0;
+  }
+  .progreso .p-hora { color: var(--texto-2); font-size: 12px; margin-top: 10px; }
   .aviso-flash {
     position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
     background: var(--texto); color: var(--fondo);
@@ -159,6 +189,11 @@
       <div class="fila oculto" id="fila-desbloquear">
         <button class="peligro" id="btn-desbloquear" style="flex:1">Desbloquear ahora</button>
       </div>
+    </section>
+
+    <section>
+      <h2>Cómo va Maite</h2>
+      <div id="progreso-cont" class="progreso">Consultando…</div>
     </section>
 
     <section>
@@ -349,6 +384,7 @@ function desbloquear() {
 /* ---------- lectura de /status ---------- */
 function consultarEstado() {
   $('estado-texto').textContent = 'Consultando…';
+  $('progreso-cont').textContent = 'Consultando…';
   tokenValido().then(function (token) {
     return fetch(FIREBASE.dbUrl + '/status.json?auth=' + token).then(function (r) { return r.json(); });
   }).then(function (s) {
@@ -360,9 +396,66 @@ function consultarEstado() {
     $('estado-texto').innerHTML =
       'App abierta por última vez: <b>' + visto + '</b><br>' +
       'Bloqueada: <b>' + bloq + '</b>';
+    pintarProgreso(s.resumen);
   }).catch(function (e) {
     $('estado-texto').textContent = 'No se pudo consultar (' + e.message + ')';
+    $('progreso-cont').textContent = 'No se pudo consultar.';
   });
+}
+
+function esc(x) {
+  return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+
+function pintarProgreso(r) {
+  var cont = $('progreso-cont');
+  if (!r || typeof r !== 'object') {
+    cont.innerHTML = '<p class="p-vacio">Todavía no hay datos. Aparecerán cuando Maite abra la app.</p>';
+    return;
+  }
+  var h = '';
+  h += '<div class="p-racha"><b>' + (r.racha || 0) + '</b>' +
+       '<span>' + ((r.racha === 1) ? 'día seguido' : 'días seguidos') +
+       (r.hoyHecho ? ' · ya ha estudiado hoy' : ' · hoy aún no') + '</span></div>';
+
+  h += '<div class="p-grid">';
+  h += dato(r.diasMes, 'días este mes');
+  h += dato((r.aprendidas || 0) + '/' + (r.repertorio || 0), 'canciones aprendidas');
+  if (r.logros) h += dato(r.logros.hechos + '/' + r.logros.total, 'logros');
+  if (typeof r.grabaciones === 'number') h += dato(r.grabaciones, 'grabaciones');
+  h += '</div>';
+
+  if (r.ultimoEstudio && r.ultimoEstudio.cuando) {
+    h += '<p class="p-vacio">Último estudio: <b style="color:var(--texto)">' +
+         haceCuanto(r.ultimoEstudio.cuando) + '</b>' +
+         (r.ultimoEstudio.titulo ? ' — ' + esc(r.ultimoEstudio.titulo) : '') + '</p>';
+  }
+
+  var m = r.mesAnterior;
+  if (m && (m.dias || (m.aprendidas && m.aprendidas.length) || (m.logros && m.logros.length))) {
+    h += '<div class="p-mes"><h3>Resumen de ' + esc(m.nombre) + '</h3><ul>';
+    h += '<li>' + m.dias + ' de ' + m.diasDelMes + ' días de estudio</li>';
+    if (m.canciones) h += '<li>' + m.canciones + ' canciones distintas</li>';
+    if (m.rachaMax >= 2) h += '<li>Racha más larga: ' + m.rachaMax + ' días</li>';
+    if (m.aprendidas && m.aprendidas.length) {
+      h += '<li>Aprendidas: ' + m.aprendidas.map(esc).join(', ') + '</li>';
+    }
+    if (m.trozos) h += '<li>' + m.trozos + ' trozos difíciles marcados</li>';
+    if (m.grabaciones) h += '<li>' + m.grabaciones + ' grabaciones</li>';
+    if (m.logros && m.logros.length) h += '<li>Logros: ' + m.logros.map(esc).join(', ') + '</li>';
+    h += '</ul>';
+    if (m.frase) h += '<p class="p-frase">«' + esc(m.frase) + '»</p>';
+    h += '</div>';
+  }
+
+  if (r.generado) h += '<p class="p-hora">Datos de ' + haceCuanto(r.generado) + '</p>';
+  cont.innerHTML = h;
+}
+
+function dato(valor, etq) {
+  return '<div class="p-dato"><b>' + esc(valor) + '</b><span>' + esc(etq) + '</span></div>';
 }
 
 function haceCuanto(ts) {

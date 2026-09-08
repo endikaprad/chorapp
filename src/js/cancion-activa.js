@@ -32,6 +32,8 @@ window.CancionActiva = (function () {
   var vistaAbierta = false; // true mientras el modo estudio de ESTA canción está montado
   var forzarBarra = false;  // el modo estudio pide la barra aunque su vista esté abierta
                             // (p. ej. Maite ha bajado y ya no ve el reproductor de la página)
+  var oculta = false;       // alguien (p. ej. la hoja de añadir canción/sesión) pide
+                            // esconder la barra flotante mientras esté en pantalla
   var ultimoEstado = { reproduciendo: false, actual: 0, total: 0, velocidad: 1, bucle: null };
   var barra = null;         // UI flotante (o null si aún no se creó)
   var arrastrandoBarra = false; // Maite tiene el dedo en la barra de progreso
@@ -184,6 +186,15 @@ window.CancionActiva = (function () {
     evaluarBarra();
   }
 
+  // Esconde/restaura la barra flotante a petición externa (hojas de alta de
+  // canción o sesión). No para el audio: solo oculta la UI.
+  function fijarOculta(o) {
+    o = !!o;
+    if (o === oculta) return;
+    oculta = o;
+    evaluarBarra();
+  }
+
   /* ---------- Barra flotante ---------- */
 
   function crearBarra() {
@@ -271,12 +282,12 @@ window.CancionActiva = (function () {
   // ¿Debe verse la barra? Hay canción cargada y el modo estudio de esa
   // canción NO está en pantalla.
   function evaluarBarra() {
-    if (audio && urlActual && cancionActual && (!vistaAbierta || forzarBarra)) mostrarBarra();
+    if (!oculta && audio && urlActual && cancionActual && (!vistaAbierta || forzarBarra)) mostrarBarra();
     else ocultarBarra();
   }
 
   function debeVerse() {
-    return !!(barra && audio && urlActual && cancionActual && (!vistaAbierta || forzarBarra));
+    return !!(!oculta && barra && audio && urlActual && cancionActual && (!vistaAbierta || forzarBarra));
   }
 
   function mostrarBarra() {
@@ -306,6 +317,7 @@ window.CancionActiva = (function () {
     suscribir: suscribir,
     fijarVistaAbierta: fijarVistaAbierta,
     fijarForzarBarra: fijarForzarBarra,
+    fijarOculta: fijarOculta,
     estado: function () { return ultimoEstado; },
     cancionId: function () { return cancionActual && cancionActual.id; },
     hayCancion: function () { return !!(audio && urlActual); },

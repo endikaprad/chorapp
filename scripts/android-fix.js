@@ -30,6 +30,34 @@ if (existsSync(iconoSrc)) {
   }
 }
 
+// --- Audio mudo para el canal de notificaciones ------------------------
+// El canal "chorapp" (src/js/avisos.js) va SIN sonido pero CON vibración.
+// El plugin no tiene opción "sin sonido", así que se le pasa un WAV mudo.
+// Se genera aquí para no versionar un binario. res/raw exige nombre a-z0-9_.
+const rawSilencio = resolve(raiz, 'android/app/src/main/res/raw/silencio.wav');
+{
+  const sr = 8000, seg = 0.4, n = Math.floor(sr * seg), data = n * 2; // 16-bit mono
+  const wav = Buffer.alloc(44 + data);
+  wav.write('RIFF', 0, 'ascii');
+  wav.writeUInt32LE(36 + data, 4);
+  wav.write('WAVE', 8, 'ascii');
+  wav.write('fmt ', 12, 'ascii');
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);            // PCM
+  wav.writeUInt16LE(1, 22);            // mono
+  wav.writeUInt32LE(sr, 24);
+  wav.writeUInt32LE(sr * 2, 28);       // byteRate
+  wav.writeUInt16LE(2, 32);            // blockAlign
+  wav.writeUInt16LE(16, 34);           // bitsPerSample
+  wav.write('data', 36, 'ascii');
+  wav.writeUInt32LE(data, 40);         // el resto ya es 0 = silencio
+  if (!existsSync(rawSilencio) || !readFileSync(rawSilencio).equals(wav)) {
+    mkdirSync(dirname(rawSilencio), { recursive: true });
+    writeFileSync(rawSilencio, wav);
+    console.log('android-fix: res/raw/silencio.wav (audio mudo del canal) generado.');
+  }
+}
+
 // --- Firebase Cloud Messaging (push con la app cerrada) -----------------
 // google-services.json NO se versiona (lleva ids del proyecto). El fuente
 // vive en resources/ y se copia a android/app/. Si no está, se omite todo
@@ -81,6 +109,7 @@ if (hayFCM && !xml.includes('com.google.firebase.messaging.default_notification_
   xml = xml.replace(
     /(\s*)(<\/application>)/,
     `$1    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_bihotsak" />` +
+    `$1    <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="chorapp" />` +
     `$1$2`
   );
   cambiado = true;

@@ -6,46 +6,937 @@
 window.Pagina_practice = (function () {
   'use strict';
 
-  function iniciar(contenedor) {
+  var raizActual = null;
+
+  function iniciar(contenedor, datos) {
     var raiz = contenedor.querySelector('[data-modulo="practice"]');
     if (!raiz) return;
+    raizActual = raiz;
+
+    if (window.Practica && window.Practica.revisar) {
+      try { window.Practica.revisar(); } catch (e) {}
+    }
 
     var dias = window.Practica ? window.Practica.diasPracticados() : [];
-    var racha = window.Practica ? window.Practica.racha() : 0;
-    var semana = window.Practica ? window.Practica.cancionesSemana() : 0;
 
-    var elRacha = raiz.querySelector('[data-racha]');
-    var elRachaLabel = raiz.querySelector('[data-racha-label]');
-    var elSemana = raiz.querySelector('[data-semana]');
-    var elSemanaLabel = raiz.querySelector('[data-semana-label]');
-
-    contarHasta(elRacha, racha);
-    elRachaLabel.textContent = racha === 1 ? 'día seguido' : 'días seguidos';
-    contarHasta(elSemana, semana);
-    elSemanaLabel.textContent = semana === 1 ? 'canción esta semana' : 'canciones esta semana';
+    pintarRachaHero(raiz);
+    pintarLogros(raiz);
+    pintarResumenMes(raiz);
 
     raiz.querySelector('[data-vacio]').hidden = dias.length > 0;
 
     pintarRepasar(raiz);
 
-    // Días con algo que enseñar aunque no cuenten como práctica.
-    var conActividad = window.Diario ? window.Diario.dias() : [];
+    montarCalendario(raiz);
 
-    // Calendario del mes. Al tocar un día se abre su resumen.
-    window.Calendario.crear(raiz.querySelector('[data-calendario]'), {
-      practicados: dias,
-      conActividad: conActividad,
-      onDia: abrirResumenDia,
-    });
+    var btnConc = raiz.querySelector('[data-ir-conciertos]');
+    if (btnConc) {
+      var nConc = window.Conciertos ? window.Conciertos.listar().length : 0;
+      var txt = raiz.querySelector('[data-ir-conciertos-txt]');
+      if (txt) txt.textContent = nConc ? 'Conciertos del coro · ' + nConc : 'Conciertos del coro';
+      btnConc.addEventListener('click', function () { window.App.ir('conciertos'); });
+    }
+    // Compatibilidad: si aún existe el botón viejo de "Añadir día de concierto".
+    var btnAdd = raiz.querySelector('[data-add-concierto]');
+    if (btnAdd) btnAdd.addEventListener('click', function () { abrirFormConcierto(null); });
 
     pintarDatos(raiz);
+
+    // Se ha llegado aquí tocando un aviso de logro: llevar a ESE logro.
+    if (datos && datos.logroId) {
+      setTimeout(function () { enfocarLogro(datos.logroId); }, 140);
+    }
+    // Desde la pantalla de Conciertos: abrir el detalle de ese día.
+    if (datos && datos.conciertoDia) {
+      setTimeout(function () { abrirResumenDia(datos.conciertoDia); }, 160);
+    }
+    // Desde Conciertos: abrir el formulario de nuevo concierto.
+    if (datos && datos.nuevoConcierto) {
+      setTimeout(function () { abrirFormConcierto(null); }, 160);
+    }
 
     // Al abandonar la pantalla, cerrar el resumen si quedó abierto.
     var vista = document.getElementById('vista');
     var obs = new MutationObserver(function () {
-      if (!document.body.contains(raiz)) { cerrarResumen(); obs.disconnect(); }
+      if (!document.body.contains(raiz)) {
+        cerrarResumen(); cerrarFormConcierto(); cerrarLogro(); cerrarPrograma();
+        cerrarRecuerdo(); cerrarFotoFull();
+        if (window.ResumenMes) window.ResumenMes.cerrarHoja();
+        obs.disconnect();
+      }
     });
     obs.observe(vista, { childList: true, subtree: true });
+  }
+
+  /* ----------------------------------------------------------
+     Racha estilo Duolingo — llama con el número de días, tira de
+     la semana, mensaje según el estado y escudos de racha.
+     ---------------------------------------------------------- */
+  function pintarRachaHero(raiz) {
+    var hero = raiz.querySelector('[data-racha-hero]');
+    if (!hero || !window.Practica || !window.Practica.rachaInfo) return;
+
+    var info = window.Practica.rachaInfo();
+    var n = info.dias;
+
+    var elNum = hero.querySelector('[data-racha]');
+    var elLabel = hero.querySelector('[data-racha-label]');
+    contarHasta(elNum, n);
+    elLabel.textContent = n === 1 ? 'día seguido' : 'días seguidos';
+
+    // El fuego y el número se amoldan a las cifras: cuantos más dígitos,
+    // más grande la llama y más pequeño el número para que quepa.
+    var cifras = String(Math.max(n, 0)).length;
+    hero.setAttribute('data-cifras', cifras);
+
+    hero.classList.toggle('racha-hero--activa', n > 0 && !info.enPeligro);
+    hero.classList.toggle('racha-hero--peligro', info.enPeligro);
+    hero.classList.toggle('racha-hero--apagada', n === 0);
+
+    // Mensaje cálido según el estado.
+    var msg;
+    if (info.escudoAyer) {
+      msg = 'Ayer no pudiste, pero un escudo salvó tu racha 🛡️';
+    } else if (n === 0 && !info.hoyHecho) {
+      msg = 'Estudia hoy y empieza tu racha';
+    } else if (n === 0 && info.hoyHecho) {
+      msg = '¡Racha empezada! Vuelve mañana para seguirla';
+    } else if (info.enPeligro) {
+      msg = n === 1
+        ? 'Estudia hoy para no perder tu racha'
+        : 'Estudia hoy para no perder tus ' + n + ' días';
+    } else {
+      var buenas = ['¡Vas genial, Maite!', 'Un día más sin fallar 🎶',
+                    'Tu constancia se nota', '¡Sigue así!'];
+      msg = buenas[n % buenas.length];
+    }
+    hero.querySelector('[data-racha-msg]').textContent = msg;
+
+    // Tira de la semana.
+    var check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="m5 13 4 4L19 7"/></svg>';
+    var escudo = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M12 3 5 6v5c0 4.4 3 7.5 7 9 4-1.5 7-4.6 7-9V6z"/></svg>';
+    hero.querySelector('[data-semana]').innerHTML = info.semana.map(function (d) {
+      var cl = 'semana__dia';
+      if (d.hecho || d.escudo) cl += ' semana__dia--hecho';
+      if (d.escudo && !d.hecho) cl += ' semana__dia--escudo';
+      if (d.hoy) cl += ' semana__dia--hoy';
+      else if (d.futuro) cl += ' semana__dia--futuro';
+      var ico = d.escudo && !d.hecho ? escudo : (d.hecho ? check : '');
+      return '<span class="' + cl + '">' +
+        '<span class="semana__nombre">' + d.nombre + '</span>' +
+        '<span class="semana__punto">' + ico + '</span></span>';
+    }).join('');
+
+    // Pie: canciones de la semana, récord y escudos.
+    var semana = window.Practica.cancionesSemana ? window.Practica.cancionesSemana() : 0;
+    var elSem = hero.querySelector('[data-semana-stat]');
+    elSem.textContent = semana + (semana === 1 ? ' canción esta semana' : ' canciones esta semana');
+
+    var elRecord = hero.querySelector('[data-record]');
+    if (info.mejor >= 2 && info.mejor > n) {
+      elRecord.textContent = 'Tu récord: ' + info.mejor + ' días';
+      elRecord.hidden = false;
+    } else {
+      elRecord.hidden = true;
+    }
+
+    var elEsc = hero.querySelector('[data-escudos]');
+    if (info.escudos > 0) {
+      elEsc.textContent = '🛡️ ' + info.escudos +
+        (info.escudos === 1 ? ' escudo de racha' : ' escudos de racha');
+      elEsc.title = 'Cada escudo te cubre un día sin estudiar. Ganas uno por cada 7 días seguidos.';
+      elEsc.hidden = false;
+    } else {
+      elEsc.hidden = true;
+    }
+  }
+
+  /* ----------------------------------------------------------
+     Botón "Ver el resumen del mes" — abre la hoja de resumenmes.js
+     con el balance del mes anterior (si hubo algo que contar).
+     ---------------------------------------------------------- */
+  function pintarResumenMes(raiz) {
+    var btn = raiz.querySelector('[data-resumen-mes]');
+    if (!btn || !window.ResumenMes) return;
+
+    var ant = window.ResumenMes.ultimoMes();
+    var d;
+    try { d = window.ResumenMes.datosDe(ant.anio, ant.mes); } catch (e) { return; }
+    if (!d || !d.hayAlgo) return;
+
+    raiz.querySelector('[data-resumen-mes-texto]').textContent =
+      'Resumen de ' + d.nombreMes;
+    btn.addEventListener('click', function () { window.ResumenMes.abrirHoja(d); });
+    btn.hidden = false;
+  }
+
+  /* ----------------------------------------------------------
+     Logros / medallas — se calculan al vuelo (logros.js). Los
+     conseguidos van en cobalto con su check; los pendientes en
+     gris con el progreso ("3/7"). Tocar uno abre su detalle.
+     ---------------------------------------------------------- */
+  function pintarLogros(raiz) {
+    var sec = raiz.querySelector('[data-logros]');
+    if (!sec || !window.Logros) return;
+
+    var lista = window.Logros.listar();
+    if (!lista.length) return;
+
+    var res = window.Logros.resumen();
+    raiz.querySelector('[data-logros-cuenta]').textContent =
+      res.hechos + ' de ' + res.total;
+
+    // Orden: conseguidos primero (por grupo), luego los pendientes
+    // ordenados por lo cerca que están de caer.
+    var hechos = lista.filter(function (l) { return l.hecho; });
+    var pend = lista.filter(function (l) { return !l.hecho; })
+      .sort(function (a, b) { return b.progreso - a.progreso; });
+    var orden = hechos.concat(pend);
+
+    var grid = raiz.querySelector('[data-logros-grid]');
+    grid.innerHTML = orden.map(function (l, i) {
+      var prog = l.hecho
+        ? ''
+        : '<span class="logro__prog">' + Math.min(l.valor, l.objetivo) + '/' + l.objetivo + '</span>';
+      return '<button type="button" class="logro' + (l.hecho ? ' logro--hecho' : '') + '" ' +
+        'data-logro="' + l.id + '" style="animation-delay:' + (i * 28) + 'ms">' +
+        '<span class="logro__medalla">' + window.Logros.icono(l.icono) + '</span>' +
+        '<span class="logro__titulo">' + escapar(l.titulo) + '</span>' +
+        prog +
+      '</button>';
+    }).join('');
+
+    grid.onclick = function (ev) {
+      var b = ev.target.closest('[data-logro]');
+      if (!b) return;
+      var l = lista.filter(function (x) { return x.id === b.getAttribute('data-logro'); })[0];
+      if (l) abrirLogro(l);
+    };
+
+    // Barra de progreso global.
+    raiz.querySelector('[data-logros-barra]').style.width =
+      Math.round((res.hechos / res.total) * 100) + '%';
+
+    sec.hidden = false;
+  }
+
+  /* Llevar la vista a un logro concreto (p. ej. al tocar su aviso):
+     baja hasta él, lo resalta un momento y abre su detalle. */
+  function enfocarLogro(id) {
+    var raiz = raizActual;
+    if (!raiz || !document.body.contains(raiz) || !window.Logros) return;
+
+    var grid = raiz.querySelector('[data-logros-grid]');
+    var btn = grid && grid.querySelector('[data-logro="' + id + '"]');
+    var l = window.Logros.listar().filter(function (x) { return x.id === id; })[0];
+    if (!l) return;
+
+    if (btn) {
+      try { btn.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      catch (e) { btn.scrollIntoView(); }
+      btn.classList.remove('logro--destacado');
+      void btn.offsetWidth;
+      btn.classList.add('logro--destacado');
+      setTimeout(function () { btn.classList.remove('logro--destacado'); }, 2400);
+    }
+    // Deja que el desplazamiento arranque antes de tapar con la hoja.
+    setTimeout(function () { abrirLogro(l); }, 300);
+  }
+
+  var hojaLogro = null;
+
+  function abrirLogro(l) {
+    cerrarResumen();
+    cerrarLogro();
+
+    var pct = Math.round(l.progreso * 100);
+    var comoLoHizo = '';
+    try { comoLoHizo = window.Logros.detalle(l) || ''; } catch (e) {}
+
+    hojaLogro = document.createElement('div');
+    hojaLogro.className = 'hoja hoja--logro';
+    hojaLogro.innerHTML =
+      '<div class="hoja__fondo" data-cerrar></div>' +
+      '<div class="hoja__panel" role="dialog" aria-modal="true" aria-label="Logro">' +
+        '<div class="hoja__asa"></div>' +
+        '<div class="logro-det__medalla' + (l.hecho ? '' : ' logro-det__medalla--bloq') + '">' +
+          window.Logros.icono(l.icono) + '</div>' +
+        (l.hecho
+          ? '<p class="logro-det__pill">Conseguido</p>'
+          : '<p class="logro-det__pill logro-det__pill--pend">Vas por ' +
+            Math.min(l.valor, l.objetivo) + ' de ' + l.objetivo + '</p>') +
+        '<p class="logro-det__titulo">' + escapar(l.titulo) + '</p>' +
+        '<p class="logro-det__desc">' + escapar(l.desc) + '</p>' +
+        (l.hecho ? '' :
+          '<div class="logro-det__barra"><i style="width:' + pct + '%"></i></div>') +
+        (comoLoHizo ? '<p class="logro-det__como">' + escapar(comoLoHizo) + '</p>' : '') +
+        '<div class="hoja__acciones">' +
+          '<button type="button" class="btn btn--primario" data-cerrar>Cerrar</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(hojaLogro);
+
+    Array.prototype.forEach.call(hojaLogro.querySelectorAll('[data-cerrar]'), function (el) {
+      el.addEventListener('click', cerrarLogro);
+    });
+    document.addEventListener('keydown', cerrarLogroEsc);
+
+    void hojaLogro.offsetHeight;
+    hojaLogro.classList.add('is-abierta');
+  }
+
+  function cerrarLogroEsc(e) { if (e.key === 'Escape') cerrarLogro(); }
+
+  function cerrarLogro() {
+    document.removeEventListener('keydown', cerrarLogroEsc);
+    var h = hojaLogro;
+    hojaLogro = null;
+    if (!h) return;
+    h.classList.remove('is-abierta');
+    var quita = function () { if (h.parentNode) h.parentNode.removeChild(h); };
+    h.addEventListener('transitionend', quita, { once: true });
+    setTimeout(quita, 320);
+  }
+
+  /* ----------------------------------------------------------
+     Calendario del mes. Se vuelve a montar entero cuando cambia
+     algún concierto, para que se repinte el color del día.
+     ---------------------------------------------------------- */
+  function montarCalendario(raiz) {
+    raiz = raiz || raizActual;
+    if (!raiz || !window.Calendario || !document.body.contains(raiz)) return;
+    var cont = raiz.querySelector('[data-calendario]');
+    if (!cont) return;
+    cont.innerHTML = '';
+    cont.className = '';
+
+    var dias = window.Practica ? window.Practica.diasPracticados() : [];
+    var conActividad = window.Diario ? window.Diario.dias() : [];
+    var conciertos = window.Conciertos ? window.Conciertos.mapa() : {};
+
+    window.Calendario.crear(cont, {
+      practicados: dias,
+      conActividad: conActividad,
+      conciertos: conciertos,
+      onDia: abrirResumenDia,
+    });
+  }
+
+  /* ----------------------------------------------------------
+     Días de concierto — alta / edición / borrado desde una hoja
+     inferior. La fecha puede ser futura (FechaPicker con maxHoy
+     desactivado). Al guardar se reprograman las notificaciones.
+     ---------------------------------------------------------- */
+  var hojaConcierto = null;
+  var fpConcierto = null;
+
+  // Aviso de que algún concierto ha cambiado: repinta el calendario (si esta
+  // pantalla está montada) y deja que otras pantallas (Conciertos) se enteren.
+  function _conciertoCambio() {
+    try { montarCalendario(); } catch (e) {}
+    try { document.dispatchEvent(new CustomEvent('chorapp:concierto-cambio')); } catch (e) {}
+  }
+
+  function abrirFormConcierto(concierto, opts) {
+    if (!window.Conciertos) return;
+    opts = opts || {};
+    cerrarResumen();
+    cerrarFormConcierto();
+    var editando = !!(concierto && concierto.id);
+
+    hojaConcierto = document.createElement('div');
+    hojaConcierto.className = 'hoja hoja--concierto';
+    hojaConcierto.innerHTML =
+      '<div class="hoja__fondo" data-cerrar></div>' +
+      '<div class="hoja__panel" role="dialog" aria-modal="true" aria-label="Día de concierto">' +
+        '<div class="hoja__asa"></div>' +
+        '<h2 class="hoja__titulo">' + (editando ? 'Editar concierto' : 'Nuevo concierto') + '</h2>' +
+        '<div class="campo">' +
+          '<span class="campo__label">Día del concierto</span>' +
+          '<div data-fecha></div>' +
+        '</div>' +
+        '<label class="campo">' +
+          '<span class="campo__label">Lugar <span class="campo__opcional">(opcional)</span></span>' +
+          '<input type="text" data-lugar placeholder="Iglesia de San Juan, Llodio…" />' +
+        '</label>' +
+        '<label class="campo">' +
+          '<span class="campo__label">Hora <span class="campo__opcional">(opcional)</span></span>' +
+          '<input type="text" data-hora placeholder="19:30" />' +
+        '</label>' +
+        '<label class="campo">' +
+          '<span class="campo__label">Notas <span class="campo__opcional">(opcional)</span></span>' +
+          '<textarea data-notas placeholder="Qué repertorio, con quién quedas, vestuario…"></textarea>' +
+        '</label>' +
+        '<div class="hoja__acciones">' +
+          (editando ? '<button type="button" class="btn btn--fantasma" data-eliminar>Eliminar</button>' : '') +
+          '<button type="button" class="btn btn--texto" data-cerrar>Cancelar</button>' +
+          '<button type="button" class="btn btn--primario" data-guardar>Guardar</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(hojaConcierto);
+
+    var elLugar = hojaConcierto.querySelector('[data-lugar]');
+    var elHora = hojaConcierto.querySelector('[data-hora]');
+    var elNotas = hojaConcierto.querySelector('[data-notas]');
+    if (editando) {
+      elLugar.value = concierto.lugar || '';
+      elHora.value = concierto.hora || '';
+      elNotas.value = concierto.notas || '';
+    }
+
+    // Un concierto se marca de hoy en adelante (nunca en el pasado).
+    // (Al editar uno que ya pasó, se respeta su fecha para poder verlo.)
+    var hoy = hoyISO();
+    var minISO = hoy;
+    if (editando && concierto.fecha && concierto.fecha < hoy) minISO = concierto.fecha;
+
+    fpConcierto = window.FechaPicker.montar(hojaConcierto.querySelector('[data-fecha]'), {
+      valor: (concierto && concierto.fecha) || hoy,
+      maxHoy: false,
+      minISO: minISO,
+      rapidos: false,
+    });
+
+    function finForm() {
+      cerrarFormConcierto();
+      if (editando) abrirResumenDia(concierto.fecha);   // vuelve al detalle
+    }
+    Array.prototype.forEach.call(hojaConcierto.querySelectorAll('[data-cerrar]'), function (el) {
+      el.addEventListener('click', finForm);
+    });
+    _finFormActual = finForm;
+    document.addEventListener('keydown', cerrarFormConciertoEsc);
+
+    hojaConcierto.querySelector('[data-guardar]').addEventListener('click', function () {
+      var fecha = fpConcierto ? fpConcierto.valor() : '';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return;
+      if (fecha < hoyISO() && !(editando && concierto.fecha === fecha)) {
+        if (window.UI) window.UI.aviso('El concierto tiene que ser hoy o un día futuro', { tipo: 'error' });
+        return;
+      }
+      var yaHabia = window.Conciertos.porFecha(fecha);
+      window.Conciertos.guardar({
+        id: editando ? concierto.id : null,
+        fecha: fecha,
+        lugar: elLugar.value,
+        hora: elHora.value,
+        notas: elNotas.value,
+      });
+      cerrarFormConcierto();
+      _conciertoCambio();
+      reprogramarAvisos();
+      if (window.UI) {
+        window.UI.aviso(
+          editando ? 'Concierto actualizado'
+                   : (yaHabia && !editando ? 'Ese día ya tenías un concierto: lo he sustituido'
+                                           : 'Concierto añadido al calendario'),
+          { tipo: 'ok' }
+        );
+      }
+      // Volver al detalle del concierto (al editar, o si se pide al crear).
+      if (editando || opts.volverAlDia) abrirResumenDia(fecha);
+    });
+
+    var elBorrar = hojaConcierto.querySelector('[data-eliminar]');
+    if (elBorrar) {
+      elBorrar.addEventListener('click', function () {
+        if (!window.UI) { hacerBorrado(); return; }
+        window.UI.confirmar('¿Quitar este día de concierto del calendario?', {
+          ok: 'Quitar', peligro: true,
+        }).then(function (ok) { if (ok) hacerBorrado(); });
+      });
+    }
+    function hacerBorrado() {
+      window.Conciertos.eliminar(concierto.id);
+      cerrarFormConcierto();
+      _conciertoCambio();
+      reprogramarAvisos();
+      if (window.UI) window.UI.aviso('Concierto quitado', { tipo: 'ok' });
+    }
+
+    void hojaConcierto.offsetHeight;
+    hojaConcierto.classList.add('is-abierta');
+  }
+
+  var _finFormActual = null;
+  function cerrarFormConciertoEsc(e) {
+    if (e.key !== 'Escape') return;
+    if (_finFormActual) _finFormActual();
+    else cerrarFormConcierto();
+  }
+
+  function cerrarFormConcierto() {
+    document.removeEventListener('keydown', cerrarFormConciertoEsc);
+    _finFormActual = null;
+    var h = hojaConcierto;
+    hojaConcierto = null;
+    if (fpConcierto && fpConcierto.destruir) { try { fpConcierto.destruir(); } catch (e) {} }
+    fpConcierto = null;
+    if (!h) return;
+    h.classList.remove('is-abierta');
+    var quita = function () { if (h.parentNode) h.parentNode.removeChild(h); };
+    h.addEventListener('transitionend', quita, { once: true });
+    setTimeout(quita, 320);
+  }
+
+  /* ----------------------------------------------------------
+     Programa del concierto (setlist) — hoja con la lista de
+     canciones en el orden del concierto. Se arrastra el asa ⠿
+     para reordenar; se añaden y se quitan canciones; tocar una
+     fila lleva a su Modo estudio.
+     ---------------------------------------------------------- */
+  var hojaPrograma = null;
+
+  var ICO_HANDLE = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+    '<circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/>' +
+    '<circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/>' +
+    '<circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+  var ICO_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
+    'stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+  var ETQ_ESTADO_C = { pendiente: 'Pendiente', progreso: 'En progreso', aprendida: 'Aprendida' };
+
+  // Abre una canción del repertorio: al Modo estudio si tiene audio, si no a su ficha.
+  function irACancion(id) {
+    if (!id || !window.App) return;
+    var hay = window.Sesiones && window.Sesiones.ultimaMarcaDeCancion &&
+              window.Sesiones.ultimaMarcaDeCancion(id);
+    window.App.ir(hay ? 'estudio' : 'cancion', { datos: { id: id } });
+  }
+
+  function abrirPrograma(concierto) {
+    if (!concierto || !concierto.id || !window.Conciertos || !window.Canciones) return;
+    cerrarResumen();
+    cerrarFormConcierto();
+    cerrarPrograma();
+    var cid = concierto.id;
+
+    hojaPrograma = document.createElement('div');
+    hojaPrograma.className = 'hoja hoja--programa';
+    hojaPrograma.innerHTML =
+      '<div class="hoja__fondo" data-cerrar></div>' +
+      '<div class="hoja__panel" role="dialog" aria-modal="true" aria-label="Programa del concierto">' +
+        '<div class="hoja__asa"></div>' +
+        '<h2 class="hoja__titulo">Programa del concierto</h2>' +
+        '<p class="programa__sub">' + escapar(fechaLarga(concierto.fecha)) + '</p>' +
+        '<p class="programa__pista">Coloca las canciones en el orden del concierto. Arrastra el asa para moverlas.</p>' +
+        '<ul class="programa__lista" data-lista></ul>' +
+        '<button type="button" class="programa__anadir" data-anadir>' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>' +
+          'Añadir canción</button>' +
+        '<div class="programa__picker" data-picker></div>' +
+        '<div class="hoja__acciones">' +
+          '<button type="button" class="btn btn--primario" data-cerrar>Listo</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(hojaPrograma);
+
+    var ul = hojaPrograma.querySelector('[data-lista]');
+    var picker = hojaPrograma.querySelector('[data-picker]');
+
+    function pintar() {
+      var prog = window.Conciertos.programaDe(cid);
+      if (!prog.length) {
+        ul.innerHTML = '<li class="programa__vacio">Aún no hay canciones. Toca «Añadir canción» y ponlas en orden.</li>';
+        return;
+      }
+      ul.innerHTML = prog.map(function (s, i) {
+        var chip = '<span class="programa__chip programa__chip--' + s.estado + '">' +
+          (ETQ_ESTADO_C[s.estado] || s.estado) + '</span>';
+        return '<li class="programa__it" data-id="' + s.id + '">' +
+          '<span class="programa__handle" data-handle aria-label="Reordenar" title="Arrastra para reordenar">' + ICO_HANDLE + '</span>' +
+          '<span class="programa__num">' + (i + 1) + '</span>' +
+          '<span class="programa__tit">' + escapar(s.titulo) +
+            (s.compositor ? '<span class="programa__comp">' + escapar(s.compositor) + '</span>' : '') +
+          '</span>' +
+          chip +
+          '<button type="button" class="programa__quitar" data-quitar aria-label="Quitar del programa">' + ICO_X + '</button>' +
+        '</li>';
+      }).join('');
+    }
+    pintar();
+
+    ul.addEventListener('click', function (ev) {
+      var q = ev.target.closest('[data-quitar]');
+      if (q) {
+        var li = q.closest('.programa__it');
+        window.Conciertos.quitarDelPrograma(cid, li.getAttribute('data-id'));
+        pintar();
+        return;
+      }
+      if (ev.target.closest('[data-handle]')) return;
+      var fila = ev.target.closest('.programa__it');
+      if (fila) { cerrarPrograma(); irACancion(fila.getAttribute('data-id')); }
+    });
+
+    activarDragPrograma(ul, function (desde, hasta) {
+      window.Conciertos.moverEnPrograma(cid, desde, hasta);
+      pintar();
+    });
+
+    var pickerAbierto = false;
+
+    function cerrarPicker() {
+      if (!pickerAbierto) return;
+      pickerAbierto = false;
+      picker.style.maxHeight = picker.scrollHeight + 'px';
+      void picker.offsetHeight;
+      picker.classList.remove('is-abierto');
+      picker.style.maxHeight = '0px';
+    }
+
+    function abrirPicker() {
+      var enPrograma = (window.Conciertos.obtener(cid) || {}).programa || [];
+      var libres = window.Canciones.listar().filter(function (c) {
+        return enPrograma.indexOf(c.id) === -1;
+      });
+      if (!libres.length) {
+        if (window.UI) window.UI.aviso('Ya están todas las canciones del repertorio en el programa');
+        return;
+      }
+      picker.innerHTML = libres.map(function (c, i) {
+        return '<button type="button" class="programa__opt" style="--i:' + i + '" data-add="' + c.id + '">' +
+          escapar(c.titulo) +
+          (c.compositor ? '<span>' + escapar(c.compositor) + '</span>' : '') +
+        '</button>';
+      }).join('');
+      pickerAbierto = true;
+      picker.classList.add('is-abierto');
+      // Altura exacta del contenido (con tope) para que la transición no
+      // "salte" al final.
+      picker.style.maxHeight = '0px';
+      void picker.offsetHeight;
+      picker.style.maxHeight = Math.min(288, picker.scrollHeight) + 'px';
+    }
+
+    hojaPrograma.querySelector('[data-anadir]').addEventListener('click', function () {
+      if (pickerAbierto) cerrarPicker();
+      else abrirPicker();
+    });
+    picker.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-add]');
+      if (!b) return;
+      window.Conciertos.agregarAlPrograma(cid, b.getAttribute('data-add'));
+      cerrarPicker();
+      pintar();
+    });
+
+    function finPrograma() {
+      cerrarPrograma();
+      _conciertoCambio();
+      abrirResumenDia(concierto.fecha);   // vuelve al detalle del concierto
+    }
+    Array.prototype.forEach.call(hojaPrograma.querySelectorAll('[data-cerrar]'), function (el) {
+      el.addEventListener('click', finPrograma);
+    });
+    _finProgramaActual = finPrograma;
+    document.addEventListener('keydown', cerrarProgramaEsc);
+
+    void hojaPrograma.offsetHeight;
+    hojaPrograma.classList.add('is-abierta');
+  }
+
+  var _finProgramaActual = null;
+  function cerrarProgramaEsc(e) {
+    if (e.key !== 'Escape') return;
+    if (_finProgramaActual) _finProgramaActual();
+    else cerrarPrograma();
+  }
+
+  function cerrarPrograma() {
+    document.removeEventListener('keydown', cerrarProgramaEsc);
+    _finProgramaActual = null;
+    var h = hojaPrograma;
+    hojaPrograma = null;
+    if (!h) return;
+    h.classList.remove('is-abierta');
+    var quita = function () { if (h.parentNode) h.parentNode.removeChild(h); };
+    h.addEventListener('transitionend', quita, { once: true });
+    setTimeout(quita, 320);
+  }
+
+  /* ----------------------------------------------------------
+     Recuerdo del concierto — foto + nota de "cómo fue". Hoja con
+     una foto (galería o cámara) y un texto libre. Solo para
+     conciertos ya pasados. Ver conciertos.js.
+     ---------------------------------------------------------- */
+  var hojaRecuerdo = null;
+  var recUrlPrev = null;   // object URL de la previsualización
+
+  function abrirRecuerdo(concierto) {
+    if (!concierto || !concierto.id || !window.Conciertos) return;
+    cerrarResumen();
+    cerrarRecuerdo();
+    var cid = concierto.id;
+    var rec = window.Conciertos.recuerdoDe(cid);
+    var claveF = window.Conciertos.claveFoto(cid);
+    var fotoNueva = null;      // File pendiente de guardar
+    var quitarFoto = false;
+
+    hojaRecuerdo = document.createElement('div');
+    hojaRecuerdo.className = 'hoja hoja--recuerdo';
+    hojaRecuerdo.innerHTML =
+      '<div class="hoja__fondo" data-cerrar></div>' +
+      '<div class="hoja__panel" role="dialog" aria-modal="true" aria-label="Recuerdo del concierto">' +
+        '<div class="hoja__asa"></div>' +
+        '<h2 class="hoja__titulo">El recuerdo del concierto</h2>' +
+        '<p class="recuerdo__sub">' + escapar(fechaLarga(concierto.fecha)) + '</p>' +
+        '<div class="recuerdo__foto" data-foto-caja>' +
+          '<img data-preview alt="Foto del concierto" hidden>' +
+          '<label class="recuerdo__anadir-foto" data-vacia>' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="3.5"/></svg>' +
+            '<span>Añadir una foto</span>' +
+            '<input type="file" accept="image/*" capture="environment" data-input-foto hidden>' +
+          '</label>' +
+          '<div class="recuerdo__foto-acciones" data-foto-acc hidden>' +
+            '<label class="btn btn--texto">Cambiar' +
+              '<input type="file" accept="image/*" capture="environment" data-input-foto2 hidden>' +
+            '</label>' +
+            '<button type="button" class="btn btn--texto" data-quitar-foto>Quitar foto</button>' +
+          '</div>' +
+        '</div>' +
+        '<label class="campo">' +
+          '<span class="campo__label">¿Cómo fue? <span class="campo__opcional">(opcional)</span></span>' +
+          '<textarea data-nota rows="4" maxlength="2000" placeholder="Qué tal sonasteis, con quién fuiste, cómo respondió el público, alguna anécdota…"></textarea>' +
+        '</label>' +
+        '<div class="hoja__acciones">' +
+          ((rec.nota || rec.foto) ? '<button type="button" class="btn btn--fantasma" data-eliminar>Borrar recuerdo</button>' : '') +
+          '<button type="button" class="btn btn--texto" data-cerrar>Cancelar</button>' +
+          '<button type="button" class="btn btn--primario" data-guardar>Guardar</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(hojaRecuerdo);
+
+    var elImg = hojaRecuerdo.querySelector('[data-preview]');
+    var elVacia = hojaRecuerdo.querySelector('[data-vacia]');
+    var elAcc = hojaRecuerdo.querySelector('[data-foto-acc]');
+    var elNota = hojaRecuerdo.querySelector('[data-nota]');
+    elNota.value = rec.nota || '';
+
+    function pintarFoto(url) {
+      if (url) {
+        elImg.src = url;
+        elImg.hidden = false;
+        elVacia.hidden = true;
+        elAcc.hidden = false;
+      } else {
+        elImg.hidden = true;
+        elImg.removeAttribute('src');
+        elVacia.hidden = false;
+        elAcc.hidden = true;
+      }
+    }
+
+    if (rec.foto && window.Archivos) {
+      window.Archivos.url(claveF).then(function (u) {
+        if (!hojaRecuerdo) { if (u) URL.revokeObjectURL(u); return; }
+        recUrlPrev = u;
+        pintarFoto(u);
+      });
+    }
+
+    function onFoto(inp) {
+      var f = inp.files && inp.files[0];
+      inp.value = '';
+      if (!f) return;
+      fotoNueva = f;
+      quitarFoto = false;
+      if (recUrlPrev) { URL.revokeObjectURL(recUrlPrev); }
+      recUrlPrev = URL.createObjectURL(f);
+      pintarFoto(recUrlPrev);
+    }
+    hojaRecuerdo.querySelector('[data-input-foto]').addEventListener('change', function () { onFoto(this); });
+    hojaRecuerdo.querySelector('[data-input-foto2]').addEventListener('change', function () { onFoto(this); });
+    hojaRecuerdo.querySelector('[data-quitar-foto]').addEventListener('click', function () {
+      fotoNueva = null;
+      quitarFoto = true;
+      if (recUrlPrev) { URL.revokeObjectURL(recUrlPrev); recUrlPrev = null; }
+      pintarFoto(null);
+    });
+
+    function finRecuerdo() { cerrarRecuerdo(); abrirResumenDia(concierto.fecha); }
+    Array.prototype.forEach.call(hojaRecuerdo.querySelectorAll('[data-cerrar]'), function (el) {
+      el.addEventListener('click', finRecuerdo);
+    });
+    _finRecuerdoActual = finRecuerdo;
+    document.addEventListener('keydown', cerrarRecuerdoEsc);
+
+    var elBorrar = hojaRecuerdo.querySelector('[data-eliminar]');
+    if (elBorrar) {
+      elBorrar.addEventListener('click', function () {
+        var hacer = function () {
+          if (window.Archivos) window.Archivos.borrar(claveF);
+          window.Conciertos.fijarFotoRecuerdo(cid, null);
+          window.Conciertos.fijarNotaRecuerdo(cid, '');
+          cerrarRecuerdo();
+          _conciertoCambio();
+          abrirResumenDia(concierto.fecha);
+          if (window.UI) window.UI.aviso('Recuerdo borrado', { tipo: 'ok' });
+        };
+        if (!window.UI) { hacer(); return; }
+        window.UI.confirmar('¿Borrar la foto y la nota de este concierto?', { ok: 'Borrar', peligro: true })
+          .then(function (ok) { if (ok) hacer(); });
+      });
+    }
+
+    hojaRecuerdo.querySelector('[data-guardar]').addEventListener('click', function () {
+      var nota = elNota.value;
+      var guardarMeta = function () {
+        window.Conciertos.fijarNotaRecuerdo(cid, nota);
+        cerrarRecuerdo();
+        _conciertoCambio();
+        abrirResumenDia(concierto.fecha);
+        if (window.UI) window.UI.aviso('Recuerdo guardado', { tipo: 'ok' });
+      };
+      if (fotoNueva && window.Archivos) {
+        window.Archivos.guardar(claveF, fotoNueva).then(function (meta) {
+          window.Conciertos.fijarFotoRecuerdo(cid, meta);
+          guardarMeta();
+        }).catch(function () {
+          if (window.UI) window.UI.aviso('No se pudo guardar la foto', { tipo: 'error' });
+        });
+      } else if (quitarFoto) {
+        if (window.Archivos) window.Archivos.borrar(claveF);
+        window.Conciertos.fijarFotoRecuerdo(cid, null);
+        guardarMeta();
+      } else {
+        guardarMeta();
+      }
+    });
+
+    void hojaRecuerdo.offsetHeight;
+    hojaRecuerdo.classList.add('is-abierta');
+  }
+
+  var _finRecuerdoActual = null;
+  function cerrarRecuerdoEsc(e) {
+    if (e.key !== 'Escape') return;
+    if (_finRecuerdoActual) _finRecuerdoActual();
+    else cerrarRecuerdo();
+  }
+
+  function cerrarRecuerdo() {
+    document.removeEventListener('keydown', cerrarRecuerdoEsc);
+    _finRecuerdoActual = null;
+    if (recUrlPrev) { try { URL.revokeObjectURL(recUrlPrev); } catch (e) {} recUrlPrev = null; }
+    var h = hojaRecuerdo;
+    hojaRecuerdo = null;
+    if (!h) return;
+    h.classList.remove('is-abierta');
+    var quita = function () { if (h.parentNode) h.parentNode.removeChild(h); };
+    h.addEventListener('transitionend', quita, { once: true });
+    setTimeout(quita, 320);
+  }
+
+  /* Foto del recuerdo a pantalla completa. Toca para cerrar. */
+  var capaFoto = null;
+  var capaFotoUrl = null;
+
+  function abrirFotoFull(clave) {
+    if (!window.Archivos) return;
+    cerrarFotoFull();
+    capaFoto = document.createElement('div');
+    capaFoto.className = 'foto-full';
+    capaFoto.innerHTML = '<img alt="Foto del concierto">' +
+      '<button type="button" class="foto-full__cerrar" aria-label="Cerrar">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+    document.body.appendChild(capaFoto);
+    window.Archivos.url(clave).then(function (u) {
+      if (!capaFoto) { if (u) URL.revokeObjectURL(u); return; }
+      capaFotoUrl = u;
+      capaFoto.querySelector('img').src = u;
+    });
+    capaFoto.addEventListener('click', cerrarFotoFull);
+    document.addEventListener('keydown', cerrarFotoFullEsc);
+    void capaFoto.offsetHeight;
+    capaFoto.classList.add('is-abierta');
+  }
+  function cerrarFotoFullEsc(e) { if (e.key === 'Escape') cerrarFotoFull(); }
+  function cerrarFotoFull() {
+    document.removeEventListener('keydown', cerrarFotoFullEsc);
+    if (capaFotoUrl) { try { URL.revokeObjectURL(capaFotoUrl); } catch (e) {} capaFotoUrl = null; }
+    var c = capaFoto;
+    capaFoto = null;
+    if (!c) return;
+    c.classList.remove('is-abierta');
+    setTimeout(function () { if (c.parentNode) c.parentNode.removeChild(c); }, 220);
+  }
+
+  // Reordenar arrastrando el asa. Filas de altura uniforme (CSS).
+  // Los listeners de move/up van en `document` para que el arrastre no se
+  // "pierda" si el dedo se sale de la lista.
+  function activarDragPrograma(ul, onReorder) {
+    var drag = null;
+
+    function mover(ev) {
+      if (!drag) return;
+      ev.preventDefault();
+      var y = (ev.touches && ev.touches[0] ? ev.touches[0].clientY : ev.clientY);
+      var dy = y - drag.startY;
+      drag.li.style.transform = 'translateY(' + dy + 'px)';
+      var to = Math.max(0, Math.min(drag.lis.length - 1, drag.from + Math.round(dy / drag.h)));
+      if (to === drag.to) return;
+      drag.to = to;
+      drag.lis.forEach(function (el, i) {
+        if (el === drag.li) return;
+        var shift = 0;
+        if (drag.from < to && i > drag.from && i <= to) shift = -drag.h;
+        else if (drag.from > to && i < drag.from && i >= to) shift = drag.h;
+        el.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+      });
+    }
+
+    function fin() {
+      if (!drag) return;
+      var d = drag;
+      drag = null;
+      document.removeEventListener('pointermove', mover, true);
+      document.removeEventListener('pointerup', fin, true);
+      document.removeEventListener('pointercancel', fin, true);
+      d.lis.forEach(function (el) { el.style.transform = ''; el.classList.remove('is-drag'); });
+      document.body.classList.remove('reordenando');
+      if (d.from !== d.to) onReorder(d.from, d.to);
+    }
+
+    ul.addEventListener('pointerdown', function (ev) {
+      if (ev.button) return;
+      var h = ev.target.closest('[data-handle]');
+      if (!h) return;
+      var li = h.closest('.programa__it');
+      var lis = Array.prototype.slice.call(ul.querySelectorAll('.programa__it'));
+      var from = lis.indexOf(li);
+      if (from < 0) return;
+      ev.preventDefault();
+      drag = {
+        li: li, lis: lis, from: from, to: from,
+        h: li.getBoundingClientRect().height,
+        startY: (ev.touches && ev.touches[0] ? ev.touches[0].clientY : ev.clientY),
+      };
+      li.classList.add('is-drag');
+      document.body.classList.add('reordenando');
+      document.addEventListener('pointermove', mover, true);
+      document.addEventListener('pointerup', fin, true);
+      document.addEventListener('pointercancel', fin, true);
+    });
+  }
+
+  function hoyISO() {
+    if (window.Conciertos && window.Conciertos.hoyISO) return window.Conciertos.hoyISO();
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var dia = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + dia;
+  }
+
+  // Reprograma las notificaciones locales (incluye ya los conciertos).
+  function reprogramarAvisos() {
+    if (window.Avisos && window.Avisos.iniciar) {
+      try { window.Avisos.iniciar(); } catch (e) {}
+    }
   }
 
   /* ----------------------------------------------------------
@@ -55,10 +946,12 @@ window.Pagina_practice = (function () {
      ---------------------------------------------------------- */
 
   var hojaResumen = null;
+  var urlsResumen = [];   // object URLs de fotos que hay que revocar al cerrar
 
   function abrirResumenDia(iso) {
     if (!window.Diario) return;
     var r = window.Diario.resumenDia(iso);
+    var concierto = window.Conciertos ? window.Conciertos.porFecha(iso) : null;
     cerrarResumen();
 
     hojaResumen = document.createElement('div');
@@ -79,8 +972,64 @@ window.Pagina_practice = (function () {
     document.body.appendChild(hojaResumen);
 
     var cuerpo = hojaResumen.querySelector('[data-cuerpo]');
-    cuerpo.innerHTML = r.hayAlgo ? cuerpoResumen(r) :
-      '<p class="resumen__vacio">Ese día no quedó registrada ninguna actividad en la app.</p>';
+    var html = concierto ? bloqueConcierto(concierto) : '';
+    if (r.hayAlgo) html += cuerpoResumen(r);
+    else if (!concierto) {
+      html = '<p class="resumen__vacio">Ese día no quedó registrada ninguna actividad en la app.</p>';
+    }
+    cuerpo.innerHTML = html;
+
+    var elEditarC = cuerpo.querySelector('[data-editar-concierto]');
+    if (elEditarC && concierto) {
+      elEditarC.addEventListener('click', function () {
+        cerrarResumen();
+        abrirFormConcierto(concierto);
+      });
+    }
+
+    // Programa del concierto: editar y estudiar en orden.
+    var elEditProg = cuerpo.querySelector('[data-editar-programa]');
+    if (elEditProg && concierto) {
+      elEditProg.addEventListener('click', function () {
+        cerrarResumen();
+        abrirPrograma(concierto);
+      });
+    }
+    var elEstudiarProg = cuerpo.querySelector('[data-estudiar-programa]');
+    if (elEstudiarProg && concierto) {
+      elEstudiarProg.addEventListener('click', function () {
+        var prog = window.Conciertos.programaDe(concierto.id);
+        if (!prog.length) return;
+        var sig = prog.filter(function (s) { return s.estado !== 'aprendida'; })[0] || prog[0];
+        cerrarResumen();
+        irACancion(sig.id);
+      });
+    }
+    Array.prototype.forEach.call(cuerpo.querySelectorAll('[data-ir-cancion]'), function (el) {
+      el.addEventListener('click', function () {
+        cerrarResumen();
+        irACancion(el.getAttribute('data-ir-cancion'));
+      });
+    });
+
+    // Recuerdo del concierto: editar y ver la foto.
+    var elEditRec = cuerpo.querySelector('[data-editar-recuerdo]');
+    if (elEditRec && concierto) {
+      elEditRec.addEventListener('click', function () {
+        cerrarResumen();
+        abrirRecuerdo(concierto);
+      });
+    }
+    Array.prototype.forEach.call(cuerpo.querySelectorAll('[data-ver-foto]'), function (b) {
+      b.addEventListener('click', function () { abrirFotoFull(b.getAttribute('data-ver-foto')); });
+    });
+    // Cargar las miniaturas de foto (blob -> object URL).
+    Array.prototype.forEach.call(cuerpo.querySelectorAll('[data-foto-async]'), function (img) {
+      if (!window.Archivos) return;
+      window.Archivos.url(img.getAttribute('data-foto-async')).then(function (u) {
+        if (u) { img.src = u; urlsResumen.push(u); }
+      }).catch(function () {});
+    });
 
     Array.prototype.forEach.call(hojaResumen.querySelectorAll('[data-cerrar]'), function (el) {
       el.addEventListener('click', cerrarResumen);
@@ -100,6 +1049,96 @@ window.Pagina_practice = (function () {
 
     void hojaResumen.offsetHeight;
     hojaResumen.classList.add('is-abierta');
+  }
+
+  // Bloque destacado con los datos del concierto de ese día + su programa.
+  function bloqueConcierto(c) {
+    var lineas = [];
+    if (c.hora) lineas.push(item('Hora: ' + c.hora));
+    if (c.lugar) lineas.push(item('Lugar: ' + c.lugar));
+    if (c.notas) lineas.push(item(c.notas));
+    if (!lineas.length) lineas.push(item('Sin detalles. Toca «Editar» para añadirlos.'));
+
+    var prog = window.Conciertos && window.Conciertos.programaDe
+      ? window.Conciertos.programaDe(c.id) : [];
+    var faltan = prog.filter(function (s) { return s.estado !== 'aprendida'; }).length;
+
+    var check = '<svg class="prog-mini__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>';
+
+    var bloqueProg;
+    if (prog.length) {
+      bloqueProg =
+        '<div class="prog-mini">' +
+          '<div class="prog-mini__cab">' +
+            '<span>Programa · ' + prog.length + (prog.length === 1 ? ' canción' : ' canciones') + '</span>' +
+            (faltan > 0
+              ? '<span class="prog-mini__faltan">' + faltan + ' por aprender</span>'
+              : '<span class="prog-mini__ok">Todas aprendidas</span>') +
+          '</div>' +
+          '<ol class="prog-mini__lista">' +
+            prog.map(function (s) {
+              return '<li class="prog-mini__it' + (s.estado === 'aprendida' ? ' is-ok' : '') + '" ' +
+                'data-ir-cancion="' + s.id + '">' +
+                '<span class="prog-mini__tit">' + escapar(s.titulo) + '</span>' +
+                (s.estado === 'aprendida' ? check : '') +
+              '</li>';
+            }).join('') +
+          '</ol>' +
+          '<div class="prog-mini__acciones">' +
+            '<button type="button" class="btn btn--primario prog-mini__estudiar" data-estudiar-programa>Estudiar el programa</button>' +
+            '<button type="button" class="btn btn--texto" data-editar-programa>Editar</button>' +
+          '</div>' +
+        '</div>';
+    } else {
+      bloqueProg =
+        '<button type="button" class="prog-mini__crear" data-editar-programa>' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>' +
+          'Crear el programa' +
+        '</button>';
+    }
+
+    // Recuerdo (foto + nota de "cómo fue"), solo para conciertos ya pasados.
+    var bloqueRec = '';
+    if (window.Conciertos.recuerdoDe && c.fecha <= window.Conciertos.hoyISO()) {
+      var rec = window.Conciertos.recuerdoDe(c.id);
+      var claveF = window.Conciertos.claveFoto(c.id);
+      if (rec.nota || rec.foto) {
+        bloqueRec =
+          '<div class="recuerdo-mini">' +
+            '<span class="recuerdo-mini__cab">El recuerdo</span>' +
+            (rec.foto
+              ? '<button type="button" class="recuerdo-mini__foto" data-ver-foto="' + escapar(claveF) + '">' +
+                  '<img data-foto-async="' + escapar(claveF) + '" alt="Foto del concierto">' +
+                '</button>'
+              : '') +
+            (rec.nota ? '<p class="recuerdo-mini__nota">' + escapar(rec.nota) + '</p>' : '') +
+            '<button type="button" class="btn btn--texto" data-editar-recuerdo>Editar el recuerdo</button>' +
+          '</div>';
+      } else {
+        bloqueRec =
+          '<button type="button" class="recuerdo-mini__crear" data-editar-recuerdo>' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="3.5"/></svg>' +
+            'Añadir un recuerdo del concierto' +
+          '</button>';
+      }
+    }
+
+    return '<section class="resumen__bloque resumen__bloque--concierto">' +
+      '<h3 class="resumen__tit">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' +
+        '<span>Concierto de Bihotsak</span>' +
+      '</h3>' +
+      '<ul class="resumen__lista">' + lineas.join('') + '</ul>' +
+      bloqueProg +
+      bloqueRec +
+      '<button type="button" class="resumen__ir" data-editar-concierto>Editar concierto' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>' +
+      '</button>' +
+    '</section>';
   }
 
   function cuerpoResumen(r) {
@@ -182,6 +1221,8 @@ window.Pagina_practice = (function () {
 
   function cerrarResumen() {
     document.removeEventListener('keydown', cerrarResumenEsc);
+    urlsResumen.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
+    urlsResumen = [];
     var h = hojaResumen;
     hojaResumen = null;
     if (!h) return;
@@ -316,5 +1357,19 @@ window.Pagina_practice = (function () {
     });
   }
 
-  return { iniciar: iniciar };
+  // Cierra cualquier hoja de concierto abierta (la usa la pantalla
+  // Conciertos al salir, ya que sus hojas viven en este módulo).
+  function cerrarHojasConcierto() {
+    cerrarResumen(); cerrarFormConcierto(); cerrarPrograma();
+    cerrarRecuerdo(); cerrarFotoFull();
+  }
+
+  return {
+    iniciar: iniciar,
+    enfocarLogro: enfocarLogro,
+    // API para la pantalla Conciertos: abre las hojas sin salir de ella.
+    abrirConciertoDia: abrirResumenDia,
+    abrirNuevoConcierto: function () { abrirFormConcierto(null); },
+    cerrarHojasConcierto: cerrarHojasConcierto,
+  };
 })();

@@ -51,9 +51,13 @@ window.Reproductor = (function () {
       pause: function () { acciones.alternar(); },
       seekbackward: function (d) { acciones.retroceder((d && d.seekOffset) || 5); },
       seekforward: function (d) { acciones.adelantar((d && d.seekOffset) || 5); },
-      previoustrack: function () { acciones.retroceder(5); },
-      nexttrack: function () { acciones.adelantar(5); },
       seekto: function (d) { if (d && typeof d.seekTime === 'number') acciones.irA(d.seekTime); },
+      // OJO: NO registramos previoustrack/nexttrack. En el reproductor de
+      // Android (notificación / pantalla de bloqueo) esos handlers pintan los
+      // iconos de "canción anterior / siguiente", que aquí no tienen sentido:
+      // no hay lista de reproducción, solo una canción que se estudia. Al dejar
+      // solo seek(backward|forward) Android muestra los botones de retroceder /
+      // adelantar 5 s, que es justo lo que Maite necesita.
     };
     var acis = Object.keys(manejadores);
 

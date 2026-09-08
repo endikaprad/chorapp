@@ -42,6 +42,20 @@ window.Push = (function () {
     var PN = plugin();
     if (!esNativo() || !PN) return;
 
+    // Las push con la app cerrada las pinta Android por su cuenta usando el
+    // canal que indique el mensaje (channel_id: "chorapp", ver worker). Nos
+    // aseguramos de que ese canal exista: sin sonido, con vibración.
+    if (window.Avisos && window.Avisos.crearCanal) {
+      try { window.Avisos.crearCanal(); } catch (e) {}
+    } else if (PN.createChannel) {
+      PN.createChannel({
+        id: 'chorapp', name: 'ChorApp',
+        description: 'Recordatorios y avisos de ChorApp',
+        importance: 3, visibility: 1,
+        sound: 'silencio', vibration: true, lights: true, lightColor: '#1512D6'
+      }).catch(function () {});
+    }
+
     // La URL de la base de datos vive en el mismo sitio que para
     // control-remoto.js. Si no está configurada, no hacemos nada.
     fetch('data/control.json')

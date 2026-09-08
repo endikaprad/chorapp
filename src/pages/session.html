@@ -56,10 +56,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M12 5v14M5 12h14"/>
     </svg>
-    Marcar canción aquí
+    Marcar ensayo aquí
   </button>
 
-  <h3 class="seccion-titulo">Canciones de esta sesión</h3>
+  <h3 class="seccion-titulo">Ensayos de esta sesión</h3>
   <div class="marcas-lista" data-marcas-lista></div>
 
   <!-- Hoja: crear / editar una marca (= una canción de esta sesión) -->
@@ -67,7 +67,7 @@
     <div class="hoja__fondo" data-cerrar></div>
     <form class="hoja__panel" data-form-marca novalidate>
       <div class="hoja__asa" aria-hidden="true"></div>
-      <h2 class="hoja__titulo" data-marca-titulo>Marcar canción</h2>
+      <h2 class="hoja__titulo" data-marca-titulo>Marcar ensayo</h2>
 
       <!-- Reproductor a mano: adelantar el ensayo sin cerrar la hoja -->
       <div class="hoja-repro" data-hoja-repro hidden>
@@ -157,21 +157,55 @@
         </label>
 
         <label class="campo">
-          <span class="campo__label">Letra <span class="campo__opcional">(texto, opcional)</span></span>
-          <textarea name="letraTexto" rows="4" maxlength="8000" placeholder="Pega o escribe aquí la letra"></textarea>
+          <span class="campo__label">Idioma <span class="campo__opcional">(opcional)</span></span>
+          <select name="idioma" class="campo__select">
+            <option value="">Sin especificar</option>
+            <option value="es">Español</option>
+            <option value="eu">Euskera</option>
+            <option value="la">Latín</option>
+            <option value="de">Alemán</option>
+            <option value="en">Inglés</option>
+            <option value="fr">Francés</option>
+            <option value="it">Italiano</option>
+            <option value="pt">Portugués</option>
+            <option value="ca">Catalán</option>
+            <option value="otro">Otro</option>
+          </select>
         </label>
 
-        <div class="campo">
-          <span class="campo__label">Archivos <span class="campo__opcional">(opcional)</span></span>
+        <div class="campo campo--grupo">
+          <span class="campo__label">La letra <span class="campo__opcional">(opcional)</span></span>
+          <p class="campo__ayuda">Rellena solo lo que quieras: texto, o un PDF/imagen. Aparecerá en el modo estudio, donde también se puede traducir sola.</p>
 
-        <div class="archivo-fila" data-fila="letra">
-          <svg class="archivo-fila__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v5h5"/><path d="M6 3h9l5 5v13H6z"/><path d="M9 13h6M9 17h6"/></svg>
-          <span class="archivo-fila__txt" data-nombre="letra">Letra (PDF, imagen o texto)</span>
-          <label class="archivo-fila__accion">Añadir
-            <input type="file" accept="application/pdf,.pdf,image/*,text/plain,.txt" data-input="letra" hidden />
+          <label class="campo__sub">
+            <span class="campo__sub-lbl">Letra original</span>
+            <textarea name="letraTexto" rows="4" maxlength="8000" placeholder="Pega o escribe aquí la letra tal cual se canta"></textarea>
           </label>
-          <button type="button" class="archivo-fila__quitar" data-quitar="letra" hidden>Quitar</button>
+          <div class="archivo-fila" data-fila="letra">
+            <svg class="archivo-fila__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v5h5"/><path d="M6 3h9l5 5v13H6z"/><path d="M9 13h6M9 17h6"/></svg>
+            <span class="archivo-fila__txt" data-nombre="letra">Letra (PDF, imagen o texto)</span>
+            <label class="archivo-fila__accion">Añadir
+              <input type="file" accept="application/pdf,.pdf,image/*,text/plain,.txt" data-input="letra" hidden />
+            </label>
+            <button type="button" class="archivo-fila__quitar" data-quitar="letra" hidden>Quitar</button>
+          </div>
+
+          <label class="campo__sub">
+            <span class="campo__sub-lbl">Cómo se pronuncia</span>
+            <textarea name="letraFonetica" rows="4" maxlength="8000" placeholder="Cómo suena, línea a línea igual que la letra original"></textarea>
+          </label>
+          <div class="archivo-fila" data-fila="fonetica">
+            <svg class="archivo-fila__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v5h5"/><path d="M6 3h9l5 5v13H6z"/><path d="M9 13h6M9 17h6"/></svg>
+            <span class="archivo-fila__txt" data-nombre="fonetica">Cómo se pronuncia (PDF o imagen)</span>
+            <label class="archivo-fila__accion">Añadir
+              <input type="file" accept="application/pdf,.pdf,image/*,text/plain,.txt" data-input="fonetica" hidden />
+            </label>
+            <button type="button" class="archivo-fila__quitar" data-quitar="fonetica" hidden>Quitar</button>
+          </div>
         </div>
+
+        <div class="campo">
+          <span class="campo__label">Partitura <span class="campo__opcional">(opcional)</span></span>
 
         <div class="archivo-fila" data-fila="partitura">
           <svg class="archivo-fila__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m3 15 5-5 4 4 3-3 6 6"/><circle cx="8.5" cy="9" r="1.5"/></svg>

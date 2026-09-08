@@ -12,7 +12,7 @@
 window.Pagina_session = (function () {
   'use strict';
 
-  var TIPOS_ARCHIVO = ['letra', 'partitura'];
+  var TIPOS_ARCHIVO = ['letra', 'fonetica', 'partitura'];
 
   var cont, sesion, obs, vistaSub;
   var tiempoActual = 0, duracionAudio = 0;
@@ -46,6 +46,8 @@ window.Pagina_session = (function () {
         extra: { fecha: sesion.fecha },
       });
     }
+
+    if (window.Selector) window.Selector.mejorarTodos(hoja);
 
     pintarCabecera();
     montarAudio();
@@ -280,7 +282,7 @@ window.Pagina_session = (function () {
     var marcas = (sesion.marcas || []).slice().sort(function (a, b) { return a.segundo - b.segundo; });
     if (!marcas.length) {
       caja.innerHTML = '<p class="visor-vacio">Mientras suena el ensayo, pulsa ' +
-        '<strong>“Marcar canción aquí”</strong> cada vez que empiece una canción.</p>';
+        '<strong>“Marcar ensayo aquí”</strong> cada vez que empiece una pieza.</p>';
       pintarTicks();
       return;
     }
@@ -339,11 +341,13 @@ window.Pagina_session = (function () {
 
     var cancion = (m && m.cancionId) ? window.Canciones.obtener(m.cancionId) : null;
 
-    hq('[data-marca-titulo]').textContent = m ? 'Editar canción' : 'Marcar canción';
+    hq('[data-marca-titulo]').textContent = m ? 'Editar ensayo' : 'Marcar ensayo';
     form.titulo.value = cancion ? cancion.titulo : (m ? m.titulo : '');
     form.compositor.value = cancion ? (cancion.compositor || '') : '';
     form.nota.value = m ? (m.nota || '') : '';
+    form.idioma.value = cancion ? (cancion.idioma || '') : '';
     form.letraTexto.value = cancion ? (cancion.letraTexto || '') : '';
+    form.letraFonetica.value = cancion ? (cancion.letraFonetica || '') : '';
 
     TIPOS_ARCHIVO.forEach(function (tipo) {
       var meta = cancion && cancion.archivos ? cancion.archivos[tipo] : null;
@@ -364,6 +368,9 @@ window.Pagina_session = (function () {
 
     hq('[data-borrar-marca]').hidden = !m;
     pintarTiemposHoja();
+
+    // Mientras la hoja está en pantalla, esconde el mini reproductor flotante.
+    if (window.CancionActiva) window.CancionActiva.fijarOculta(true);
 
     hoja.hidden = false;
     void hoja.offsetHeight;
@@ -437,7 +444,9 @@ window.Pagina_session = (function () {
     if (c) {
       form.titulo.value = c.titulo;
       form.compositor.value = c.compositor || '';
+      form.idioma.value = c.idioma || '';
       form.letraTexto.value = c.letraTexto || '';
+      form.letraFonetica.value = c.letraFonetica || '';
     }
     sincronizarSel('elegida');
   }
@@ -447,7 +456,9 @@ window.Pagina_session = (function () {
     selModoNueva = true;
     form.titulo.value = nombre || hq('[data-sel-input]').value.trim();
     form.compositor.value = '';
+    form.idioma.value = '';
     form.letraTexto.value = '';
+    form.letraFonetica.value = '';
     TIPOS_ARCHIVO.forEach(function (tipo) { pintarFilaArchivo(tipo, null); });
     archivosPendientes = {};
     sincronizarSel('nueva');
@@ -476,6 +487,7 @@ window.Pagina_session = (function () {
 
   var ETIQUETA_BASE = {
     letra: 'Letra (PDF, imagen o texto)',
+    fonetica: 'Cómo se pronuncia (PDF o imagen)',
     partitura: 'Partitura (imagen o PDF)',
   };
 
@@ -526,7 +538,9 @@ window.Pagina_session = (function () {
       cancion = window.Canciones.crear({
         titulo: titulo,
         compositor: form.compositor.value,
+        idioma: form.idioma.value,
         letraTexto: form.letraTexto.value,
+        letraFonetica: form.letraFonetica.value,
       });
     }
     var cancionId = cancion.id;
@@ -586,6 +600,7 @@ window.Pagina_session = (function () {
   }
 
   function cerrarHoja() {
+    if (window.CancionActiva) window.CancionActiva.fijarOculta(false);
     hoja.classList.remove('is-abierta');
     var cerrar = function () { hoja.hidden = true; hoja.removeEventListener('transitionend', cerrar); };
     hoja.addEventListener('transitionend', cerrar);

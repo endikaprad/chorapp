@@ -75,6 +75,39 @@ createServer(async (req, res) => {
     return;
   }
 
+  // Proxy solo-desarrollo para la traducción automática de letras. En el APK
+  // la app llama a translate.googleapis.com directamente (CapacitorHttp evita
+  // CORS); aquí hacemos de puente para poder probarlo en el navegador.
+  if (url.pathname === '/api/traducir') {
+    const q = url.searchParams.get('q') || '';
+    const sl = url.searchParams.get('sl') || 'auto';
+    const tl = url.searchParams.get('tl') || 'es';
+    const hosts = ['translate.googleapis.com', 'translate.google.com', 'clients5.google.com'];
+    try {
+      let r;
+      for (let i = 0; i < hosts.length; i++) {
+        r = await fetch(
+          'https://' + hosts[i] + '/translate_a/single?client=gtx&dt=t' +
+            '&sl=' + encodeURIComponent(sl) +
+            '&tl=' + encodeURIComponent(tl) +
+            '&q=' + encodeURIComponent(q),
+          { headers: { 'User-Agent': 'Mozilla/5.0' } }
+        );
+        if (r.ok || (r.status !== 429 && r.status < 500)) break;
+      }
+      const cuerpo = await r.text();
+      res.writeHead(r.status, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      res.end(cuerpo);
+    } catch (e) {
+      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('proxy traducir: ' + e.message);
+    }
+    return;
+  }
+
   let archivo = join(base, ruta);
   if (!existsSync(archivo) && !extname(archivo)) archivo = join(base, 'index.html');
 

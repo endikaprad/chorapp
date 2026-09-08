@@ -72,6 +72,19 @@ window.Selector = (function () {
     obs.observe(sel, { childList: true, attributes: true, attributeFilter: ['disabled'] });
     sel.addEventListener('change', function () { pintarValor(inst); });
 
+    // Rellenar un formulario de edición hace `sel.value = '...'` a mano, y eso
+    // NO dispara 'change'. Interceptamos value/selectedIndex para repintar.
+    var proto = Object.getPrototypeOf(sel);
+    ['value', 'selectedIndex'].forEach(function (prop) {
+      var d = Object.getOwnPropertyDescriptor(proto, prop);
+      if (!d || !d.set || !d.get) return;
+      Object.defineProperty(sel, prop, {
+        get: function () { return d.get.call(this); },
+        set: function (v) { d.set.call(this, v); pintarValor(inst); },
+        configurable: true,
+      });
+    });
+
     sincronizar(inst);
   }
 
@@ -89,6 +102,9 @@ window.Selector = (function () {
       li.dataset.idx = i;
       li.addEventListener('click', function (e) {
         e.stopPropagation();
+        // El <select> vive dentro de un <label>: sin esto, el label reenvía
+        // el clic a su control (nuestro botón) y el panel se vuelve a abrir.
+        e.preventDefault();
         sel.selectedIndex = i;
         sel.dispatchEvent(new Event('change', { bubbles: true }));
         cerrar(inst);
@@ -143,5 +159,14 @@ window.Selector = (function () {
     if (e.key === 'Escape' && abierto) { var i = abierto; cerrar(i); i.control.focus(); }
   });
 
-  return { mejorar: mejorar };
+  // Envuelve de golpe todos los <select> de un contenedor (o del documento).
+  function mejorarTodos(raiz) {
+    var ambito = raiz || document;
+    Array.prototype.forEach.call(
+      ambito.querySelectorAll('select.campo__select, select[data-selector]'),
+      mejorar
+    );
+  }
+
+  return { mejorar: mejorar, mejorarTodos: mejorarTodos };
 })();

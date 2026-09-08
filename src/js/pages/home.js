@@ -12,15 +12,25 @@ window.Pagina_home = (function () {
     cargarCoro(raiz);
     pintarFecha(raiz);
     pintarFrase(raiz);
+    pintarConcierto(raiz);
 
     var canciones = window.Canciones ? window.Canciones.listar() : [];
-    var sesiones = window.Sesiones ? window.Sesiones.listar() : [];
+    var sesiones = window.Sesiones ? window.Sesiones.listarVisibles() : [];
     var total = canciones.length;
     var hayContenido = sesiones.length > 0 || total > 0;
 
     contarHasta(raiz.querySelector('[data-num-canciones]'), total);
+    var elCancionesLabel = raiz.querySelector('[data-canciones-label]');
+    if (elCancionesLabel) {
+      elCancionesLabel.textContent = total === 1
+        ? 'canción en tu repertorio'
+        : 'canciones en tu repertorio';
+    }
 
     // Racha de días de estudio (practica.js).
+    if (window.Practica && window.Practica.revisar) {
+      try { window.Practica.revisar(); } catch (e) {}
+    }
     var racha = window.Practica ? window.Practica.racha() : 0;
     var elRacha = raiz.querySelector('[data-num-racha]');
     if (elRacha) contarHasta(elRacha, racha);
@@ -32,6 +42,7 @@ window.Pagina_home = (function () {
     pintarHoy(raiz, hayContenido);
     pintarSemana(raiz);
     pintarRepasar(raiz);
+    mostrarResumenMes();
 
     var card = raiz.querySelector('[data-continuar]');
     var eyebrow = raiz.querySelector('[data-continuar-eyebrow]');
@@ -114,6 +125,85 @@ window.Pagina_home = (function () {
     el.textContent = f.texto;
     el.classList.toggle('frase-dia--especial', !!f.especial);
     el.hidden = false;
+  }
+
+  /* ----------------------------------------------------------
+     Cuenta atrás para el siguiente concierto del coro. Solo
+     aparece si hay uno marcado (hoy o más adelante). Al tocarla
+     lleva al calendario de Práctica.
+     ---------------------------------------------------------- */
+  var MESES_LARGOS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+    'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+  var _timerConcierto = null;
+
+  // Momento exacto del concierto a partir de 'YYYY-MM-DD' + hora ('20:00').
+  // Si no hay hora, se asume las 20:00 (habitual en Bihotsak).
+  function _momentoConcierto(c) {
+    var f = /^(\d{4})-(\d{2})-(\d{2})$/.exec(c.fecha || '');
+    if (!f) return null;
+    var h = /(\d{1,2})[:.hH](\d{2})/.exec(c.hora || '');
+    var hh = h ? parseInt(h[1], 10) : 20;
+    var mm = h ? parseInt(h[2], 10) : 0;
+    return new Date(+f[1], +f[2] - 1, +f[3], hh, mm, 0, 0);
+  }
+
+  function pintarConcierto(raiz) {
+    var btn = raiz.querySelector('[data-concierto]');
+    if (!btn || !window.Conciertos || !window.Conciertos.siguiente) return;
+
+    if (_timerConcierto) { clearInterval(_timerConcierto); _timerConcierto = null; }
+
+    var c = window.Conciertos.siguiente();
+    if (!c) return;
+
+    var elDias = raiz.querySelector('[data-concierto-dias]');
+    var elDet = raiz.querySelector('[data-concierto-detalle]');
+
+    var momento = _momentoConcierto(c);
+
+    // A menos de 24 h (y antes de que termine): cuenta atrás viva de
+    // horas, minutos y segundos, refrescada cada segundo.
+    function tic() {
+      var restante = momento - Date.now();
+      if (!document.body.contains(elDias)) {
+        clearInterval(_timerConcierto); _timerConcierto = null; return;
+      }
+      if (restante <= 0) { elDias.textContent = '¡El concierto es ahora!'; return; }
+      var s = Math.floor(restante / 1000);
+      var hh = Math.floor(s / 3600);
+      var mm = Math.floor((s % 3600) / 60);
+      var ss = s % 60;
+      var partes = [];
+      if (hh) partes.push(hh + ' h');
+      if (hh || mm) partes.push(mm + ' min');
+      partes.push(ss + ' s');
+      elDias.textContent = 'Faltan ' + partes.join(' ') + ' para el concierto';
+    }
+
+    if (momento && momento - Date.now() > 0 && momento - Date.now() < 86400000) {
+      tic();
+      _timerConcierto = setInterval(tic, 1000);
+    } else if (c.dias === 0) elDias.textContent = '¡Hoy hay concierto!';
+    else if (c.dias === 1) elDias.textContent = 'Mañana hay concierto';
+    else elDias.textContent = 'Faltan ' + c.dias + ' días para el concierto';
+
+    var partes = [];
+    var f = /^(\d{4})-(\d{2})-(\d{2})$/.exec(c.fecha);
+    if (f) {
+      var dia = parseInt(f[3], 10);
+      var mes = MESES_LARGOS[parseInt(f[2], 10) - 1];
+      partes.push(dia + ' de ' + mes);
+    }
+    if (c.hora) partes.push(c.hora);
+    if (c.lugar) partes.push(c.lugar);
+    elDet.textContent = partes.join(' · ');
+
+    btn.classList.toggle('cuenta-concierto--hoy', c.dias === 0);
+    btn.addEventListener('click', function () {
+      window.App.ir('conciertos');
+    });
+    btn.hidden = false;
   }
 
   /* ----------------------------------------------------------
@@ -212,6 +302,20 @@ window.Pagina_home = (function () {
       lista.appendChild(btn);
     });
     seccion.hidden = false;
+  }
+
+  /* ----------------------------------------------------------
+     Resumen del mes — hoja que sale sola el día 1 (y hasta el 12)
+     con el balance del mes anterior. Tono cabrón. Se renderiza en
+     resumenmes.js (también se abre desde Práctica).
+     ---------------------------------------------------------- */
+  function mostrarResumenMes() {
+    if (!window.ResumenMes || !window.ResumenMes.pendiente) return;
+    var d;
+    try { d = window.ResumenMes.pendiente(); } catch (e) { d = null; }
+    if (!d) return;
+    window.ResumenMes.abrirHoja(d);
+    window.ResumenMes.marcarVisto(d.anio, d.mes);
   }
 
   /* ----------------------------------------------------------

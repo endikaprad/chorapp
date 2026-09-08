@@ -19,6 +19,9 @@
   --estado-progreso: #C98A2E;
   --estado-pendiente: #9A9490;
 
+  --color-concierto: #17805C;        /* día de concierto: verde jade cálido, no chillón */
+  --color-concierto-suave: #E1F0E9;
+
   /* --- Tipografía --- */
   --fuente-titulo: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --fuente-texto: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -63,6 +66,8 @@
     --estado-aprendida: #7FB98E;
     --estado-progreso: #E0A857;
     --estado-pendiente: #8E877F;
+    --color-concierto: #3FBF93;
+    --color-concierto-suave: #16271F;
     --sombra-sobre-acento: 0 1px 2px rgba(0, 0, 0, 0.35);
   }
 }
@@ -78,6 +83,8 @@
   --estado-aprendida: #7FB98E;
   --estado-progreso: #E0A857;
   --estado-pendiente: #8E877F;
+  --color-concierto: #3FBF93;
+  --color-concierto-suave: #16271F;
   --sombra-sobre-acento: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
@@ -374,6 +381,67 @@ button {
   @keyframes frase-dia-fade { from { opacity: 0; } to { opacity: 1; } }
 }
 
+/* Cuenta atrás para el siguiente concierto (Inicio) */
+.cuenta-concierto {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  text-align: left;
+  margin: -8px 0 22px;
+  padding: 14px 15px;
+  border-radius: 14px;
+  background: var(--color-concierto-suave);
+  border: 1px solid color-mix(in srgb, var(--color-concierto) 40%, var(--color-borde));
+  color: var(--color-texto);
+  transition: transform var(--dur-micro) var(--curva);
+  animation: frase-dia-in 420ms var(--curva) both;
+}
+.cuenta-concierto:active { transform: scale(0.98); }
+.cuenta-concierto__ico {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--color-concierto);
+  color: #fff;
+}
+.cuenta-concierto__ico svg { width: 21px; height: 21px; }
+.cuenta-concierto__cuerpo { flex: 1 1 auto; min-width: 0; }
+.cuenta-concierto__dias {
+  display: block;
+  font-weight: 700;
+  font-size: 1rem;
+  color: color-mix(in srgb, var(--color-concierto) 82%, var(--color-texto));
+}
+.cuenta-concierto__detalle {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--color-texto-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cuenta-concierto__flecha {
+  flex: 0 0 auto;
+  color: var(--color-concierto);
+}
+.cuenta-concierto__flecha svg { width: 17px; height: 17px; display: block; }
+.cuenta-concierto--hoy .cuenta-concierto__ico { animation: cc-late 2.2s var(--curva) infinite; }
+@keyframes cc-late {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-concierto) 45%, transparent); }
+  50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-concierto) 22%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cuenta-concierto { animation: frase-dia-fade 120ms linear both; }
+  .cuenta-concierto:active { transform: none; }
+  .cuenta-concierto--hoy .cuenta-concierto__ico { animation: none; }
+}
+
 .seccion-titulo {
   font-family: var(--fuente-texto);
   font-size: 13px;
@@ -447,6 +515,487 @@ button {
   margin-top: 6px;
   font-size: 13px;
   color: var(--color-texto-2);
+}
+
+/* Racha estilo Duolingo (Práctica) — llama + semana + mensaje.
+   Compacto a propósito: racha y calendario deben verse sin scroll. */
+.racha-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+  padding: 14px 16px 12px;
+  margin-bottom: 12px;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+}
+.racha-hero__llama {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-acento-suave);
+}
+.racha-hero--activa .racha-hero__llama { color: var(--color-acento); }
+.racha-hero--peligro .racha-hero__llama { color: var(--estado-progreso); }
+.racha-hero--apagada .racha-hero__llama { color: var(--color-borde); }
+.racha-hero__fuego {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.racha-hero--activa .racha-hero__fuego {
+  animation: racha-fuego 2.6s var(--curva) infinite;
+  transform-origin: 50% 80%;
+}
+.racha-hero__num {
+  position: relative;
+  font-family: var(--fuente-titulo);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(7, 7, 7, 0.4);
+  transform: translateY(5px);
+}
+/* El número se amolda a las cifras para no salirse del fuego. */
+.racha-hero[data-cifras="2"] .racha-hero__llama { width: 84px; height: 84px; }
+.racha-hero[data-cifras="2"] .racha-hero__num { font-size: 20px; }
+.racha-hero[data-cifras="3"] .racha-hero__llama { width: 92px; height: 92px; }
+.racha-hero[data-cifras="3"] .racha-hero__num { font-size: 17px; transform: translateY(4px); }
+.racha-hero--apagada .racha-hero__num { color: var(--color-texto-2); text-shadow: none; }
+.racha-hero__label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-texto-2);
+}
+.racha-hero__msg {
+  margin-top: 3px;
+  font-size: 14px;
+  color: var(--color-texto);
+}
+.racha-hero__semana {
+  width: 100%;
+  margin: 10px 0 2px;
+}
+.racha-hero__semana.semana { gap: 6px; }
+.racha-hero__semana .semana__punto { width: 26px; height: 26px; }
+.racha-hero__pie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-texto-2);
+}
+.racha-hero__pie > span { position: relative; }
+.racha-hero__pie > span + span::before {
+  content: "";
+  position: absolute;
+  left: -6.5px;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+.racha-hero__escudos { color: var(--color-acento); font-weight: 600; }
+.semana__dia--escudo .semana__punto {
+  background: var(--color-acento-suave);
+  border-color: var(--color-acento);
+  color: var(--color-acento);
+}
+@keyframes racha-fuego {
+  0%, 100% { transform: scale(1) rotate(-1.5deg); }
+  50%      { transform: scale(1.06) rotate(1.5deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .racha-hero--activa .racha-hero__fuego { animation: none; }
+}
+
+/* ============================================================
+   Logros / medallas (Práctica)
+   ============================================================ */
+.logros { margin-top: 22px; }
+.logros__cab {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.logros__cab h2 { margin: 0; }
+.logros__cuenta { font-size: 13px; color: var(--color-texto-2); white-space: nowrap; }
+.logros__barra {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-borde);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.logros__barra i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-acento), var(--color-acento-oscuro));
+  transition: width 600ms var(--curva);
+}
+.logros__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px 8px;
+}
+@media (max-width: 360px) { .logros__grid { grid-template-columns: repeat(3, 1fr); } }
+.logro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--color-texto-2);
+}
+.logro__medalla {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* anillo de progreso para los bloqueados */
+  background: var(--color-borde);
+  transition: transform var(--dur-micro) var(--curva);
+}
+.logro:active .logro__medalla { transform: scale(0.92); }
+.logro__medalla::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--color-superficie);
+}
+.logro__medalla svg {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  color: var(--color-texto-2);
+  opacity: 0.55;
+}
+.logro__titulo { font-size: 11.5px; line-height: 1.25; color: var(--color-texto-2); }
+.logro__prog { font-size: 10.5px; color: var(--color-texto-2); opacity: 0.8; }
+
+/* Desbloqueado */
+.logro--hecho { color: var(--color-texto); }
+.logro--hecho .logro__medalla {
+  background: linear-gradient(150deg, var(--color-acento), var(--color-acento-oscuro));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-acento) 32%, transparent);
+}
+.logro--hecho .logro__medalla::before { background: transparent; }
+.logro--hecho .logro__medalla svg { color: #fff; opacity: 1; }
+.logro--hecho .logro__titulo { color: var(--color-texto); font-weight: 600; }
+.logro--hecho .logro__medalla::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--estado-aprendida);
+  border: 2px solid var(--color-superficie);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 13 4 4L19 7'/%3E%3C/svg%3E");
+  background-size: 11px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.logros__grid .logro { animation: entra-item 260ms var(--curva) both; }
+.logro--nuevo .logro__medalla { animation: cal-sello 420ms var(--curva) both; }
+
+/* Logro al que se ha llegado desde su aviso: latido con halo cobalto. */
+.logro--destacado { animation: logro-destacado 2200ms var(--curva); }
+.logro--destacado .logro__medalla { animation: logro-destacado-medalla 2200ms var(--curva); }
+@keyframes logro-destacado {
+  0%, 100% { transform: scale(1); }
+  12%      { transform: scale(1.08); }
+  30%      { transform: scale(1); }
+}
+@keyframes logro-destacado-medalla {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-acento) 60%, transparent); }
+  15%  { box-shadow: 0 0 0 10px color-mix(in srgb, var(--color-acento) 22%, transparent); }
+  45%  { box-shadow: 0 0 0 16px color-mix(in srgb, var(--color-acento) 0%, transparent); }
+  55%  { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-acento) 55%, transparent); }
+  75%  { box-shadow: 0 0 0 12px color-mix(in srgb, var(--color-acento) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logros__grid .logro,
+  .logro--nuevo .logro__medalla,
+  .logro--destacado,
+  .logro--destacado .logro__medalla { animation: none; }
+  .logros__barra i { transition: none; }
+}
+
+/* Hoja con el detalle de un logro */
+.hoja--logro .hoja__panel { text-align: center; }
+.logro-det__medalla {
+  width: 84px;
+  height: 84px;
+  margin: 4px auto 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(150deg, var(--color-acento), var(--color-acento-oscuro));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--color-acento) 30%, transparent);
+}
+.logro-det__medalla svg { width: 38px; height: 38px; color: #fff; }
+.logro-det__medalla--bloq {
+  background: var(--color-borde);
+  box-shadow: none;
+}
+.logro-det__medalla--bloq svg { color: var(--color-texto-2); opacity: 0.6; }
+.logro-det__pill {
+  display: inline-block;
+  padding: 3px 12px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--estado-aprendida);
+}
+.logro-det__pill--pend { color: var(--color-texto-2); background: var(--color-borde); }
+.logro-det__titulo { font-family: var(--fuente-titulo); font-size: 20px; margin-bottom: 6px; }
+.logro-det__desc { font-size: 14px; color: var(--color-texto-2); margin-bottom: 14px; }
+.logro-det__barra {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-borde);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.logro-det__barra i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-acento), var(--color-acento-oscuro));
+}
+.logro-det__como {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-texto);
+  background: var(--color-acento-suave);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 4px;
+}
+
+/* Aviso estilo Steam al conseguir un logro (esquina inferior) */
+.logro-toasts {
+  position: fixed;
+  right: 14px;
+  left: 14px;
+  bottom: calc(var(--alto-nav) + 14px + env(safe-area-inset-bottom, 0px));
+  z-index: 1200;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+.logro-toast {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: min(340px, 100%);
+  padding: 13px 15px;
+  border: 1px solid color-mix(in srgb, var(--color-acento) 35%, var(--color-borde));
+  text-align: left;
+  font: inherit;
+  border-radius: 16px;
+  color: var(--color-texto);
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--color-acento) 16%, var(--color-superficie)) 0%, var(--color-superficie) 60%);
+  box-shadow:
+    0 14px 34px rgba(7, 7, 7, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 10px 26px -8px color-mix(in srgb, var(--color-acento) 45%, transparent);
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateX(115%) scale(0.96);
+  transition: opacity 240ms var(--curva), transform 260ms var(--curva);
+}
+.logro-toast.is-visible {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  animation: logro-toast-in 560ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+.logro-toast.is-saliendo {
+  animation: logro-toast-out 520ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  pointer-events: none;
+}
+
+/* Resplandor tras la medalla */
+.logro-toast__glow {
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 120px;
+  height: 120px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-acento) 55%, transparent) 0%, transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+}
+.logro-toast.is-visible .logro-toast__glow { animation: logro-glow 1600ms var(--curva) both; }
+
+/* Barrido de brillo diagonal sobre toda la tarjeta */
+.logro-toast__sweep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.22) 48%, rgba(255, 255, 255, 0.05) 56%, transparent 70%);
+  transform: translateX(-120%);
+}
+.logro-toast.is-visible .logro-toast__sweep { animation: logro-sweep 1100ms var(--curva) 160ms both; }
+
+/* Barra de tiempo que se vacía */
+.logro-toast__tiempo {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--color-acento), var(--color-acento-oscuro));
+  opacity: 0.85;
+}
+.logro-toast.is-visible .logro-toast__tiempo { animation: logro-tiempo 4600ms linear 400ms both; }
+
+.logro-toast__medalla {
+  position: relative;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(150deg, var(--color-acento), var(--color-acento-oscuro));
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--color-acento) 45%, transparent);
+}
+.logro-toast.is-visible .logro-toast__medalla { animation: logro-medalla-pop 620ms cubic-bezier(0.22, 1.4, 0.4, 1) 60ms both; }
+.logro-toast__medalla svg { position: relative; width: 23px; height: 23px; }
+/* Anillo giratorio de luz */
+.logro-toast__medalla::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0%, rgba(255, 255, 255, 0.85) 12%, transparent 30%, transparent 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  opacity: 0;
+}
+.logro-toast.is-visible .logro-toast__medalla::before { animation: logro-anillo 1400ms var(--curva) 220ms both; }
+/* Gloss diagonal fijo */
+.logro-toast__medalla::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.4) 0%, transparent 45%);
+}
+
+.logro-toast__txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; position: relative; }
+.logro-toast__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--color-acento-oscuro);
+}
+.logro-toast__eyebrow svg { width: 12px; height: 12px; }
+.logro-toast__titulo {
+  font-family: var(--fuente-titulo);
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes logro-toast-in {
+  0%   { transform: translateX(115%) scale(0.9); }
+  70%  { transform: translateX(-2%) scale(1.02); }
+  100% { transform: translateX(0) scale(1); }
+}
+@keyframes logro-medalla-pop {
+  0%   { transform: scale(0.2) rotate(-25deg); }
+  60%  { transform: scale(1.12) rotate(6deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+@keyframes logro-anillo {
+  0%   { opacity: 0; transform: rotate(0); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: rotate(300deg); }
+}
+@keyframes logro-glow {
+  0%   { opacity: 0; transform: translateY(-50%) scale(0.6); }
+  35%  { opacity: 0.9; }
+  100% { opacity: 0; transform: translateY(-50%) scale(1.15); }
+}
+@keyframes logro-sweep {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+@keyframes logro-tiempo {
+  0%   { transform: scaleX(1); }
+  100% { transform: scaleX(0); }
+}
+/* Salida: pequeño impulso hacia dentro y deslizamiento a la derecha con un
+   punto de desenfoque. La altura la colapsa el JS con una transición aparte
+   para que la pila se cierre con suavidad. */
+@keyframes logro-toast-out {
+  0%   { opacity: 1; transform: translateX(0) scale(1); filter: blur(0); }
+  20%  { opacity: 1; transform: translateX(-10px) scale(1.02); }
+  100% { opacity: 0; transform: translateX(118%) scale(0.9); filter: blur(2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logro-toast,
+  .logro-toast.is-visible { transition: opacity 160ms linear; transform: none; animation: none; }
+  .logro-toast.is-saliendo { transform: none; }
+  .logro-toast__glow,
+  .logro-toast__sweep,
+  .logro-toast__medalla::before { animation: none !important; opacity: 0; }
+  .logro-toast.is-visible .logro-toast__tiempo { animation: logro-tiempo 4600ms linear 400ms both; }
 }
 
 /* Estado de hoy (Inicio) — recordatorio cálido, no dashboard */
@@ -805,6 +1354,90 @@ body.con-barra-repro .fab { --fab-subida: -64px; }
   .fab { transition: background var(--dur-micro) var(--curva); }
 }
 
+/* Menú desplegable del (+): elegir Sesión o Canción suelta */
+.fab-menu {
+  position: fixed;
+  right: max(18px, calc(50% - 240px + 18px));
+  bottom: calc(var(--alto-nav) + env(safe-area-inset-bottom) + 16px);
+  --fab-subida: 0px;
+  transform: translateY(var(--fab-subida));
+  transition: transform 260ms var(--curva);
+  z-index: 25;
+}
+body.con-barra-repro .fab-menu { --fab-subida: -64px; }
+
+/* Dentro del menú, el (+) deja de posicionarse solo */
+.fab-menu .fab {
+  position: static;
+  right: auto;
+  bottom: auto;
+  transform: none;
+  transition: background var(--dur-micro) var(--curva);
+}
+.fab-menu .fab:active { transform: scale(0.9); background: var(--color-acento-oscuro); }
+.fab__mas { transition: transform 240ms var(--curva); }
+.fab-menu.is-abierto .fab__mas { transform: rotate(45deg); }
+
+.fab-menu__acciones {
+  position: absolute;
+  right: 4px;
+  bottom: 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-end;
+}
+.fab-menu__accion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(10px) scale(0.9);
+  transition: opacity 160ms var(--curva), transform 160ms var(--curva);
+  pointer-events: none;
+}
+.fab-menu.is-abierto .fab-menu__accion { opacity: 1; transform: none; pointer-events: auto; }
+.fab-menu.is-abierto .fab-menu__accion:nth-child(1) { transition-delay: 60ms; }
+.fab-menu.is-abierto .fab-menu__accion:nth-child(2) { transition-delay: 20ms; }
+.fab-menu__accion:active .fab-menu__mini { transform: scale(0.92); }
+
+.fab-menu__etiqueta {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 9px;
+  padding: 7px 12px;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.fab-menu__mini {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--color-superficie);
+  color: var(--color-acento);
+  border: 1px solid var(--color-borde);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.16);
+  transition: transform var(--dur-micro) var(--curva);
+}
+.fab-menu__mini svg { width: 22px; height: 22px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fab-menu, .fab-menu .fab, .fab__mas,
+  .fab-menu__accion, .fab-menu__mini { transition: opacity 120ms linear; }
+  .fab-menu__accion { transform: none; }
+  .fab-menu.is-abierto .fab__mas { transform: rotate(45deg); }
+}
+
 /* ============================================================
    Hoja inferior (formulario alta / edición)
    ============================================================ */
@@ -862,8 +1495,32 @@ body.con-barra-repro .fab { --fab-subida: -64px; }
   margin-bottom: 7px;
 }
 .campo__opcional { font-weight: 400; }
+
+/* Grupo de campos relacionados (p. ej. las tres vistas de la letra) */
+.campo--grupo {
+  border: 1px solid var(--color-borde);
+  border-radius: 14px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--color-superficie) 55%, transparent);
+}
+.campo__ayuda {
+  margin: -2px 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-texto-2);
+}
+.campo__sub { display: block; margin-bottom: 12px; }
+.campo__sub:last-child { margin-bottom: 0; }
+.campo__sub-lbl {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-texto);
+  margin-bottom: 6px;
+}
 .campo input[type="text"],
-.campo textarea {
+.campo textarea,
+.campo__select {
   width: 100%;
   font: inherit;
   color: var(--color-texto);
@@ -874,8 +1531,10 @@ body.con-barra-repro .fab { --fab-subida: -64px; }
   outline: none;
   transition: border-color var(--dur-micro) var(--curva);
 }
+.campo__select { -webkit-appearance: none; appearance: none; height: 46px; }
 .campo input[type="text"]:focus,
-.campo textarea:focus { border-color: var(--color-acento); }
+.campo textarea:focus,
+.campo__select:focus { border-color: var(--color-acento); }
 .campo textarea { resize: vertical; min-height: 76px; }
 .campo--error { border-color: #b3261e !important; }
 
@@ -1027,6 +1686,112 @@ body.con-barra-repro .fab { --fab-subida: -64px; }
 .estudio__editar:active { transform: scale(0.9); }
 .estudio__cab .chip,
 .estudio__cab .estudio__editar { align-self: center; }
+
+/* Selector de día del ensayo (bajo el título en Modo estudio) */
+.estudio__dia {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-acento);
+  background: var(--color-acento-suave);
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 10px 6px 9px;
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.estudio__dia:active { transform: scale(0.97); }
+/* Etiqueta fija: una sola toma, no hay menú que abrir. */
+.estudio__dia--fijo { cursor: default; }
+.estudio__dia--fijo:active { transform: none; }
+.estudio__dia--fijo .estudio__dia-chevron { display: none; }
+.estudio__dia-ic { display: inline-flex; }
+.estudio__dia-ic svg { width: 15px; height: 15px; }
+.estudio__dia-chevron {
+  width: 12px; height: 12px; opacity: 0.7;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.estudio__dia.is-abierto .estudio__dia-chevron { transform: rotate(180deg); }
+/* Aparece con un fundido suave al entrar en la pieza (solo opacidad,
+   para no pisar el scale del :active). */
+.estudio__dia { animation: aparece-suave 300ms var(--curva) both; }
+@keyframes aparece-suave { from { opacity: 0; } to { opacity: 1; } }
+
+/* Botón "Añadir la canción original" (cuando la pieza solo tiene ensayos) */
+.anadir-orig {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  margin: 4px 0 8px;
+  padding: 13px 14px;
+  color: var(--color-texto);
+  background: var(--color-acento-suave);
+  border: 1px solid color-mix(in srgb, var(--color-acento) 30%, transparent);
+  border-radius: 14px;
+  animation: aparece-suave 300ms var(--curva) both;
+  transition: transform var(--dur-micro) var(--curva), background var(--dur-micro) var(--curva);
+}
+.anadir-orig:active { transform: scale(0.98); }
+.anadir-orig.is-cargando { opacity: 0.6; pointer-events: none; }
+.anadir-orig__ic {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  color: #fff;
+  background: var(--color-acento);
+}
+.anadir-orig__ic svg { width: 19px; height: 19px; }
+.anadir-orig__txt { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.anadir-orig__txt strong { font-size: 1rem; }
+.anadir-orig__txt small { color: var(--color-texto-2); line-height: 1.35; }
+.anadir-orig__mas { flex: none; width: 20px; height: 20px; color: var(--color-acento); }
+@media (prefers-reduced-motion: reduce) {
+  .anadir-orig { transition: none; }
+  .anadir-orig:active { transform: none; }
+}
+
+.menu-dia .menu-estado__op {
+  justify-content: space-between;
+  gap: 14px;
+}
+.menu-dia__f { font-weight: 600; }
+.menu-dia__r { font-size: 12px; color: var(--color-texto-2); flex-shrink: 0; }
+.menu-dia .menu-estado__op.is-actual .menu-dia__f { color: var(--color-acento); }
+/* Entrada escalonada de las versiones al abrir el menú */
+.menu-dia.is-abierto .menu-estado__op { animation: entra-item 240ms var(--curva) both; }
+.menu-dia.is-abierto .menu-estado__op:nth-child(1) { animation-delay: 16ms; }
+.menu-dia.is-abierto .menu-estado__op:nth-child(2) { animation-delay: 44ms; }
+.menu-dia.is-abierto .menu-estado__op:nth-child(3) { animation-delay: 72ms; }
+.menu-dia.is-abierto .menu-estado__op:nth-child(4) { animation-delay: 100ms; }
+.menu-dia.is-abierto .menu-estado__op:nth-child(5) { animation-delay: 128ms; }
+.menu-dia.is-abierto .menu-estado__op:nth-child(n+6) { animation-delay: 150ms; }
+
+/* Pie de "Ensayos de esta pieza" en la ficha de la canción */
+.song-ensayos__pie {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--color-texto-2);
+  animation: aparece-suave 420ms var(--curva) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .estudio__dia,
+  .menu-dia.is-abierto .menu-estado__op,
+  .song-ensayos__pie { animation: none; }
+  .estudio__dia-chevron { transition: none; }
+}
 
 /* Reproductor */
 .player {
@@ -1249,6 +2014,41 @@ body.con-barra-repro .fab { --fab-subida: -64px; }
   font-size: 14px;
   padding: 4px 2px;
 }
+/* Botón "Añadir" dentro del estado vacío de Letra / Partitura */
+.visor-vacio__anadir {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 10px 18px 10px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-acento);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--mov-micro, 160ms) var(--mov-curva, ease),
+              background var(--mov-micro, 160ms) var(--mov-curva, ease);
+}
+.visor-vacio__anadir svg { width: 16px; height: 16px; }
+.visor-vacio__anadir:active { transform: scale(0.97); background: var(--color-acento-oscuro); }
+
+/* Resalte momentáneo de la fila de archivo al llegar desde "Añadir" */
+.archivo-fila--foco {
+  animation: filaFoco 1.8s var(--mov-curva, ease);
+  border-radius: var(--radio);
+}
+@keyframes filaFoco {
+  0%, 70% { box-shadow: 0 0 0 2px var(--color-acento); background: var(--color-acento-suave); }
+  100% { box-shadow: 0 0 0 0 transparent; background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .visor-vacio__anadir { transition: none; }
+  .archivo-fila--foco { animation: none; background: var(--color-acento-suave); }
+}
 .visor-letra__texto {
   font-family: var(--fuente-texto);
   font-size: 16px;
@@ -1259,6 +2059,241 @@ body.con-barra-repro .fab { --fab-subida: -64px; }
   border: 1px solid var(--color-borde);
   border-radius: var(--radio);
   padding: 16px;
+}
+
+/* Conmutador Original / Cómo suena / Ambas */
+.visor-letra__modos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.visor-letra__modos button {
+  flex: 1 1 auto;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-texto-2);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  padding: 8px 6px;
+  transition: transform var(--dur-micro) var(--curva), border-color var(--dur-micro) var(--curva), color var(--dur-micro) var(--curva);
+}
+.visor-letra__modos button:active { transform: scale(0.97); }
+.visor-letra__modos button.is-activo {
+  color: var(--color-acento);
+  border-color: var(--color-acento);
+  background: var(--color-acento-suave);
+}
+
+/* Vista "Ambas": cada verso con su fonética debajo */
+.visor-letra__ambas {
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  padding: 16px;
+  font-family: var(--fuente-texto);
+}
+.visor-letra__par { padding: 5px 0; }
+.visor-letra__par + .visor-letra__par { border-top: 1px solid var(--color-borde); }
+.visor-letra__par--vacio { height: 12px; padding: 0; border-top: 0; }
+.visor-letra__linea { display: block; }
+.visor-letra__linea--orig {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-texto);
+}
+.visor-letra__linea--fon {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-acento);
+}
+.visor-letra__linea--trad {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-texto-2);
+  font-style: italic;
+}
+
+/* Botón "Traducir la letra" bajo el visor de letra */
+.visor-letra__accion { margin-top: 10px; }
+.visor-letra__traducir {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-acento);
+  background: var(--color-acento-suave);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 9px 15px;
+  transition: transform var(--dur-micro) var(--curva), opacity var(--dur-micro) var(--curva);
+}
+.visor-letra__traducir svg { width: 16px; height: 16px; }
+.visor-letra__traducir:active { transform: scale(0.96); }
+.visor-letra__traducir:disabled { opacity: 0.6; pointer-events: none; }
+
+/* Fila de archivo dentro del grupo "La letra" de los formularios */
+.campo--grupo .archivo-fila { margin: -2px 0 14px; }
+.campo--grupo .campo__sub { margin-bottom: 6px; }
+
+/* Fila de filtros por idioma (biblioteca) */
+.idioma-filtros {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.idioma-filtros::-webkit-scrollbar { display: none; }
+.idioma-filtros__chip {
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-texto-2);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  padding: 7px 14px;
+  transition: transform var(--dur-micro) var(--curva), border-color var(--dur-micro) var(--curva), color var(--dur-micro) var(--curva);
+}
+.idioma-filtros__chip:active { transform: scale(0.96); }
+.idioma-filtros__chip.is-activo {
+  color: #fff;
+  background: var(--color-acento);
+  border-color: var(--color-acento);
+}
+/* Segunda fila (etiquetas): pega más a la de idioma, chips con almohadilla */
+.idioma-filtros--etiq { padding-top: 0; margin-top: -8px; }
+.idioma-filtros--etiq .idioma-filtros__chip:not(:first-child)::before {
+  content: "#";
+  opacity: 0.5;
+  margin-right: 2px;
+}
+
+/* Editor de etiquetas (hoja de canción) */
+.etiq-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  min-height: 46px;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+}
+.etiq-editor:focus-within { border-color: var(--color-acento); }
+.etiq-editor__input {
+  flex: 1;
+  min-width: 130px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--color-texto);
+  padding: 4px 2px;
+  outline: none;
+}
+.etiq-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-acento);
+  background: var(--color-acento-suave);
+  border-radius: 999px;
+  padding: 4px 4px 4px 11px;
+}
+.etiq-chip button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.etiq-chip button:active { background: color-mix(in srgb, var(--color-acento) 20%, transparent); }
+.etiq-chip svg { width: 11px; height: 11px; }
+.etiq-editor__sug {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.etiq-sug {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-texto-2);
+  background: var(--color-superficie);
+  border: 1px dashed var(--color-borde);
+  border-radius: 999px;
+  padding: 5px 11px 5px 8px;
+  cursor: pointer;
+}
+.etiq-sug:active { transform: scale(0.96); }
+.etiq-sug svg { width: 12px; height: 12px; }
+
+/* Etiquetas en la tarjeta de canción */
+.cancion__etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.cancion__etq {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-texto-2);
+  background: color-mix(in srgb, var(--color-texto-2) 12%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* Filtro de grabaciones por origen (ensayo / canción limpia / voz sola) */
+.grab-filtro {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.grab-filtro::-webkit-scrollbar { display: none; }
+.grab-filtro__chip {
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-texto-2);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 999px;
+  padding: 7px 14px;
+  transition: transform var(--dur-micro) var(--curva), border-color var(--dur-micro) var(--curva), color var(--dur-micro) var(--curva);
+}
+.grab-filtro__chip:active { transform: scale(0.96); }
+.grab-filtro__chip.is-activo {
+  color: #fff;
+  background: var(--color-acento);
+  border-color: var(--color-acento);
+}
+@media (prefers-reduced-motion: reduce) {
+  .grab-filtro__chip:active { transform: none; }
 }
 .visor-doc object {
   width: 100%;
@@ -1816,7 +2851,824 @@ body.sin-scroll { overflow: hidden; }
                          0 0 0 4px var(--color-acento-suave); }
 }
 
+/* Día de concierto: SIEMPRE verde, gana a cualquier otro estado del día
+   (practicado, hoy…). Es el evento importante del día. */
+.cal__dia--concierto,
+.cal__dia--concierto.cal__dia--hecho,
+.cal__dia--concierto.cal__dia--hoy,
+.cal__dia--concierto.cal__dia--hecho.cal__dia--hoy {
+  background: var(--color-concierto);
+  color: #fff;
+  font-weight: 700;
+}
+.cal__dia--concierto {
+  animation: cal-sello 320ms var(--curva) both;
+}
+/* Si además estudió ese día, un anillo azul cobalto fino lo indica (el mismo
+   que los días estudiados) sin robarle el verde al concierto. */
+.cal__dia--concierto.cal__dia--hecho {
+  box-shadow: inset 0 0 0 2px var(--color-acento);
+}
+.cal__dia--concierto.cal__dia--hoy {
+  box-shadow: inset 0 0 0 2px #fff;
+}
+.cal__dia--concierto.cal__dia--hecho.cal__dia--hoy {
+  box-shadow: inset 0 0 0 2px var(--color-acento);
+}
+.cal__dia--abrible.cal__dia--concierto::after { display: none; }
+
+/* Botón "Añadir día de concierto" bajo el calendario */
+.btn-concierto {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 13px 16px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-concierto);
+  background: var(--color-concierto-suave);
+  border: 1px solid color-mix(in srgb, var(--color-concierto) 35%, transparent);
+  border-radius: 12px;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.btn-concierto svg { width: 18px; height: 18px; }
+.btn-concierto:active { transform: scale(0.97); }
+.btn-concierto > span { flex: 1; text-align: left; }
+.btn-concierto__flecha { width: 16px !important; height: 16px !important; opacity: 0.7; }
+@media (prefers-reduced-motion: reduce) {
+  .cal__dia--concierto { animation: none; }
+  .btn-concierto:active { transform: none; }
+}
+
+/* ============================================================
+   Pantalla "Conciertos" — recopilatorio
+   ============================================================ */
+.conc-lista { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.conc-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  padding: 14px;
+  font: inherit;
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  transition: transform var(--dur-micro) var(--curva), border-color var(--dur-micro) var(--curva);
+}
+.conc-card:active { transform: scale(0.985); }
+.conc-card--prox {
+  border-color: color-mix(in srgb, var(--color-concierto) 40%, var(--color-borde));
+}
+.conc-card__fecha {
+  flex-shrink: 0;
+  width: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+  border-radius: 12px;
+  background: var(--color-concierto-suave);
+  color: var(--color-concierto);
+  line-height: 1;
+}
+.conc-card__dia { font-family: var(--fuente-titulo); font-size: 24px; font-weight: 800; }
+.conc-card__mes { font-size: 12px; font-weight: 700; text-transform: uppercase; margin-top: 3px; }
+.conc-card__cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.conc-card__cuenta {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-concierto);
+}
+.conc-card__sem {
+  font-family: var(--fuente-titulo);
+  font-size: 15px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conc-card__meta {
+  font-size: 13px;
+  color: var(--color-texto-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.conc-card__chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.conc-card__chip {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-texto-2);
+  background: color-mix(in srgb, var(--color-texto-2) 12%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.conc-card__chip--rec {
+  color: var(--color-concierto);
+  background: var(--color-concierto-suave);
+}
+.conc-card__foto {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-borde);
+}
+.conc-card__foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.conc-card__flecha { flex-shrink: 0; width: 18px; height: 18px; color: var(--color-texto-2); }
+.conciertos-vista .seccion-titulo:first-child { margin-top: 6px; }
+.conciertos-vista .btn-concierto { color: var(--color-acento); background: var(--color-acento-suave); border-color: color-mix(in srgb, var(--color-acento) 30%, transparent); }
+
+/* Botón "Resumen del mes" (Práctica) */
+.btn-mes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 18px;
+  padding: 14px 16px;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 14px;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.btn-mes > span { flex: 1; }
+.btn-mes svg { width: 20px; height: 20px; color: var(--color-acento); flex-shrink: 0; }
+.btn-mes__flecha { width: 18px !important; height: 18px !important; color: var(--color-texto-2) !important; }
+.btn-mes:active { transform: scale(0.98); }
+@media (prefers-reduced-motion: reduce) { .btn-mes:active { transform: none; } }
+
+/* Hoja "Resumen del mes" */
+.mes__eyebrow {
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-texto-2);
+  margin-bottom: 10px;
+}
+.mes__grande {
+  text-align: center;
+  margin-bottom: 18px;
+}
+.mes__num {
+  display: block;
+  font-family: var(--fuente-titulo);
+  font-size: 52px;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--color-acento);
+}
+.mes__num-label {
+  display: block;
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--color-texto-2);
+}
+.mes__lista {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+.mes__lista li {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 9px 0;
+  font-size: 15px;
+  border-bottom: 1px solid var(--color-borde);
+}
+.mes__lista li:last-child { border-bottom: 0; }
+.mes__lista svg { width: 20px; height: 20px; color: var(--color-acento); flex-shrink: 0; margin-top: 1px; }
+.mes__logros {
+  background: var(--color-acento-suave);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.mes__logros-tit {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-acento-oscuro);
+  margin-bottom: 8px;
+}
+.mes__logros-fila { display: flex; flex-wrap: wrap; gap: 8px; }
+.mes__medalla {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(150deg, var(--color-acento), var(--color-acento-oscuro));
+}
+.mes__medalla svg { width: 20px; height: 20px; }
+.mes__frase {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 4px;
+}
+
+/* Bloque de concierto dentro de la hoja "Resumen del día" */
+.resumen__bloque--concierto {
+  background: var(--color-concierto-suave);
+  border-radius: 14px;
+  padding: 14px 14px 10px;
+}
+.resumen__bloque--concierto .resumen__tit svg { color: var(--color-concierto); }
+.resumen__bloque--concierto .resumen__lista { padding-left: 28px; }
+.resumen__bloque--concierto .resumen__ir { color: var(--color-concierto); }
+
+/* Programa del concierto — mini vista (dentro del resumen del día) */
+.prog-mini {
+  margin: 10px 0 4px;
+  background: var(--color-superficie);
+  border: 1px solid color-mix(in srgb, var(--color-concierto) 22%, var(--color-borde));
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.prog-mini__cab {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-texto-2);
+  margin-bottom: 8px;
+}
+.prog-mini__faltan { color: var(--estado-progreso); white-space: nowrap; }
+.prog-mini__ok { color: var(--color-concierto); white-space: nowrap; }
+.prog-mini__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: prog;
+}
+.prog-mini__it {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-top: 1px solid var(--color-borde);
+  font-size: 15px;
+  color: var(--color-texto);
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--curva);
+}
+.prog-mini__it:first-child { border-top: 0; }
+.prog-mini__it:active { background: var(--color-acento-suave); }
+.prog-mini__it::before {
+  counter-increment: prog;
+  content: counter(prog);
+  flex-shrink: 0;
+  width: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-texto-2);
+  text-align: center;
+}
+.prog-mini__tit { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prog-mini__it.is-ok .prog-mini__tit { color: var(--color-texto-2); }
+.prog-mini__check { width: 16px; height: 16px; color: var(--estado-aprendida); flex-shrink: 0; }
+.prog-mini__acciones { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.prog-mini__estudiar { width: 100%; margin-left: 0 !important; }
+.prog-mini__acciones .btn--texto { align-self: center; }
+.prog-mini__crear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin: 10px 0 4px;
+  padding: 12px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-concierto);
+  background: var(--color-superficie);
+  border: 1px dashed color-mix(in srgb, var(--color-concierto) 45%, transparent);
+  border-radius: 12px;
+}
+.prog-mini__crear svg { width: 18px; height: 18px; }
+
+/* Recuerdo del concierto — mini (dentro del resumen del día) */
+.recuerdo-mini {
+  margin: 10px 0 4px;
+  background: var(--color-superficie);
+  border: 1px solid color-mix(in srgb, var(--color-concierto) 22%, var(--color-borde));
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.recuerdo-mini__cab {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-texto-2);
+  margin-bottom: 8px;
+}
+.recuerdo-mini__foto {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-borde);
+  cursor: zoom-in;
+}
+.recuerdo-mini__foto img {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+}
+.recuerdo-mini__nota {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-texto);
+  white-space: pre-wrap;
+  margin: 10px 0 4px;
+}
+.recuerdo-mini .btn--texto { padding-left: 0; }
+.recuerdo-mini__crear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin: 10px 0 4px;
+  padding: 12px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-concierto);
+  background: var(--color-superficie);
+  border: 1px dashed color-mix(in srgb, var(--color-concierto) 45%, transparent);
+  border-radius: 12px;
+}
+.recuerdo-mini__crear svg { width: 18px; height: 18px; }
+
+/* Recuerdo del concierto — hoja de edición */
+.hoja--recuerdo .hoja__titulo { margin-bottom: 2px; }
+.recuerdo__sub {
+  font-size: 14px;
+  color: var(--color-texto-2);
+  margin-bottom: 14px;
+  text-transform: capitalize;
+}
+.recuerdo__foto {
+  position: relative;
+  margin-bottom: 14px;
+}
+.recuerdo__foto img {
+  display: block;
+  width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+.recuerdo__anadir-foto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 150px;
+  border: 1px dashed var(--color-borde);
+  border-radius: 12px;
+  color: var(--color-texto-2);
+  font-weight: 600;
+  cursor: pointer;
+}
+.recuerdo__anadir-foto svg { width: 30px; height: 30px; }
+.recuerdo__foto-acciones {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 6px;
+}
+.recuerdo__foto-acciones .btn { padding: 6px 10px; }
+
+/* Compartir la canción (Modo estudio) */
+.compartir-cancion { margin-top: 6px; }
+.hoja--compartir .hoja__titulo { margin-bottom: 6px; }
+.comp-cc__nota {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-texto-2);
+  margin-bottom: 16px;
+}
+/* Vista previa del resumen */
+.comp-cc__previa {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid var(--color-borde);
+  background: var(--color-fondo);
+  overflow: hidden;
+  max-height: 220px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+}
+.comp-cc__previa.is-lista { align-items: flex-start; }
+.comp-cc__previa img {
+  width: 100%;
+  height: auto;
+  display: block;
+  -webkit-mask-image: linear-gradient(#000 62%, transparent);
+  mask-image: linear-gradient(#000 62%, transparent);
+}
+.comp-cc__previa-carga {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 22px;
+}
+.comp-cc__previa-carga span {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--color-borde) 25%, var(--color-superficie) 37%, var(--color-borde) 63%);
+  background-size: 400% 100%;
+  animation: comp-shimmer 1.4s var(--curva) infinite;
+}
+.comp-cc__previa-carga span:nth-child(1) { width: 55%; }
+.comp-cc__previa-carga span:nth-child(3) { width: 78%; }
+@keyframes comp-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+.comp-cc__previa-fallo {
+  padding: 26px 18px;
+  font-size: 13.5px;
+  color: var(--color-texto-2);
+  text-align: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .comp-cc__previa-carga span { animation-duration: 0.01ms; }
+}
+
+/* Selector de formato (segmented) */
+.comp-cc__formato {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.comp-cc__seg {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 8px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--color-texto-2);
+  background: var(--color-superficie);
+  border: 1.5px solid var(--color-borde);
+  border-radius: 14px;
+  transition: transform var(--dur-micro) var(--curva),
+              border-color var(--dur-micro) var(--curva),
+              color var(--dur-micro) var(--curva),
+              background var(--dur-micro) var(--curva);
+}
+.comp-cc__seg svg { width: 22px; height: 22px; }
+.comp-cc__seg small { font-weight: 500; font-size: 11.5px; color: var(--color-texto-2); }
+.comp-cc__seg:active { transform: scale(0.97); }
+.comp-cc__seg.is-activo {
+  color: var(--color-acento);
+  border-color: var(--color-acento);
+  background: var(--color-acento-suave);
+}
+.comp-cc__seg.is-activo small { color: var(--color-acento); }
+
+/* Acciones: Compartir / Descargar */
+.comp-cc__acciones { display: flex; gap: 10px; }
+.comp-cc__accion {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 12px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  border-radius: 14px;
+  border: 1.5px solid transparent;
+  transition: transform var(--dur-micro) var(--curva), opacity var(--dur-micro) var(--curva);
+}
+.comp-cc__accion svg { width: 19px; height: 19px; }
+.comp-cc__accion:active { transform: scale(0.97); }
+.comp-cc__accion:disabled { opacity: 0.45; }
+.comp-cc__accion--pri { background: var(--color-acento); color: #fff; }
+.comp-cc__accion--pri:active { background: var(--color-acento-oscuro); }
+.comp-cc__accion--sec {
+  background: var(--color-superficie);
+  color: var(--color-acento);
+  border-color: var(--color-borde);
+}
+@media (prefers-reduced-motion: reduce) {
+  .comp-cc__seg:active, .comp-cc__accion:active { transform: none; }
+}
+.comp-cc__estado {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-texto-2);
+}
+
+/* Mini-tutorial de Modo estudio (coach-marks) */
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  opacity: 0;
+  transition: opacity 200ms var(--curva);
+}
+.tour.is-visible { opacity: 1; }
+.tour__foco {
+  position: fixed;
+  left: 0; top: 0; width: 0; height: 0;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(7, 7, 7, 0.66), 0 0 0 2px var(--color-acento) inset;
+  transition: left 240ms var(--curva), top 240ms var(--curva),
+              width 240ms var(--curva), height 240ms var(--curva);
+  pointer-events: none;
+}
+.tour__globo {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  max-width: 400px;
+  margin: 0 auto;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  padding: 16px 18px;
+  box-shadow: 0 14px 40px rgba(7, 7, 7, 0.3);
+  transition: top 240ms var(--curva);
+}
+.tour__paso {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-acento);
+}
+.tour__titulo { font-family: var(--fuente-titulo); font-size: 17px; margin: 4px 0 6px; }
+.tour__texto { font-size: 14px; line-height: 1.5; color: var(--color-texto-2); }
+.tour__acc {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+.tour__saltar {
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-texto-2);
+  background: none;
+  border: 0;
+  padding: 8px 4px;
+  cursor: pointer;
+}
+.tour__sig { margin-left: 0 !important; padding: 9px 20px; }
+@media (prefers-reduced-motion: reduce) {
+  .tour, .tour__foco, .tour__globo { transition: opacity 120ms linear; }
+}
+
+/* Foto a pantalla completa */
+.foto-full {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(7, 7, 7, 0.92);
+  opacity: 0;
+  transition: opacity 200ms var(--curva);
+}
+.foto-full.is-abierta { opacity: 1; }
+.foto-full img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.foto-full__cerrar {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 12px);
+  right: 12px;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+.foto-full__cerrar svg { width: 20px; height: 20px; }
+
+/* Programa del concierto — hoja de edición (setlist) */
+.hoja--programa .hoja__titulo { margin-bottom: 2px; }
+.programa__sub {
+  font-size: 14px;
+  color: var(--color-texto-2);
+  margin-bottom: 12px;
+  text-transform: capitalize;
+}
+.programa__pista { font-size: 13px; color: var(--color-texto-2); margin-bottom: 12px; }
+.programa__lista {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.programa__vacio {
+  font-size: 14px;
+  color: var(--color-texto-2);
+  text-align: center;
+  padding: 22px 10px;
+  border: 1px dashed var(--color-borde);
+  border-radius: 12px;
+}
+.programa__it {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 4px 0 0;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  touch-action: pan-y;
+}
+.programa__it:not(.is-drag) { transition: transform 160ms var(--curva); }
+.programa__it.is-drag {
+  z-index: 5;
+  position: relative;
+  box-shadow: 0 10px 26px rgba(7, 7, 7, 0.22);
+  border-color: var(--color-acento);
+}
+body.reordenando { cursor: grabbing; user-select: none; }
+.programa__handle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 100%;
+  color: var(--color-texto-2);
+  cursor: grab;
+  touch-action: none;
+}
+.programa__handle svg { width: 20px; height: 20px; }
+.programa__num {
+  flex-shrink: 0;
+  width: 18px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-texto-2);
+  text-align: center;
+}
+.programa__tit {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.programa__comp {
+  font-size: 12px;
+  color: var(--color-texto-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.programa__chip {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.programa__chip--pendiente { color: var(--estado-pendiente); background: color-mix(in srgb, var(--estado-pendiente) 16%, transparent); }
+.programa__chip--progreso { color: var(--estado-progreso); background: color-mix(in srgb, var(--estado-progreso) 16%, transparent); }
+.programa__chip--aprendida { color: var(--estado-aprendida); background: color-mix(in srgb, var(--estado-aprendida) 16%, transparent); }
+.programa__quitar {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--color-texto-2);
+  border-radius: 8px;
+}
+.programa__quitar svg { width: 15px; height: 15px; }
+.programa__quitar:active { background: var(--color-borde); }
+.programa__anadir {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-acento);
+  background: var(--color-acento-suave);
+  border: 0;
+  border-radius: 12px;
+}
+.programa__anadir svg { width: 18px; height: 18px; }
+.programa__picker {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 12px;
+  transition:
+    max-height 300ms var(--curva),
+    opacity 200ms var(--curva),
+    margin-top 300ms var(--curva);
+}
+.programa__picker.is-abierto {
+  margin-top: 8px;
+  opacity: 1;
+  overflow-y: auto;
+  border: 1px solid var(--color-borde);
+}
+.programa__opt {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  padding: 11px 14px;
+  font: inherit;
+  border: 0;
+  border-top: 1px solid var(--color-borde);
+  background: var(--color-superficie);
+  color: var(--color-texto);
+}
+.programa__opt:first-child { border-top: 0; }
+.programa__opt:active { background: var(--color-acento-suave); }
+.programa__opt span { font-size: 12px; color: var(--color-texto-2); }
+/* Cada opción entra escalonada al desplegar la lista */
+.programa__picker.is-abierto .programa__opt {
+  opacity: 0;
+  transform: translateY(-7px);
+  animation: prog-opt-in 240ms var(--curva) forwards;
+  animation-delay: calc(var(--i, 0) * 32ms + 60ms);
+}
+@keyframes prog-opt-in {
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .programa__it:not(.is-drag) { transition: none; }
+  .programa__picker { transition: opacity 120ms linear; }
+  .programa__picker.is-abierto .programa__opt { animation: none; opacity: 1; transform: none; }
+}
+
 .practica .racha { margin-bottom: 16px; }
+/* Compacto: la racha y el calendario deben verse juntos sin scroll. */
+.practica .racha-hero + .seccion-titulo { margin-top: 16px; }
 
 .practica__repasar {
   width: 100%;
@@ -2093,6 +3945,17 @@ body.sin-scroll { overflow: hidden; }
 }
 .grabacion__titulo { font-family: var(--fuente-titulo); font-weight: 600; font-size: 16px; }
 .grabacion__fecha { font-size: 12px; color: var(--color-texto-2); }
+.grabacion__ensayo {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--color-acento);
+  background: var(--color-acento-suave);
+  border-radius: 999px;
+}
 .grabacion__fila { display: flex; align-items: center; gap: 10px; }
 .grabacion__mas {
   margin-top: 12px;
@@ -2264,6 +4127,75 @@ body.sin-scroll { overflow: hidden; }
   border-color: var(--color-acento);
   color: var(--color-acento);
 }
+
+/* Calibración rápida del altavoz, bajo el selector "Escuchando con".
+   Solo visible en modo Altavoz. */
+.escucha-cal {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  margin: -2px 0 14px;
+  border: 1px solid var(--color-borde);
+  border-radius: 16px;
+  background: var(--color-superficie);
+}
+.escucha-cal[hidden] { display: none; }
+.escucha-cal__ico {
+  width: 34px;
+  height: 34px;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex: none;
+}
+.escucha-cal__ico svg { width: 18px; height: 18px; }
+.escucha-cal.is-ok .escucha-cal__ico {
+  color: var(--estado-aprendida);
+  background: color-mix(in srgb, var(--estado-aprendida) 14%, transparent);
+}
+.escucha-cal.is-pend .escucha-cal__ico {
+  color: var(--estado-progreso);
+  background: color-mix(in srgb, var(--estado-progreso) 16%, transparent);
+}
+.escucha-cal__txt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.escucha-cal__tit {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-texto);
+}
+.escucha-cal__sub {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--color-texto-2);
+}
+.escucha-cal__b {
+  margin-top: 10px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-acento);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 140ms var(--curva), background-color 140ms var(--curva);
+}
+.escucha-cal.is-ok .escucha-cal__b {
+  background: var(--color-acento-suave);
+  color: var(--color-acento);
+}
+.escucha-cal__b:active { transform: scale(0.97); }
+.escucha-cal__b:disabled { opacity: 0.55; cursor: default; }
 
 /* ---- Bloque "Grabaciones" del modo estudio ---- */
 .grab-est {
@@ -2533,7 +4465,8 @@ body.sin-scroll { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .escucha__op, .ref-fino__b, .ref-ajuste__cab svg,
   .grabacion__mas-cab svg { transition: none; }
-  .escucha__op:active, .ref-fino__b:active { transform: none; }
+  .escucha__op:active, .ref-fino__b:active,
+  .escucha-cal__b, .escucha-cal__b:active { transform: none; transition: none; }
   .ref-fino__val.is-cambio { animation: none; }
 }
 
@@ -2701,7 +4634,7 @@ body.sin-scroll { overflow: hidden; }
 .celebra--frase .celebra__circulo {
   width: 84px;
   height: 84px;
-  animation: celebra-pop-frase 5200ms var(--curva) both;
+  animation: celebra-pop-frase 4200ms var(--curva) both;
 }
 .celebra--frase .celebra__circulo svg { width: 42px; height: 42px; }
 .celebra__frase {
@@ -2715,17 +4648,17 @@ body.sin-scroll { overflow: hidden; }
   border-radius: 16px;
   padding: 12px 18px;
   box-shadow: 0 12px 40px -12px color-mix(in srgb, var(--estado-aprendida) 55%, transparent);
-  animation: celebra-frase-in 5200ms var(--curva) both;
+  animation: celebra-frase-in 4200ms var(--curva) both;
 }
 @keyframes celebra-pop-frase {
   0%   { opacity: 0; transform: scale(0.5); }
-  4%   { opacity: 1; transform: scale(1.06); }
-  8%, 90% { opacity: 1; transform: scale(1); }
+  5%   { opacity: 1; transform: scale(1.06); }
+  10%, 88% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(1); }
 }
 @keyframes celebra-frase-in {
-  0%, 3%  { opacity: 0; transform: translateY(8px); }
-  8%, 90% { opacity: 1; transform: translateY(0); }
+  0%, 4%  { opacity: 0; transform: translateY(8px); }
+  10%, 88% { opacity: 1; transform: translateY(0); }
   100%    { opacity: 0; transform: translateY(0); }
 }
 
@@ -2742,7 +4675,7 @@ body.sin-scroll { overflow: hidden; }
   .celebra__circulo svg path { animation: none; stroke-dashoffset: 0; }
   @keyframes celebra-pop-simple { 0%,80% { opacity: 1; } 100% { opacity: 0; } }
   .celebra--frase .celebra__circulo,
-  .celebra--frase .celebra__frase { animation: celebra-pop-simple 5000ms linear both; }
+  .celebra--frase .celebra__frase { animation: celebra-pop-simple 4200ms linear both; }
   .celebra--saliendo .celebra__circulo,
   .celebra--saliendo .celebra__frase { animation: celebra-salida 120ms linear forwards; }
 }
@@ -3704,6 +5637,31 @@ body.app-grabando #btn-parar-grabando {
 @keyframes filtro-lista-in {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Salida de un elemento de lista al eliminarlo: colapso de altura + fade.
+   El JS fija max-height al alto real, fuerza reflow y luego lo lleva a 0.
+   `--colapsa-gap` = separación del contenedor (flex gap) a comerse. */
+.item-colapsa {
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(-14px) scale(0.985);
+  padding-top: 0;
+  padding-bottom: 0;
+  border-top-width: 0;
+  border-bottom-width: 0;
+  margin-top: 0;
+  margin-bottom: calc(-1 * var(--colapsa-gap, 0px));
+  transition:
+    opacity 150ms var(--curva),
+    transform 200ms var(--curva),
+    max-height 240ms var(--curva),
+    padding 220ms var(--curva),
+    margin 220ms var(--curva),
+    border-width 220ms var(--curva);
+}
+@media (prefers-reduced-motion: reduce) {
+  .item-colapsa { transition: opacity 110ms linear; transform: none; }
 }
 
 .vacio--filtro { padding: 32px 16px; text-align: center; color: var(--color-texto-2); }

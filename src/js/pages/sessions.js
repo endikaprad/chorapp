@@ -50,15 +50,30 @@ window.Pagina_sessions = (function () {
     formTitulo = raiz.querySelector('[data-form-titulo]');
     btnBorrar = raiz.querySelector('[data-borrar]');
 
-    var fab = raiz.querySelector('[data-nueva]');
-    fab.setAttribute('data-fab-sessions', '');
+    var fabMenu = raiz.querySelector('[data-fab-menu]');
+    var fab = fabMenu.querySelector('[data-nueva]');
+    fabMenu.setAttribute('data-fab-sessions', '');
     // Marca propia: otras páginas también mueven una [data-hoja] al <body>
     // (songs.js, session.js). Sin esto, su limpieza se llevaría la nuestra.
     hoja.setAttribute('data-hoja-sessions', '');
-    document.body.appendChild(fab);
+    document.body.appendChild(fabMenu);
     document.body.appendChild(hoja);
 
-    fab.addEventListener('click', function () { abrirHoja(null); });
+    if (window.Selector) window.Selector.mejorarTodos(hoja);
+
+    fab.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      fabAbierto ? cerrarFabMenu() : abrirFabMenu();
+    });
+    Array.prototype.forEach.call(fabMenu.querySelectorAll('[data-crear]'), function (b) {
+      b.addEventListener('click', function () {
+        var tipo = b.getAttribute('data-crear');
+        cerrarFabMenu();
+        if (tipo === 'cancion') abrirHojaCancion();
+        else abrirHoja(null);
+      });
+    });
+
     btnBorrar.addEventListener('click', onBorrar);
     form.addEventListener('submit', onGuardar);
 
@@ -103,27 +118,59 @@ window.Pagina_sessions = (function () {
     }
   }
 
+  /* ---------- Menú del (+): Sesión o Canción suelta ---------- */
+
+  var fabAbierto = false;
+
+  function fabMenuEl() { return document.querySelector('body > [data-fab-sessions]'); }
+
+  function abrirFabMenu() {
+    var m = fabMenuEl();
+    if (!m) return;
+    fabAbierto = true;
+    m.classList.add('is-abierto');
+    m.querySelector('[data-nueva]').setAttribute('aria-expanded', 'true');
+    setTimeout(function () { document.addEventListener('click', cerrarFabMenu); }, 0);
+  }
+
+  function cerrarFabMenu() {
+    var m = fabMenuEl();
+    if (m) {
+      m.classList.remove('is-abierto');
+      m.querySelector('[data-nueva]').setAttribute('aria-expanded', 'false');
+    }
+    fabAbierto = false;
+    document.removeEventListener('click', cerrarFabMenu);
+  }
+
   function limpiarRestos() {
+    cerrarFabMenu();
     Array.prototype.forEach.call(
       document.querySelectorAll('body > [data-hoja-sessions], body > [data-fab-sessions]'),
       function (el) { el.remove(); }
     );
   }
 
+  /* ---------- Acceso anclado al repertorio ---------- */
+
+  // "Ver el repertorio" aparece en cuanto hay alguna canción.
+  function pintarAccesos() {
+    var hayCanciones = !!(window.Canciones && window.Canciones.listar().length);
+    raiz.querySelector('[data-ir-repertorio]').hidden = !hayCanciones;
+  }
+
   /* ---------- Lista ---------- */
 
   function pintarLista() {
-    var sesiones = window.Sesiones ? window.Sesiones.listar() : [];
-    var repertorio = raiz.querySelector('[data-ir-repertorio]');
+    var sesiones = window.Sesiones ? window.Sesiones.listarVisibles() : [];
+    pintarAccesos();
 
     if (!sesiones.length) {
       filtroRango.hidden = true;
       contenido.innerHTML = vacioInicial();
-      repertorio.hidden = (window.Canciones && window.Canciones.listar().length > 0) ? false : true;
       primeraCarga = false;
       return;
     }
-    repertorio.hidden = false;
 
     // El filtro aparece a partir de 5 sesiones (antes no hace falta).
     filtroRango.hidden = sesiones.length < 5;
@@ -335,8 +382,8 @@ window.Pagina_sessions = (function () {
 
     var nMarcas = (s.marcas || []).length;
     var sub = nMarcas === 0
-      ? 'Sin canciones marcadas todavía'
-      : nMarcas + (nMarcas === 1 ? ' canción marcada' : ' canciones marcadas');
+      ? 'Sin ensayos marcados todavía'
+      : nMarcas + (nMarcas === 1 ? ' ensayo marcado' : ' ensayos marcados');
     if (s.lugar) sub = s.lugar + ' · ' + sub;
 
     btn.innerHTML =
@@ -387,6 +434,9 @@ window.Pagina_sessions = (function () {
     formTitulo.textContent = s ? 'Editar sesión' : 'Nueva sesión';
     btnBorrar.hidden = !s;
 
+    // Mientras la hoja está en pantalla, esconde el mini reproductor flotante.
+    if (window.CancionActiva) window.CancionActiva.fijarOculta(true);
+
     hoja.hidden = false;
     void hoja.offsetHeight;
     hoja.classList.add('is-abierta');
@@ -411,6 +461,7 @@ window.Pagina_sessions = (function () {
   }
 
   function cerrarHoja() {
+    if (window.CancionActiva) window.CancionActiva.fijarOculta(false);
     hoja.classList.remove('is-abierta');
     var cerrar = function () { hoja.hidden = true; hoja.removeEventListener('transitionend', cerrar); };
     hoja.addEventListener('transitionend', cerrar);
@@ -466,6 +517,16 @@ window.Pagina_sessions = (function () {
       window.Sesiones.borrar(id);
       cerrarHoja();
       pintarLista();
+    });
+  }
+
+  /* ---------- Canción suelta (canción del repertorio con su propio MP3) ---------- */
+
+  // Es la misma hoja que en el Repertorio y en el Modo estudio.
+  function abrirHojaCancion() {
+    window.HojaCancion.abrir({
+      id: null,
+      alGuardar: function () { primeraCarga = false; pintarLista(); },
     });
   }
 

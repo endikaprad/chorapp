@@ -1,24 +1,20 @@
 /* ============================================================
    Pagina_songs — Biblioteca de canciones (Fases 3 y 4)
-   Lista + búsqueda + alta / edición / borrado.
-   La hoja de edición incluye letra (texto) e importación de
-   archivos (audio, letra, partitura) a través de window.Archivos.
+   Lista + búsqueda + filtros + selector rápido de estado.
+   El alta / edición usa la hoja compartida window.HojaCancion
+   (el mismo formulario que el (+) de Sesiones y el Modo estudio).
    Al tocar una canción se abre el Modo estudio (Fase 5).
    ============================================================ */
 
 window.Pagina_songs = (function () {
   'use strict';
 
-  var TIPOS_ARCHIVO = ['letra', 'partitura'];
-
-  var raiz, contenido, buscador, inputBuscar, hoja, form, formTitulo, btnBorrar;
-  var idEditando = null;   // null => alta; id => edición
+  var raiz, contenido, buscador, inputBuscar;
   var filtro = '';
+  var filtroIdioma = '';   // '' => todos; código de idioma => solo ese
+  var filtroEtiqueta = ''; // '' => todas; etiqueta => solo canciones con ella
   var primeraCarga = true;
   var pendienteEditar = null;   // id a editar tras navegar desde otra pantalla
-
-  // Cambios de archivo pendientes de guardar: { letra: File|null|'quitar', ... }
-  var archivosPendientes = {};
 
   function iniciar(contenedor) {
     limpiarRestos();
@@ -27,53 +23,21 @@ window.Pagina_songs = (function () {
     contenido = raiz.querySelector('[data-contenido]');
     buscador = raiz.querySelector('[data-buscador]');
     inputBuscar = raiz.querySelector('[data-input-buscar]');
-    hoja = raiz.querySelector('[data-hoja]');
-    form = raiz.querySelector('[data-form]');
-    formTitulo = raiz.querySelector('[data-form-titulo]');
-    btnBorrar = raiz.querySelector('[data-borrar]');
 
     var fab = raiz.querySelector('[data-nueva]');
     // .pantalla se anima con transform y crea un bloque contenedor que
-    // rompe `position: fixed`. Movemos FAB y hoja al <body>.
+    // rompe `position: fixed`. Movemos el FAB al <body>.
     fab.setAttribute('data-fab-songs', '');
-    // Marca propia: otras páginas también mueven una [data-hoja] al <body>.
-    hoja.setAttribute('data-hoja-songs', '');
     document.body.appendChild(fab);
-    document.body.appendChild(hoja);
 
     fab.addEventListener('click', function () { abrirHoja(null); });
-    btnBorrar.addEventListener('click', onBorrar);
-    form.addEventListener('submit', onGuardar);
-
-    // hoja ya se ha movido al <body>: hay que consultarla directamente,
-    // no a través de `raiz` (que ya no la contiene).
-    Array.prototype.forEach.call(hoja.querySelectorAll('[data-cerrar]'), function (el) {
-      el.addEventListener('click', cerrarHoja);
-    });
-
-    // Inputs de archivo de la hoja
-    Array.prototype.forEach.call(form.querySelectorAll('[data-input]'), function (inp) {
-      inp.addEventListener('change', function () {
-        var tipo = inp.getAttribute('data-input');
-        var f = inp.files && inp.files[0];
-        if (f) { archivosPendientes[tipo] = f; pintarFilaArchivo(tipo, f.name); }
-        inp.value = '';
-      });
-    });
-    Array.prototype.forEach.call(form.querySelectorAll('[data-quitar]'), function (btn) {
-      btn.addEventListener('click', function () {
-        var tipo = btn.getAttribute('data-quitar');
-        archivosPendientes[tipo] = 'quitar';
-        pintarFilaArchivo(tipo, null);
-      });
-    });
 
     inputBuscar.addEventListener('input', function () {
       filtro = inputBuscar.value;
       pintarLista();
     });
 
-    // Al salir de la sección, retiramos FAB y hoja del <body>.
+    // Al salir de la sección, retiramos el FAB del <body>.
     var vista = document.getElementById('vista');
     var obs = new MutationObserver(function () {
       if (!document.body.contains(raiz)) {
@@ -87,24 +51,37 @@ window.Pagina_songs = (function () {
     pintarLista();
 
     if (pendienteEditar) {
-      var id = pendienteEditar;
+      var pe = pendienteEditar;
       pendienteEditar = null;
-      abrirHoja(id);
+      abrirHoja(pe.id, pe.foco);
     }
   }
 
   function limpiarRestos() {
     Array.prototype.forEach.call(
-      document.querySelectorAll('body > [data-hoja-songs], body > [data-fab-songs], body > .menu-estado'),
+      document.querySelectorAll('body > [data-fab-songs], body > .menu-estado'),
       function (el) { el.remove(); }
     );
+  }
+
+  /* ---------- Hoja compartida de alta / edición ---------- */
+
+  function abrirHoja(id, foco) {
+    window.HojaCancion.abrir({
+      id: id || null,
+      foco: foco || null,
+      alGuardar: function () { primeraCarga = false; pintarLista(); },
+      alBorrar: function () { primeraCarga = false; pintarLista(); },
+    });
   }
 
   /* ---------- API externa ---------- */
 
   // Llamado desde el Modo estudio para editar la canción abierta.
-  function editar(id) {
-    pendienteEditar = id;
+  // `foco` (opcional): 'letra' | 'partitura' | ... para abrir la hoja
+  // desplazada hasta esa fila de archivo lista para añadirlo.
+  function editar(id, foco) {
+    pendienteEditar = { id: id, foco: foco || null };
     window.App.ir('canciones');
   }
 
@@ -122,18 +99,72 @@ window.Pagina_songs = (function () {
       return;
     }
 
+    // Idiomas presentes en el repertorio (para la fila de filtros).
+    var idiomas = [];
+    todas.forEach(function (c) {
+      if (c.idioma && idiomas.indexOf(c.idioma) === -1) idiomas.push(c.idioma);
+    });
+    if (idiomas.indexOf(filtroIdioma) === -1) filtroIdioma = '';
+    if (filtroIdioma) {
+      visibles = visibles.filter(function (c) { return c.idioma === filtroIdioma; });
+    }
+
+    // Etiquetas presentes en el repertorio.
+    var etiquetas = window.Canciones.etiquetasTodas ? window.Canciones.etiquetasTodas() : [];
+    if (etiquetas.indexOf(filtroEtiqueta) === -1) filtroEtiqueta = '';
+    if (filtroEtiqueta) {
+      visibles = visibles.filter(function (c) {
+        return Array.isArray(c.etiquetas) && c.etiquetas.indexOf(filtroEtiqueta) !== -1;
+      });
+    }
+
+    contenido.innerHTML = '';
+    if (idiomas.length >= 2) contenido.appendChild(filaFiltros('idioma', idiomas));
+    if (etiquetas.length) contenido.appendChild(filaFiltros('etiqueta', etiquetas));
+
     if (visibles.length === 0) {
-      contenido.innerHTML = '<p class="vacio vacio--mini">Ninguna canción coincide con «' +
-        escapar(filtro) + '».</p>';
+      var msg = document.createElement('p');
+      msg.className = 'vacio vacio--mini';
+      msg.textContent = filtro
+        ? 'Ninguna canción coincide con «' + filtro + '».'
+        : (filtroEtiqueta
+            ? 'Ninguna canción con la etiqueta «' + filtroEtiqueta + '»'
+              + (filtroIdioma ? ' en ' + window.Canciones.nombreIdioma(filtroIdioma) : '') + '.'
+            : 'Ninguna canción en ' + window.Canciones.nombreIdioma(filtroIdioma) + '.');
+      contenido.appendChild(msg);
       return;
     }
 
     var lista = document.createElement('div');
     lista.className = 'lista' + (primeraCarga ? ' stagger' : '');
     visibles.forEach(function (c) { lista.appendChild(tarjetaCancion(c)); });
-    contenido.innerHTML = '';
     contenido.appendChild(lista);
     primeraCarga = false;
+  }
+
+  // Fila de filtros (scroll horizontal). tipo: 'idioma' | 'etiqueta'.
+  // "Todos" + un chip por valor.
+  function filaFiltros(tipo, valores) {
+    var esIdioma = tipo === 'idioma';
+    var bar = document.createElement('div');
+    bar.className = 'idioma-filtros' + (esIdioma ? '' : ' idioma-filtros--etiq');
+    [''].concat(valores).forEach(function (v) {
+      var activo = esIdioma ? (v === filtroIdioma) : (v === filtroEtiqueta);
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'idioma-filtros__chip' + (activo ? ' is-activo' : '');
+      b.textContent = v
+        ? (esIdioma ? window.Canciones.nombreIdioma(v) : v)
+        : (esIdioma ? 'Todos' : 'Todas');
+      b.addEventListener('click', function () {
+        if (esIdioma) filtroIdioma = (filtroIdioma === v) ? '' : v;
+        else filtroEtiqueta = (filtroEtiqueta === v) ? '' : v;
+        primeraCarga = false;
+        pintarLista();
+      });
+      bar.appendChild(b);
+    });
+    return bar;
   }
 
   function tarjetaCancion(c) {
@@ -150,12 +181,29 @@ window.Pagina_songs = (function () {
       '<span class="cancion__cuerpo">' +
         '<span class="cancion__texto">' +
           '<span class="cancion__titulo">' + escapar(c.titulo) + '</span>' +
-          (c.compositor ? '<span class="cancion__meta">' + escapar(c.compositor) + '</span>' : '') +
+          (c.compositor || c.idioma
+            ? '<span class="cancion__meta">' +
+                escapar([c.compositor, window.Canciones.nombreIdioma(c.idioma)].filter(Boolean).join(' · ')) +
+              '</span>'
+            : '') +
+          (Array.isArray(c.etiquetas) && c.etiquetas.length
+            ? '<span class="cancion__etiquetas">' + c.etiquetas.slice(0, 4).map(function (e) {
+                return '<span class="cancion__etq">' + escapar(e) + '</span>';
+              }).join('') + '</span>'
+            : '') +
         '</span>' +
         insigniasArchivos(c) +
       '</span>';
     abrir.addEventListener('click', function () {
-      window.App.ir('cancion', { datos: { id: c.id } });
+      // Si hay algo que escuchar (grabación original o algún ensayo), va
+      // directa al Modo estudio; allí se elige la versión. Si aún no tiene
+      // nada, a su ficha para añadir letra/partitura.
+      var hay = window.Sesiones && window.Sesiones.ultimaMarcaDeCancion(c.id);
+      if (hay) {
+        window.App.ir('estudio', { datos: { id: c.id } });
+      } else {
+        window.App.ir('cancion', { datos: { id: c.id } });
+      }
     });
 
     // Chip de estado: ahora es un botón que abre el selector rápido.
@@ -265,135 +313,6 @@ window.Pagina_songs = (function () {
       '</div>';
   }
 
-  /* ---------- Hoja de alta / edición ---------- */
-
-  function abrirHoja(id) {
-    idEditando = id || null;
-    archivosPendientes = {};
-    var c = id ? window.Canciones.obtener(id) : null;
-
-    form.titulo.value = c ? c.titulo : '';
-    form.compositor.value = c ? c.compositor : '';
-    form.notas.value = c ? c.notas : '';
-    form.letraTexto.value = c ? (c.letraTexto || '') : '';
-    var estado = c ? c.estado : 'pendiente';
-    Array.prototype.forEach.call(form.estado, function (r) { r.checked = r.value === estado; });
-
-    TIPOS_ARCHIVO.forEach(function (tipo) {
-      var meta = c && c.archivos ? c.archivos[tipo] : null;
-      pintarFilaArchivo(tipo, meta ? meta.nombre : null);
-    });
-
-    formTitulo.textContent = c ? 'Editar canción' : 'Nueva canción';
-    btnBorrar.hidden = !c;
-
-    hoja.hidden = false;
-    void hoja.offsetHeight;            // fuerza reflow: la transición arranca cerrada
-    hoja.classList.add('is-abierta');
-    setTimeout(function () { form.titulo.focus(); }, 60);
-  }
-
-  var ETIQUETA_BASE = {
-    audio: 'Audio (MP3)',
-    letra: 'Letra (PDF, imagen o texto)',
-    partitura: 'Partitura (imagen o PDF)',
-  };
-
-  function pintarFilaArchivo(tipo, nombre) {
-    var fila = form.querySelector('[data-fila="' + tipo + '"]');
-    if (!fila) return;
-    var txt = fila.querySelector('[data-nombre="' + tipo + '"]');
-    var quitar = fila.querySelector('[data-quitar="' + tipo + '"]');
-    var accion = fila.querySelector('.archivo-fila__accion');
-    if (nombre) {
-      txt.textContent = nombre;
-      fila.classList.add('archivo-fila--con-archivo');
-      quitar.hidden = false;
-      accion.firstChild.textContent = 'Cambiar';
-    } else {
-      txt.textContent = ETIQUETA_BASE[tipo];
-      fila.classList.remove('archivo-fila--con-archivo');
-      quitar.hidden = true;
-      accion.firstChild.textContent = 'Añadir';
-    }
-  }
-
-  function cerrarHoja() {
-    hoja.classList.remove('is-abierta');
-    var cerrar = function () { hoja.hidden = true; hoja.removeEventListener('transitionend', cerrar); };
-    hoja.addEventListener('transitionend', cerrar);
-    setTimeout(cerrar, 260);   // salvaguarda si no hay transición (reduce-motion)
-  }
-
-  function onGuardar(ev) {
-    ev.preventDefault();
-    var datos = {
-      titulo: form.titulo.value,
-      compositor: form.compositor.value,
-      estado: (form.querySelector('input[name="estado"]:checked') || {}).value || 'pendiente',
-      notas: form.notas.value,
-      letraTexto: form.letraTexto.value,
-    };
-    if (!datos.titulo.trim()) {
-      form.titulo.focus();
-      form.titulo.classList.add('campo--error');
-      return;
-    }
-    form.titulo.classList.remove('campo--error');
-
-    var estadoPrevio = idEditando
-      ? (window.Canciones.obtener(idEditando) || {}).estado
-      : null;
-
-    var cancion = idEditando
-      ? window.Canciones.actualizar(idEditando, datos)
-      : window.Canciones.crear(datos);
-
-    aplicarArchivos(cancion.id).then(function () {
-      cerrarHoja();
-      primeraCarga = false;
-      pintarLista();
-      if (datos.estado === 'aprendida' && estadoPrevio !== 'aprendida') celebrar();
-    });
-  }
-
-  // Guarda / quita en window.Archivos los cambios pendientes y
-  // actualiza los metadatos de la canción.
-  function aplicarArchivos(cancionId) {
-    var tareas = TIPOS_ARCHIVO.map(function (tipo) {
-      var cambio = archivosPendientes[tipo];
-      if (!cambio) return Promise.resolve();
-      var clave = cancionId + ':' + tipo;
-      if (cambio === 'quitar') {
-        return window.Archivos.borrar(clave).then(function () {
-          window.Canciones.fijarArchivo(cancionId, tipo, null);
-        });
-      }
-      return window.Archivos.guardar(clave, cambio).then(function (meta) {
-        window.Canciones.fijarArchivo(cancionId, tipo, meta);
-      });
-    });
-    return Promise.all(tareas).catch(function (e) {
-      console.error('No se pudo guardar un archivo:', e);
-      window.UI.aviso('No se pudo guardar uno de los archivos.', { tipo: 'error' });
-    });
-  }
-
-  function onBorrar() {
-    if (!idEditando) return;
-    var c = window.Canciones.obtener(idEditando);
-    var nombre = c ? c.titulo : 'esta canción';
-    var id = idEditando;
-    window.UI.confirmar('¿Eliminar «' + nombre + '»? No se puede deshacer.', {
-      ok: 'Eliminar', peligro: true,
-    }).then(function (ok) {
-      if (!ok) return;
-      window.Canciones.borrar(id);
-      cerrarHoja();
-      pintarLista();
-    });
-  }
-
   /* ---------- Utilidades ---------- */
 
   // Pequeña celebración al marcar una canción como "Aprendida".
@@ -417,7 +336,7 @@ window.Pagina_songs = (function () {
 
     // Con frase se queda un buen rato para leerla. Al tocar (dentro o
     // fuera) no se corta de golpe: se va con la misma animación de salida.
-    var t = setTimeout(quita, 5200);
+    var t = setTimeout(quita, 4200);
     var cerrado = false;
     el.addEventListener('click', function () {
       if (cerrado) return;

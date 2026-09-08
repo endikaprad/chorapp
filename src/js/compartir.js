@@ -77,10 +77,10 @@ window.Compartir = (function () {
     if (esNativo() && plugins().Share && plugins().Filesystem) {
       return escribir(blob, nombre, 'CACHE').then(function (uri) {
         return plugins().Share.share({
-          title: nombre,
+          title: opts.titulo || nombre,
           text: texto,
           url: uri,
-          dialogTitle: 'Enviar grabación',
+          dialogTitle: opts.dialogTitle || 'Compartir',
         });
       }).then(function () { return { via: 'nativo' }; });
     }

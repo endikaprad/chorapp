@@ -87,7 +87,7 @@ window.Frases = (function () {
     'Practica el estribillo. El puente ya lo tienes: puente derruido, pero puente.',
     'Hoy te propongo una locura: la misma nota que la del piano.',
     'Si te sale bien, grábalo. Nadie se lo va a creer sin pruebas.',
-    'El gato se ha ido al balcón. Cinco minutos tienes antes de que salte.',
+    'El gato del vecino se ha ido al balcón. Cinco minutos tienes antes de que salte.',
     'Abre la partitura. Las notas están ahí escritas para algo.',
     'Un ratito de escalas. Sí, esas cosas que subes y bajas sin acertar ninguna.',
     'Vas mejorando. Desde muy abajo, pero el gráfico sube.',
@@ -286,6 +286,73 @@ window.Frases = (function () {
     '2026-09-12': 'Feliz cumpleaños, Ama. Hoy concierto con Bihotsak: a por todas.',
   };
 
+  /* ---------- Días de concierto ----------
+     Cuando Maite marca un concierto en el calendario de Práctica
+     (conciertos.js), ese día la frase de Inicio y la notificación de
+     ánimo salen de aquí. Mismo tono chulesco de siempre: le decimos
+     que canta fatal, pero hoy toca salir a darlo todo igualmente. */
+  var CONCIERTOS = [
+    'Hoy hay concierto. El coro lleva meses tapándote; no lo estropees justo hoy.',
+    'Concierto esta tarde. Abre la boca, mueve los labios y deja que canten los de al lado.',
+    'Hoy actuáis. Si dudas de una nota, sonríe al público: distrae más que afinar.',
+    'Día de concierto. Ponte guapa, que es lo único que llevas clavado del repertorio.',
+    'Hoy os escuchan de verdad. Tú disimula y sigue a la de la derecha, que esa sí sabe.',
+    'Concierto. Respira, sal ahí y canta como si nadie te oyera. Ojalá.',
+    'Hoy cantáis en público. El resto del coro ha ensayado por ti, devuélveles el favor no gritando.',
+    'Día grande: concierto. Da igual lo mal que suene, con el vestido puesto parece que sabes.',
+    'Hoy toca escenario. Boca pequeña, volumen bajito y a por todas, campeona.',
+    'Concierto esta noche. Piensa que entre 30 voces la tuya se pierde. Es tu mayor virtud.',
+    'Hoy salís a cantar. Tú marca bien la letra con la cara, que las notas ya las pone el grupo.',
+    'Día de concierto. Nadie espera un milagro, solo que acabes la canción en el mismo idioma.',
+    'Hoy actúa Bihotsak. Sal, disfruta y, por lo que más quieras, no busques el agudo tú sola.',
+    'Concierto. Después de lo de los ensayos, esto solo puede ir a mejor. Un poquito.',
+    'Hoy hay función. Ochenta ojos mirándote y tú tan tranquila: no saben lo que les espera.',
+    'Hoy concierto. El truco: mira a la directora, no al público, y mueve la boca a tiempo.',
+    'Día de actuación. Que no cunda el pánico: el desastre lo repartís entre todas.',
+    'Hoy os subís al escenario. Tú ponte en la fila de atrás y proyecta hacia dentro.',
+    'Concierto esta tarde. Sonríe mucho al saludar: es la parte que mejor te sale.',
+    'Hoy cantáis de verdad. Respira, entra a tiempo y suelta el agudo antes de que te delate.',
+    'Día de concierto. El público ha pagado por el coro entero, no por tu solo. Menos mal.',
+    'Hoy actúa Bihotsak. Si te pierdes, boca cerrada y cara de estar concentradísima.',
+    'Concierto. Ensayaste poco, pero el vestido está planchado. Prioridades claras.',
+    'Hoy hay función. Tú piensa en la cena de después y deja que las notas salgan solas.',
+    'Día grande. Sal, disfruta y recuerda: en grupo hasta tú suenas bien.',
+    'Concierto esta noche. Afina con la de al lado; si ella baja, bajas; si sube, tú calla.',
+    'Hoy os escuchan familias enteras. Sé generosa: baja el volumen y reparte el protagonismo.',
+    'Día de concierto. Cuarenta años esperando este momento y aún no te sabes el segundo verso.',
+    'Hoy actuáis. Entra fuerte en la primera, que es la única que tienes medio pillada.',
+    'Concierto. Que se note que disfrutas, aunque por dentro vayas contando compases perdida.',
+    'Hoy toca escenario, Ama. Cabeza alta, hombros atrás y fe ciega en el resto del coro.',
+    'Día de función. Lo has dado todo en los ensayos: nada. Así que hoy solo puede subir.',
+  ];
+
+  var AVISOS_CONCIERTO = [
+    'Hoy concierto con Bihotsak. Sal ahí y que canten fuerte los de al lado.',
+    'Día de concierto. Boca pequeña, sonrisa grande, y a por todas.',
+    'Hoy cantáis en público. Sigue a la del lado y no falla. Suerte, fenómena.',
+    'Concierto hoy. Respira hondo y disimula: te sale de maravilla.',
+    'Hoy actúa el coro. Da igual cómo suene, tú acaba la canción y ya está.',
+    'Concierto esta tarde. El coro te cubre. Solo no chilles el agudo. Mucha mierda.',
+    'Hoy toca escenario, Ama. Ponte guapa y deja que el grupo haga el resto.',
+    'Hoy concierto. Mira a la directora, entra a tiempo y sonríe mucho. Vas a estar bien.',
+    'Día de función. Cabeza alta y fe en el coro. Rómpete una pierna, no las cuerdas.',
+    'Concierto en unas horas. Calienta la voz, bebe agua y no busques el agudo tú sola.',
+    'Hoy cantáis de verdad. Tú disfruta, que para sufrir ya estuvieron los ensayos.',
+    'Concierto hoy. En grupo suenas de maravilla. Aprovéchate de eso sin remordimientos.',
+    'Día grande, Ama. Sal, canta bajito y deja que el público piense que sabes. Suerte.',
+    'Hoy actúa Bihotsak. Primera canción a tope, el resto tú déjate llevar. A por todas.',
+    'Concierto esta tarde. Vestido planchado, sonrisa lista y voz... bueno, ya veremos. Ánimo.',
+    'Hoy os subís al escenario. Respira, cuenta hasta cuatro y entra. Lo vas a bordar (más o menos).',
+    'Día de concierto. Que se note que lo pasas bien. Lo demás lo ponen las otras 39.',
+  ];
+
+  function fraseConcierto(fecha) {
+    return CONCIERTOS[Math.floor(Math.random() * CONCIERTOS.length)];
+  }
+  function avisoConcierto() {
+    return AVISOS_CONCIERTO[Math.floor(Math.random() * AVISOS_CONCIERTO.length)];
+  }
+
   /* ---------- Utilidades de fecha ---------- */
 
   function clavesFecha(d) {
@@ -337,8 +404,19 @@ window.Frases = (function () {
   function delDia(fecha) {
     var d = fecha || new Date();
 
+    // Fechas marcadas (cumpleaños, fiestas) mandan sobre todo: la de
+    // Maite el 12/09 ya menciona el concierto en su propio texto.
     var esp = especialDeHoy(d);
     if (esp) return { texto: esp, especial: true };
+
+    // Día de concierto: frase propia con retranca.
+    if (window.Conciertos && window.Conciertos.hoy) {
+      try {
+        if (window.Conciertos.hoy(d)) {
+          return { texto: fraseConcierto(d), especial: true, concierto: true };
+        }
+      } catch (e) {}
+    }
 
     var claveMD = clavesFecha(d)[1];
     if (ESTACIONES[claveMD]) return { texto: ESTACIONES[claveMD], especial: false };
@@ -409,9 +487,82 @@ window.Frases = (function () {
     return HITOS[dias] || null;
   }
 
+  /* ---------- Aviso de racha (notificación de las ~20:00) ----------
+     Si Maite tiene una racha viva y aún no ha estudiado, avisos.js
+     programa una notificación por la tarde para que no la pierda.
+     Mismo tono cabrón de siempre: canta regular, pero que no falle.
+     El símbolo § se sustituye por "N días" (o "1 día"). */
+  var RACHA_URGENTE = [
+    'Son las ocho y no has cantado. Tu racha de § se muere esta noche. Espabila.',
+    'Llevas § seguidos desafinando con constancia y hoy lo tiras por vaga. Abre ChorApp.',
+    'Maite, tu racha de § pende de un hilo. Cinco minutos de sufrimiento para los oídos de casa y salvada.',
+    'Última llamada: canta algo hoy o mañana empiezas la racha desde cero, como una novata.',
+    'Tu racha de § te mira con cara de pena. Ponte, aunque sea a media voz y de espaldas.',
+    'Hoy no has tocado la app. § de constancia a punto de irse a la basura. Menudo desperdicio.',
+    'Las 20:00. Toca que la casa entera sufra un ratito. Por la racha: § en juego.',
+    'Como no cantes hoy, esos § no valen para nada. Y ya sabes lo que cuesta que suenes decente.',
+    'Racha de § en peligro. Vamos, una cancioncita mala y a la cama con la conciencia tranquila.',
+    'No dejes que § de esfuerzo los tumbe una noche de pereza. Aunque sea el estribillo. Va.'
+  ];
+  var RACHA_MANTENER = [
+    'Mañana, otra vez. La racha de § no se mantiene sola, y tu oído tampoco mejora solo.',
+    'Recordatorio: mañana a cantar. Aunque sea flojito, pero todos los días. Esa es la gracia.',
+    'Vas por §. No te vengas arriba, que en cuanto fallas uno vuelves a sonar a principiante.',
+    'La racha sigue viva. Mañana a la misma hora, la misma tortura para el vecindario. Ahí estaré.',
+    '§ seguidos. Sorprendente, la verdad. Mantenlo, que la cosa promete… poco, pero promete.',
+    'Mañana toca. La racha de § es lo único que te sale redondo ahora mismo, no la sueltes.',
+    'Sigue así: canta un poco cada día y algún año de estos te sale una nota limpia.',
+    'Recordatorio cariñoso: mañana, ChorApp. La constancia se te da mejor que el agudo.'
+  ];
+
+  function _diasTxt(n) {
+    n = Math.max(1, n | 0);
+    return n === 1 ? '1 día' : n + ' días';
+  }
+  function avisoRacha(dias, urgente) {
+    var pool = urgente ? RACHA_URGENTE : RACHA_MANTENER;
+    var t = pool[Math.floor(Math.random() * pool.length)];
+    return t.replace('§', _diasTxt(dias));
+  }
+
+  /* Notificación del resumen mensual (día 1). § = nombre del mes que
+     acaba de terminar. Tono cabrón, pero con ganas de que lo abra. */
+  var AVISO_MES = [
+    'Ya está el resumen de §. Ábrelo, que hay lectura y alguna pulla.',
+    'Se acabó §. Entra a ver el balance: días, canciones y lo que te queda.',
+    'Resumen de § listo. A ver si cantaste tanto como dices.',
+    'Nuevo mes, cuentas claras. El resumen de § te espera en la app.',
+    '§ ha terminado. Ábrelo y mira el resumen, que este mes toca superarse.',
+    'El resumen de § ya está. Spoiler: constante sí, afinada… hablamos.'
+  ];
+  function avisoMes(nombreMes) {
+    var t = AVISO_MES[Math.floor(Math.random() * AVISO_MES.length)];
+    t = t.replace('§', String(nombreMes || 'el mes'));
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  /* ---------- Hora de la notificación según el tipo de fecha ----------
+       Su cumpleaños ......... 9:00
+       Fiestas .............. 11:00
+       Conciertos .......... 13:00   (los pone conciertos.js)
+       Otros cumpleaños .... 16:00
+     Así cada aviso llega a una hora que le pega. */
+  var HORA_AVISO = { cumpleMaite: 9, fiesta: 11, concierto: 13, otroCumple: 16 };
+  var CUMPLE_MAITE = { '09-12': true };
+  var OTROS_CUMPLES = { '04-09': true, '12-02': true, '10-27': true };
+
+  // Categoría de una fecha marcada (por su MM-DD). Todo lo que no sea un
+  // cumpleaños concreto se considera "fiesta".
+  function categoriaFecha(d) {
+    var md = clavesFecha(d)[1];
+    if (CUMPLE_MAITE[md]) return 'cumpleMaite';
+    if (OTROS_CUMPLES[md]) return 'otroCumple';
+    return 'fiesta';
+  }
+
   /* ---------- Fechas señaladas próximas (para notificaciones) ----------
      Recorre los próximos `dias` días y devuelve las fechas de FECHAS que
-     caen dentro, con su texto ya resuelto y una hora fija (9:00).
+     caen dentro, con su texto ya resuelto y la hora que le toca a su tipo.
      Cada una lleva un `id` numérico estable (AAAAMMDD) para poder
      programar/cancelar la notificación sin duplicarla. */
   // Texto de la notificación para una fecha (AVISOS_FECHA; si no hay,
@@ -432,14 +583,26 @@ window.Frases = (function () {
     for (var i = 0; i <= dias; i++) {
       var d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + i);
       if (!especialDeHoy(d)) continue;
-      var at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 17, 0, 0, 0);
-      if (at.getTime() <= Date.now()) continue; // antes de las 17:00 aún vale; ya pasada: fuera
+      var h = HORA_AVISO[categoriaFecha(d)] || 11;
+      var at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, 0, 0, 0);
+      if (at.getTime() <= Date.now()) continue; // antes de esa hora aún vale; ya pasada: fuera
       salida.push({
         id: d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(),
         fecha: at,
         texto: avisoTextoDe(d)
       });
     }
+
+    // Días de concierto marcados en Práctica (conciertos.js): notificación
+    // de ánimo a las 13:00. Van con id propio, así que no chocan con lo de arriba.
+    if (window.Conciertos && window.Conciertos.proximos) {
+      try {
+        window.Conciertos.proximos(dias, hoy).forEach(function (c) {
+          if (c.fecha && c.fecha.getTime() > Date.now()) salida.push(c);
+        });
+      } catch (e) {}
+    }
+
     return salida;
   }
 
@@ -448,6 +611,10 @@ window.Frases = (function () {
     especialDeHoy: especialDeHoy,
     enhorabuena: enhorabuena,
     hito: hito,
+    avisoRacha: avisoRacha,
+    avisoMes: avisoMes,
+    fraseConcierto: fraseConcierto,
+    avisoConcierto: avisoConcierto,
     proximasFechas: proximasFechas
   };
 })();

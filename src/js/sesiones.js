@@ -77,6 +77,10 @@ window.Sesiones = (function () {
   function _sanear(s) {
     if (!s || typeof s !== 'object') return null;
     if (!s.archivo && s.archivos && s.archivos.audio) s.archivo = s.archivos.audio;
+    // "Canción suelta": sesión oculta creada al añadir una canción con su
+    // propio MP3 desde el repertorio. No sale en la lista de Sesiones; su
+    // única marca (en 0:00) lleva directa al Modo estudio.
+    s.suelta = s.suelta === true;
     s.lugar = s.lugar || '';
     s.notas = s.notas || '';
     s.archivo = s.archivo || null;
@@ -104,8 +108,51 @@ window.Sesiones = (function () {
     });
   }
 
+  // Solo las sesiones "de verdad" (ensayos del coro): las que se pintan en
+  // la pestaña Sesiones y cuentan como "último ensayo" en Inicio.
+  function listarVisibles() {
+    return listar().filter(function (s) { return !s.suelta; });
+  }
+
   function obtener(id) {
     return _sanear(_leer().filter(function (s) { return s.id === id; })[0]) || null;
+  }
+
+  // La sesión oculta de una "canción suelta" (o null). Se usa para llevar
+  // directamente al Modo estudio desde el repertorio.
+  function sueltaDeCancion(cancionId) {
+    if (!cancionId) return null;
+    return listar().filter(function (s) {
+      return s.suelta && (s.marcas || []).some(function (m) { return m.cancionId === cancionId; });
+    })[0] || null;
+  }
+
+  // Borra la sesión oculta ligada a una canción suelta (audio incluido).
+  function borrarSueltaDeCancion(cancionId) {
+    var s = sueltaDeCancion(cancionId);
+    if (s) borrar(s.id);
+  }
+
+  // Cuenta cuántas marcas de ensayos de verdad referencian `cancionId`
+  // (para avisar antes de borrar la canción del repertorio).
+  function contarMarcasDeCancion(cancionId) {
+    return marcasDeCancion(cancionId).length;
+  }
+
+  // Al eliminar una canción del repertorio: quita de todas las sesiones
+  // las marcas que la referenciaban (con sus notas y trozos difíciles) y
+  // desvincula sus grabaciones. La sesión oculta de una "canción suelta"
+  // se borra entera aparte (ver borrarSueltaDeCancion). Las sesiones que
+  // se queden sin marcas NO se borran: el audio del ensayo sigue ahí.
+  function borrarMarcasDeCancion(cancionId) {
+    if (!cancionId) return;
+    _leer().forEach(function (s) {
+      if (s.suelta) return;
+      if (!(s.marcas || []).some(function (m) { return m.cancionId === cancionId; })) return;
+      _mutar(s.id, function (cop) {
+        cop.marcas = cop.marcas.filter(function (m) { return m.cancionId !== cancionId; });
+      });
+    });
   }
 
   // Aplica `fn(sesion)` a la sesión `id`, marca `actualizada` y persiste.
@@ -136,6 +183,7 @@ window.Sesiones = (function () {
       fecha: /^\d{4}-\d{2}-\d{2}$/.test(datos.fecha) ? datos.fecha : hoyISO(),
       lugar: (datos.lugar || '').trim(),
       notas: (datos.notas || '').trim(),
+      suelta: datos.suelta === true,
       archivo: null,
       marcas: [],
       creada: ahora,
@@ -284,11 +332,14 @@ window.Sesiones = (function () {
 
   /* ---------- Consultas por canción del repertorio ---------- */
 
-  // [{ sesion, marca }] de todas las veces que se marcó `cancionId`,
-  // más recientes primero.
+  // [{ sesion, marca }] de todas las veces que se marcó `cancionId` en un
+  // ENSAYO de verdad (sesión del coro), más recientes primero. NO incluye la
+  // sesión oculta de una "canción suelta": esa es la pieza limpia, no un
+  // ensayo. Ver [[cancion-suelta]] y [[ensayos-vs-canciones]].
   function marcasDeCancion(cancionId) {
     var res = [];
     listar().forEach(function (s) {
+      if (s.suelta) return;
       s.marcas.forEach(function (m) {
         if (m.cancionId === cancionId) res.push({ sesion: s, marca: m });
       });
@@ -296,8 +347,27 @@ window.Sesiones = (function () {
     return res;
   }
 
+  // Para abrir el Modo estudio desde una canción: el último ensayo de verdad
+  // si lo hay; si no, la marca de su "canción suelta" (la pieza limpia).
   function ultimaMarcaDeCancion(cancionId) {
-    return marcasDeCancion(cancionId)[0] || null;
+    var ult = marcasDeCancion(cancionId)[0];
+    if (ult) return ult;
+    var s = sueltaDeCancion(cancionId);
+    var m = s && (s.marcas || [])[0];
+    return m ? { sesion: s, marca: m } : null;
+  }
+
+  // Todos los ENSAYOS (marcas) de las sesiones visibles del coro, aplanados
+  // en una sola lista: [{ sesion, marca }]. Sesiones más recientes primero;
+  // dentro de una sesión, por minuto de inicio. Lo usa la pantalla "Ensayos".
+  function listarEnsayos() {
+    var res = [];
+    listarVisibles().forEach(function (s) {
+      s.marcas.slice()
+        .sort(function (a, b) { return a.segundo - b.segundo; })
+        .forEach(function (m) { res.push({ sesion: s, marca: m }); });
+    });
+    return res;
   }
 
   // Todas las marcas con algún fragmento difícil, agrupadas por canción.
@@ -368,9 +438,63 @@ window.Sesiones = (function () {
     });
   }
 
+  // Crea una "canción suelta": canción del repertorio + sesión oculta con
+  // su MP3 obligatorio + 1 marca en 0:00. Se usa desde el repertorio y
+  // desde el (+) de Sesiones. Ver [[cancion-suelta]].
+  //   datos    : { titulo, compositor?, idioma?, letraTexto?, letraFonetica?, estado? }
+  //   audio    : File del MP3 (obligatorio)
+  //   archivos : { letra?: File, fonetica?: File, partitura?: File }
+  // Devuelve Promise -> { cancion, sesion, marca }. Si algo falla, revierte.
+  function crearSuelta(datos, audio, archivos) {
+    datos = datos || {};
+    archivos = archivos || {};
+    var titulo = String(datos.titulo || '').trim();
+    if (!titulo) return Promise.reject(new Error('Falta el título.'));
+    if (!audio) return Promise.reject(new Error('Falta el audio.'));
+
+    var cancion = window.Canciones.crear({
+      titulo: titulo,
+      compositor: datos.compositor || '',
+      idioma: datos.idioma || '',
+      etiquetas: datos.etiquetas || [],
+      estado: datos.estado || 'pendiente',
+      notas: datos.notas || '',
+      letraTexto: datos.letraTexto || '',
+      letraFonetica: datos.letraFonetica || '',
+      letraTraduccion: datos.letraTraduccion || '',
+    });
+    var sesion = crear({ suelta: true, notas: 'Canción suelta del repertorio.' });
+
+    var tareas = [window.Archivos.guardar(sesion.id + ':audio', audio).then(function (meta) {
+      fijarAudio(sesion.id, meta);
+    })];
+    ['letra', 'fonetica', 'partitura'].forEach(function (tipo) {
+      var f = archivos[tipo];
+      if (!f) return;
+      tareas.push(window.Archivos.guardar(cancion.id + ':' + tipo, f).then(function (meta) {
+        window.Canciones.fijarArchivo(cancion.id, tipo, meta);
+      }));
+    });
+
+    return Promise.all(tareas).then(function () {
+      var marca = agregarMarca(sesion.id, { cancionId: cancion.id, titulo: titulo, segundo: 0 });
+      return { cancion: cancion, sesion: sesion, marca: marca };
+    }).catch(function (e) {
+      borrar(sesion.id);
+      window.Canciones.borrar(cancion.id);
+      throw e;
+    });
+  }
+
   return {
     hoyISO: hoyISO,
+    crearSuelta: crearSuelta,
     listar: listar,
+    listarVisibles: listarVisibles,
+    sueltaDeCancion: sueltaDeCancion,
+    borrarSueltaDeCancion: borrarSueltaDeCancion,
+    contarMarcasDeCancion: contarMarcasDeCancion,
+    borrarMarcasDeCancion: borrarMarcasDeCancion,
     obtener: obtener,
     crear: crear,
     actualizar: actualizar,
@@ -387,6 +511,7 @@ window.Sesiones = (function () {
     borrarFragmento: borrarFragmento,
     marcasDeCancion: marcasDeCancion,
     ultimaMarcaDeCancion: ultimaMarcaDeCancion,
+    listarEnsayos: listarEnsayos,
     repasoPendiente: repasoPendiente,
     migrarDesdeCanciones: migrarDesdeCanciones,
   };

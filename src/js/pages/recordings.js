@@ -6,7 +6,8 @@
 window.Pagina_recordings = (function () {
   'use strict';
 
-  var raiz, selCancion, btnRec, btnRecTxt, aviso, lista, vacio;
+  var raiz, selCancion, btnRec, btnRecTxt, aviso, lista, vacio, filtro;
+  var filtroCat = null;   // categoría activa de la barra de filtros (o null = todas)
   var grabadora = null, crono = null, urls = [];
   // Si al empezar a grabar hay una sesión del coro sonando (el audio del
   // modo estudio, que sigue vivo en window.CancionActiva), guardamos cuál
@@ -15,6 +16,7 @@ window.Pagina_recordings = (function () {
   var recSesion = null, recOffset = null;
   var obs = null, vacioP = null, vacioTxt = '';
   var calibrando = false;
+  var primeraLista = true;   // 1ª pintada = aparición escalonada; luego, fundido
   var selEscucha = null;   // { refrescar } del selector Altavoz/Auriculares
 
   function iniciar(contenedor) {
@@ -26,6 +28,8 @@ window.Pagina_recordings = (function () {
     btnRecTxt = raiz.querySelector('[data-rec-txt]');
     aviso = raiz.querySelector('[data-aviso]');
     lista = raiz.querySelector('[data-lista]');
+    filtro = raiz.querySelector('[data-filtro]');
+    filtroCat = null;
     vacio = raiz.querySelector('[data-vacio]');
     vacioP = vacio ? vacio.querySelector('p') : null;
     vacioTxt = vacioP ? vacioP.innerHTML : '';
@@ -47,6 +51,7 @@ window.Pagina_recordings = (function () {
 
     montarEscucha();
 
+    primeraLista = true;
     btnRec.addEventListener('click', alternar);
     document.addEventListener('chorapp:bloqueo', pararPorBloqueo);
     selCancion.addEventListener('change', pintarLista);
@@ -167,8 +172,63 @@ window.Pagina_recordings = (function () {
     selEscucha = window.Sincronia.montarSelector(cont, {
       // Al cambiar de dispositivo, todo lo de sincronía pasa a mostrar y usar
       // el retardo de ESE dispositivo: re-render de las comparaciones.
-      onCambio: function () { pintarLista(); },
+      onCambio: function () { pintarEscucha(); pintarLista(); },
     });
+
+    // Panel de calibración rápida, a mano, JUSTO debajo del selector.
+    // Solo se muestra con el altavoz (con auriculares no se puede medir
+    // sola, se ajusta a oído en cada grabación). Recuerda a cómo estaba
+    // "al principio de todo": un botón grande y el estado de si está
+    // calibrado o no.
+    var panel = document.createElement('div');
+    panel.className = 'escucha-cal';
+    panel.setAttribute('data-escucha-cal', '');
+    panel.innerHTML =
+      '<span class="escucha-cal__ico" data-cal-ico aria-hidden="true">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>' +
+      '</span>' +
+      '<span class="escucha-cal__txt">' +
+        '<b class="escucha-cal__tit" data-cal-tit></b>' +
+        '<span class="escucha-cal__sub" data-cal-sub></span>' +
+        '<button type="button" class="escucha-cal__b" data-cal-b></button>' +
+      '</span>';
+    cont.parentNode.insertBefore(panel, cont.nextSibling);
+    panel.querySelector('[data-cal-b]').addEventListener('click', calibrarAltavoz);
+    pintarEscucha();
+  }
+
+  // Refresca el panel de calibración rápida según el perfil activo.
+  function pintarEscucha() {
+    if (!window.Sincronia) return;
+    var panel = raiz && raiz.querySelector('[data-escucha-cal]');
+    if (!panel) return;
+
+    // Solo con el altavoz: el micro del móvil no oye un pitido que suena
+    // dentro de unos auriculares.
+    var soloAltavoz = window.Sincronia.perfilActivo() === 'altavoz';
+    var puede = soloAltavoz && !!window.Grabadora.calibrarLatencia;
+    panel.hidden = !puede;
+    if (!puede) return;
+
+    var p = window.Sincronia.perfil('altavoz');
+    var tit = panel.querySelector('[data-cal-tit]');
+    var sub = panel.querySelector('[data-cal-sub]');
+    var btn = panel.querySelector('[data-cal-b]');
+
+    if (p.calibrado) {
+      panel.className = 'escucha-cal is-ok';
+      tit.textContent = 'Altavoz calibrado';
+      sub.textContent = (p.manual ? 'Ajustado a mano' : 'Medido') +
+        ' · retardo ' + Math.round(p.latencia * 1000) + ' ms';
+      btn.textContent = 'Volver a calibrar';
+    } else {
+      panel.className = 'escucha-cal is-pend';
+      tit.textContent = 'Sin calibrar';
+      sub.textContent = 'Mide el retardo del altavoz para que tus grabaciones encajen con la canción.';
+      btn.textContent = 'Calibrar';
+    }
+    btn.disabled = calibrando;
+    if (calibrando) btn.textContent = 'Calibrando…';
   }
 
   /* ---------- Calibración automática del altavoz ---------- */
@@ -242,6 +302,7 @@ window.Pagina_recordings = (function () {
   function calibrarAltavoz() {
     if (calibrando || !window.Grabadora.calibrarLatencia) return;
     calibrando = true;
+    pintarEscucha();
     pausarTodo();
     var ov = overlayCalib();
 
@@ -251,14 +312,54 @@ window.Pagina_recordings = (function () {
       window.Sincronia.guardarCalibracion('altavoz', res.latencia, res.muestras);
       calibrando = false;
       ov.ok(Math.round(res.latencia * 1000));
-      if (raiz && document.body.contains(raiz)) pintarLista();
+      if (raiz && document.body.contains(raiz)) { pintarEscucha(); pintarLista(); }
     }).catch(function (err) {
       calibrando = false;
+      pintarEscucha();
       var m = err && err.motivo;
       ov.error(
         m === 'permiso' ? 'No se pudo usar el micrófono. Revisa los permisos de la app.' :
         m === 'sinapi' ? 'Este móvil no puede calibrar solo. Ajústalo a mano con − / +.' :
         'No se oyeron bien los pitidos. Busca un sitio en silencio, sube el volumen y prueba otra vez.');
+    });
+  }
+
+  /* ---------- Barra de filtros por origen ---------- */
+
+  // Pinta un chip "Todas" + un chip por cada categoría con grabaciones.
+  // `base` = grabaciones ya filtradas por la canción del desplegable.
+  function pintarFiltro(base) {
+    if (!filtro || !window.Grabaciones) return;
+    var conteo = window.Grabaciones.conteoPorCategoria(base);
+    var cats = window.Grabaciones.CATEGORIAS.filter(function (c) { return conteo[c.id] > 0; });
+
+    // Con una sola categoría (o ninguna) no hay nada que separar: sin barra.
+    if (cats.length < 2) {
+      filtro.hidden = true;
+      filtro.innerHTML = '';
+      filtroCat = null;
+      return;
+    }
+
+    // Si la categoría activa se quedó sin grabaciones, volver a "Todas".
+    if (filtroCat && !conteo[filtroCat]) filtroCat = null;
+
+    filtro.hidden = false;
+    filtro.innerHTML = '';
+    var chips = [{ id: null, etiqueta: 'Todas', n: base.length }].concat(
+      cats.map(function (c) { return { id: c.id, etiqueta: c.etiqueta, n: conteo[c.id] }; })
+    );
+    chips.forEach(function (ch) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'grab-filtro__chip' + (filtroCat === ch.id ? ' is-activo' : '');
+      b.setAttribute('aria-pressed', String(filtroCat === ch.id));
+      b.textContent = ch.etiqueta + ' (' + ch.n + ')';
+      b.addEventListener('click', function () {
+        filtroCat = ch.id;
+        pintarLista();
+      });
+      filtro.appendChild(b);
     });
   }
 
@@ -272,8 +373,19 @@ window.Pagina_recordings = (function () {
     var grabs = window.Grabaciones
       ? (filtroId ? window.Grabaciones.listarDeCancion(filtroId) : window.Grabaciones.listar())
       : [];
+
+    // Barra de filtros por origen (ensayo / canción de ensayo / limpia / voz).
+    // Se pinta sobre el conjunto ya filtrado por canción y solo con las
+    // categorías que tienen alguna grabación.
+    pintarFiltro(grabs);
+    if (filtroCat && window.Grabaciones) {
+      grabs = grabs.filter(function (g) { return window.Grabaciones.categoria(g) === filtroCat; });
+    }
+
     vacio.hidden = grabs.length > 0;
-    if (vacioP && filtroId) {
+    if (vacioP && filtroCat) {
+      vacioP.textContent = 'No hay grabaciones en este filtro. Toca «Todas» para verlas todas.';
+    } else if (vacioP && filtroId) {
       vacioP.textContent = 'Todavía no hay grabaciones de esta canción. Pulsa Empezar a grabar y canta.';
     } else if (vacioP) {
       vacioP.innerHTML = vacioTxt;
@@ -282,7 +394,8 @@ window.Pagina_recordings = (function () {
     if (!grabs.length) return;
 
     var cont = document.createElement('div');
-    cont.className = 'lista';
+    cont.className = 'lista ' + (primeraLista ? 'stagger' : 'lista--refresca');
+    primeraLista = false;
     grabs.forEach(function (g) {
       var fila = document.createElement('div');
       fila.className = 'grabacion';
@@ -295,6 +408,20 @@ window.Pagina_recordings = (function () {
           window.MiniPlayer.plantilla() +
           '<button type="button" class="ficha__quitar" aria-label="Eliminar grabación">✕</button>' +
         '</div>';
+
+      // Si la toma es sobre un ENSAYO del coro, decir DE QUÉ DÍA era ese
+      // ensayo (no cuándo se grabó la toma: eso ya está en la cabecera).
+      if (window.Grabaciones && window.Grabaciones.categoria(g) === 'cancion-ensayo') {
+        var sIdEns = sesionIdDe(g);
+        var sEns = sIdEns && window.Sesiones ? window.Sesiones.obtener(sIdEns) : null;
+        if (sEns && !sEns.suelta && sEns.fecha) {
+          var et = document.createElement('span');
+          et.className = 'grabacion__ensayo';
+          et.textContent = 'Ensayo del ' + fmtFechaEnsayo(sEns.fecha);
+          fila.querySelector('.grabacion__cab').appendChild(et);
+        }
+      }
+
       var audio = fila.querySelector('audio');
       window.MiniPlayer.montar(fila.querySelector('[data-mp]'), g.dur || 0, g.picos);
       window.Grabaciones.url(g.id).then(function (u) {
@@ -531,7 +658,10 @@ window.Pagina_recordings = (function () {
         window.UI.confirmar('¿Eliminar esta grabación? No se puede deshacer.', {
           ok: 'Eliminar', peligro: true,
         }).then(function (ok) {
-          if (ok) window.Grabaciones.borrar(g.id).then(pintarLista);
+          if (!ok) return;
+          colapsarYQuitar(fila, 12, function () {
+            window.Grabaciones.borrar(g.id).then(pintarLista);
+          });
         });
       });
       cont.appendChild(fila);
@@ -705,6 +835,29 @@ window.Pagina_recordings = (function () {
 
   /* ---------- Utilidades ---------- */
 
+  // Anima la salida de una fila (colapso de altura + fade) y luego llama a
+  // `hecho`. `gap` = separación del contenedor (flex gap) que hay que comerse.
+  function colapsarYQuitar(el, gap, hecho) {
+    var reduce = false;
+    try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    if (reduce) { hecho(); return; }
+    el.style.maxHeight = el.scrollHeight + 'px';
+    if (gap) el.style.setProperty('--colapsa-gap', gap + 'px');
+    void el.offsetHeight;                 // fuerza reflow
+    el.classList.add('item-colapsa');
+    el.style.maxHeight = '0px';           // dispara la transición
+    var listo = false;
+    function fin() {
+      if (listo) return;
+      listo = true;
+      hecho();
+    }
+    el.addEventListener('transitionend', function (ev) {
+      if (ev.propertyName === 'max-height' || ev.propertyName === 'opacity') fin();
+    });
+    setTimeout(fin, 340);                 // red de seguridad
+  }
+
   // Sesión del coro con la que comparar esta grabación, o null.
   //   1. `g.sesionId` — lo guardan las tomas nuevas (estudio y este apartado).
   //   2. `g.cancionId` con forma "sesion:<sesionId>:<marcaId>" — tomas del
@@ -727,6 +880,15 @@ window.Pagina_recordings = (function () {
       var hora = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
       return fecha + ' · ' + hora;
     } catch (e) { return ''; }
+  }
+  // 'YYYY-MM-DD' -> "8 de septiembre de 2026" (fecha del ensayo).
+  function fmtFechaEnsayo(iso) {
+    var p = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+    if (!p) return iso || '';
+    try {
+      var d = new Date(+p[1], +p[2] - 1, +p[3]);
+      return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch (e) { return iso; }
   }
   function escapar(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {

@@ -38,6 +38,15 @@ window.Calendario = (function () {
       conActividad = setA;
     }
 
+    // Días de concierto del coro. Se pintan de otro color y son pulsables
+    // aunque estén en el futuro (para consultar los detalles).
+    var conciertos = opts.conciertos || {};
+    if (Array.isArray(conciertos)) {
+      var setC = {};
+      conciertos.forEach(function (f) { setC[f] = true; });
+      conciertos = setC;
+    }
+
     var hoy = new Date();
     var isoHoy = iso(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
     var vistaAnio = hoy.getFullYear();
@@ -92,15 +101,20 @@ window.Calendario = (function () {
       for (var d = 1; d <= totalDias; d++) {
         var clave = iso(vistaAnio, vistaMes, d);
         var clases = 'cal__dia';
-        var pulsable = !!opts.onDia && clave <= isoHoy &&
-                       (practicados[clave] || conActividad[clave]);
+        var esConcierto = !!conciertos[clave];
+        var pulsable = !!opts.onDia && (esConcierto ||
+                       (clave <= isoHoy && (practicados[clave] || conActividad[clave])));
         if (practicados[clave]) clases += ' cal__dia--hecho';
+        if (esConcierto) clases += ' cal__dia--concierto';
         if (clave === isoHoy) clases += ' cal__dia--hoy';
-        if (clave > isoHoy) clases += ' cal__dia--futuro';
+        if (clave > isoHoy && !esConcierto) clases += ' cal__dia--futuro';
         if (pulsable) clases += ' cal__dia--abrible';
+        var etq = esConcierto
+          ? 'Ver el concierto del ' + d
+          : 'Ver lo que hiciste el ' + d;
         celdas += '<span class="' + clases + '"' +
           (pulsable ? ' role="button" tabindex="0" data-dia="' + clave + '"' +
-            ' aria-label="Ver lo que hiciste el ' + d + '"' : '') +
+            ' aria-label="' + etq + '"' : '') +
           '>' + d + '</span>';
       }
       elGrid.innerHTML = celdas;

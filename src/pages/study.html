@@ -6,8 +6,18 @@
     <div class="estudio__id">
       <h2 class="estudio__titulo" data-titulo>—</h2>
       <p class="estudio__meta" data-meta hidden></p>
+      <button class="estudio__dia" type="button" data-dia-sel hidden aria-haspopup="true" aria-expanded="false">
+        <span class="estudio__dia-ic" data-dia-ic aria-hidden="true"></span>
+        <span data-dia-sel-txt>Ensayo</span>
+        <svg class="estudio__dia-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
     </div>
     <span class="chip" data-chip>—</span>
+    <button class="estudio__editar" type="button" aria-label="Compartir la canción" data-compartir-cab hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>
+      </svg>
+    </button>
     <button class="estudio__editar" type="button" aria-label="Editar canción" data-editar>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
@@ -18,6 +28,19 @@
   <!-- Notas: apunte del día (marca) y nota general de la canción -->
   <div class="estudio__notas" data-nota-dia hidden></div>
   <div class="estudio__notas" data-notas hidden></div>
+
+  <!-- Añadir la canción original (visible solo si esta canción solo tiene ensayos) -->
+  <button class="anadir-orig" type="button" data-anadir-original hidden>
+    <span class="anadir-orig__ic" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    </span>
+    <span class="anadir-orig__txt">
+      <strong>Añadir la canción original</strong>
+      <small>Sube el MP3 de referencia para estudiarla sin el ruido del ensayo.</small>
+    </span>
+    <svg class="anadir-orig__mas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+  <input type="file" accept="audio/*,.mp3,.m4a,.ogg,.wav" data-input-original hidden />
 
   <!-- Reproductor de audio -->
   <section class="player" data-player hidden>
@@ -74,8 +97,11 @@
   <h3 class="seccion-titulo">Letra</h3>
   <div class="visor-letra" data-letra>
     <p class="visor-vacio" data-letra-vacio>Aún no hay letra. Añádela desde <strong>✎ Editar</strong>.</p>
+    <div class="visor-letra__modos" data-letra-modos hidden role="group" aria-label="Cómo ver la letra"></div>
     <pre class="visor-letra__texto" data-letra-texto hidden></pre>
+    <div class="visor-letra__ambas" data-letra-ambas hidden></div>
     <div class="visor-doc" data-letra-doc hidden></div>
+    <div class="visor-letra__accion" data-letra-accion hidden></div>
   </div>
 
   <!-- Partitura -->
@@ -115,6 +141,17 @@
     </svg>
     <span data-grabar-nota-txt>Grabar</span>
   </button>
+  </section>
+
+  <!-- Compartir la canción (resumen con letra, partitura y trozos; NO grabaciones) -->
+  <section class="compartir-cancion" data-compartir-seccion hidden>
+    <button class="btn-bloque" type="button" data-compartir-cancion>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+        <path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>
+      </svg>
+      Compartir la canción
+    </button>
   </section>
 
   <!-- Visor a pantalla completa (partitura ampliada) -->

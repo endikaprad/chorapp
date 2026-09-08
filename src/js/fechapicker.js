@@ -11,7 +11,9 @@
      var fp = window.FechaPicker.montar(contenedor, {
        valor: '2026-09-05',        // ISO, opcional (por defecto hoy)
        onCambio: function (iso) {},
-       maxHoy: true                // no dejar elegir días futuros
+       maxHoy: true,               // no dejar elegir días futuros
+       minISO: '2026-09-08',       // no dejar elegir días anteriores a este
+       rapidos: true               // botones Hoy / Ayer / Otro día (por defecto sí)
      });
      fp.valor();      // -> 'YYYY-MM-DD'
      fp.fijar(iso);
@@ -48,13 +50,18 @@ window.FechaPicker = (function () {
   function montar(contenedor, opts) {
     opts = opts || {};
     var maxHoy = opts.maxHoy !== false;
+    var conRapidos = opts.rapidos !== false;
 
     var hoy = new Date(); hoy.setHours(0, 0, 0, 0);
     var ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
 
+    var minD = deISO(opts.minISO);
+    if (minD) minD.setHours(0, 0, 0, 0);
+
     var sel = deISO(opts.valor) || new Date(hoy);
     sel.setHours(0, 0, 0, 0);
     if (maxHoy && sel > hoy) sel = new Date(hoy);
+    if (minD && sel < minD) sel = new Date(minD);
 
     var vistaAnio = sel.getFullYear();
     var vistaMes = sel.getMonth();
@@ -62,6 +69,7 @@ window.FechaPicker = (function () {
     contenedor.classList.add('fpk');
     contenedor.innerHTML =
       '<p class="fpk__resumen" data-resumen></p>' +
+      (conRapidos ?
       '<div class="fpk__rapidos">' +
         '<button type="button" class="fpk__rap" data-rap="hoy">Hoy</button>' +
         '<button type="button" class="fpk__rap" data-rap="ayer">Ayer</button>' +
@@ -69,8 +77,8 @@ window.FechaPicker = (function () {
           'Otro día' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>' +
         '</button>' +
-      '</div>' +
-      '<div class="fpk__cal" data-cal hidden>' +
+      '</div>' : '') +
+      '<div class="fpk__cal" data-cal' + (conRapidos ? ' hidden' : '') + '>' +
         '<div class="cal__cab">' +
           '<button class="cal__nav" type="button" data-prev aria-label="Mes anterior">‹</button>' +
           '<span class="cal__mes" data-mes></span>' +
@@ -89,6 +97,7 @@ window.FechaPicker = (function () {
     function fijar(d, abrirCalNo) {
       d = new Date(d); d.setHours(0, 0, 0, 0);
       if (maxHoy && d > hoy) d = new Date(hoy);
+      if (minD && d < minD) d = new Date(minD);
       sel = d;
       vistaAnio = d.getFullYear();
       vistaMes = d.getMonth();
@@ -101,6 +110,7 @@ window.FechaPicker = (function () {
     }
 
     function pintarRapidos() {
+      if (!conRapidos) return;
       raps.forEach(function (b) {
         var k = b.getAttribute('data-rap');
         var activo =
@@ -126,14 +136,14 @@ window.FechaPicker = (function () {
       }
       for (var dia = 1; dia <= total; dia++) {
         var fecha = new Date(vistaAnio, vistaMes, dia);
-        var futuro = maxHoy && fecha > hoy;
+        var fueraDeRango = (maxHoy && fecha > hoy) || (minD && fecha < minD);
         var cel = document.createElement('button');
         cel.type = 'button';
         cel.className = 'cal__dia fpk__dia';
         cel.textContent = String(dia);
         if (mismaFecha(fecha, sel)) cel.classList.add('fpk__dia--sel');
         if (mismaFecha(fecha, hoy)) cel.classList.add('cal__dia--hoy');
-        if (futuro) { cel.classList.add('fpk__dia--off'); cel.disabled = true; }
+        if (fueraDeRango) { cel.classList.add('fpk__dia--off'); cel.disabled = true; }
         else {
           (function (f) {
             cel.addEventListener('click', function () { fijar(f); });
@@ -150,6 +160,7 @@ window.FechaPicker = (function () {
     }
 
     contenedor.querySelector('[data-prev]').addEventListener('click', function () {
+      if (minD && vistaAnio === minD.getFullYear() && vistaMes <= minD.getMonth()) return;
       vistaMes--; if (vistaMes < 0) { vistaMes = 11; vistaAnio--; } pintarGrid();
     });
     contenedor.querySelector('[data-next]').addEventListener('click', function () {
@@ -171,7 +182,7 @@ window.FechaPicker = (function () {
     });
 
     // Si arranca en un día que no es hoy ni ayer, mostrar ya el calendario.
-    if (!mismaFecha(sel, hoy) && !mismaFecha(sel, ayer)) elCal.hidden = false;
+    if (conRapidos && !mismaFecha(sel, hoy) && !mismaFecha(sel, ayer)) elCal.hidden = false;
     pintar();
 
     return {

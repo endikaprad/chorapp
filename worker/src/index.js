@@ -79,7 +79,8 @@ export default {
             notification: {
               icon: 'ic_stat_bihotsak',
               color: '#1512D6',
-              sound: 'default',
+              // Canal "chorapp" (lo crea la app): SIN sonido, CON vibración.
+              channel_id: 'chorapp',
               default_vibrate_timings: true,
             },
           },
