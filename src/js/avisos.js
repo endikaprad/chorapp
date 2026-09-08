@@ -81,7 +81,9 @@ window.Avisos = (function () {
   // mes que acaba de terminar. Al abrir la app ese día sale la hoja (home.js).
   var ID_MES_MIN = 17200000;
   var ID_MES_MAX = 17200010;
+  var ID_ANUAL = 17200020;   // Wrapped anual (31 de diciembre)
   var HORA_MES = 10;
+  var HORA_ANUAL = 12;
   var MESES_NOMBRE = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
                       'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   // Dos toques: a los 14 días y, si sigue sin aparecer, a los 28. Ahí paramos.
@@ -171,6 +173,7 @@ window.Avisos = (function () {
       if (primero.getTime() <= ahora.getTime()) continue;
       var mm = primero.getMonth() - 1, aa = primero.getFullYear();
       if (mm < 0) { mm = 11; aa--; }
+      if (mm === 11) continue;   // el resumen de diciembre lo cubre el Wrapped anual del 31
       var nombre = MESES_NOMBRE[mm];
       var txt = (window.Frases && window.Frases.avisoMes)
         ? window.Frases.avisoMes(nombre)
@@ -183,6 +186,24 @@ window.Avisos = (function () {
         schedule: { at: primero, allowWhileIdle: true }
       });
     }
+  }
+
+  /* Notificación del Wrapped ANUAL: el 31 de diciembre a las 12:00 (este año
+     o, si ya pasó, el del año que viene). Tono cálido. */
+  function agregarAvisoAnual(notifs) {
+    var ahora = new Date();
+    var at = new Date(ahora.getFullYear(), 11, 31, HORA_ANUAL, 0, 0, 0);
+    if (at.getTime() <= ahora.getTime()) at = new Date(ahora.getFullYear() + 1, 11, 31, HORA_ANUAL, 0, 0, 0);
+    var txt = (window.Frases && window.Frases.avisoAnual)
+      ? window.Frases.avisoAnual(at.getFullYear())
+      : 'Tu año en ChorApp ya está listo. Ábrelo con calma, Ama.';
+    notifs.push({
+      id: ID_ANUAL,
+      title: 'ChorApp',
+      body: txt,
+      channelId: CANAL_ID,
+      schedule: { at: at, allowWhileIdle: true }
+    });
   }
 
   function plugin() {
@@ -203,11 +224,41 @@ window.Avisos = (function () {
     });
   }
 
+  // Al tocar la notificación del resumen (mensual o anual), llevar a Inicio
+  // y abrir el Wrapped. Sin esto, si la app estaba en segundo plano en otra
+  // pestaña, el toque solo la trae al frente y el Wrapped no aparece.
+  var listenerPuesto = false;
+  function engancharToque(LN) {
+    if (listenerPuesto || !LN || !LN.addListener) return;
+    listenerPuesto = true;
+    LN.addListener('localNotificationActionPerformed', function (ev) {
+      var id = ev && ev.notification && ev.notification.id;
+      var esResumen = (id >= ID_MES_MIN && id <= ID_MES_MAX) || id === ID_ANUAL;
+      if (!esResumen) return;
+      if (window.App && window.App.ir) window.App.ir('inicio', { reemplazar: true });
+      // Por si ya estaba en Inicio y home.js no vuelve a renderizar.
+      setTimeout(function () {
+        if (!window.ResumenMes) return;
+        var d = null;
+        try {
+          d = (window.ResumenMes.anualPendiente && window.ResumenMes.anualPendiente()) ||
+              (window.ResumenMes.pendiente && window.ResumenMes.pendiente());
+        } catch (e) { d = null; }
+        if (d) {
+          window.ResumenMes.abrirHoja(d);
+          if (d.esAnual) window.ResumenMes.marcarAnualVisto(d.anio);
+          else window.ResumenMes.marcarVisto(d.anio, d.mes);
+        }
+      }, 300);
+    });
+  }
+
   function iniciar() {
     var LN = plugin();
     if (!esNativo() || !LN || !window.Frases || !window.Frases.proximasFechas) return;
 
     crearCanal(LN);
+    engancharToque(LN);
 
     LN.checkPermissions()
       .then(function (res) {
@@ -234,7 +285,8 @@ window.Avisos = (function () {
           return (n.id >= ID_MIN && n.id < ID_MAX) ||
                  n.id === ID_VAGA || n.id === ID_VAGA2 ||
                  (n.id >= ID_RACHA_MIN && n.id <= ID_RACHA_MAX) ||
-                 (n.id >= ID_MES_MIN && n.id <= ID_MES_MAX);
+                 (n.id >= ID_MES_MIN && n.id <= ID_MES_MAX) ||
+                 n.id === ID_ANUAL;
         });
         if (!mias.length) return;
         return LN.cancel({ notifications: mias.map(function (n) { return { id: n.id }; }) });
@@ -263,8 +315,9 @@ window.Avisos = (function () {
         // Recordatorios de racha (20:00, tono cabrón).
         agregarAvisosRacha(notifs);
 
-        // Resumen del mes (día 1, 10:00).
+        // Resumen del mes (día 1, 10:00) y Wrapped anual (31 dic, 12:00).
         agregarAvisosMes(notifs);
+        agregarAvisoAnual(notifs);
 
         return LN.schedule({ notifications: notifs });
       });

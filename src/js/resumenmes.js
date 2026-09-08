@@ -1,27 +1,37 @@
 /* ============================================================
-   resumenmes.js — Resumen del mes (con tono cabrón).
+   resumenmes.js — Datos del "Resumen del mes".
 
-   El día 1 de cada mes, Inicio enseña una hoja con el balance del
-   mes que acaba de terminar: días de estudio, canciones, aprendidas,
-   trozos difíciles, grabaciones y logros. Y una frase de despedida
-   burlona, como todo en esta app.
+   El resumen del mes ES el Wrapped a pantalla completa (js/wrapped.js):
+   este módulo solo calcula los DATOS y decide CUÁNDO ofrecerlos.
 
-   Se calcula al vuelo desde Practica + Diario + Grabaciones + Logros.
-   Lo único que se guarda es qué mes se ha visto ya
-   (Almacen 'resumenmes:visto' = "YYYY-MM").
+   - Inicio: el día 1–12 sale solo el resumen del mes anterior (tono
+     cabrón). En enero NO: el recap de diciembre lo absorbe el Wrapped
+     anual del 31 de diciembre (tono cálido, es el regalo dentro del
+     regalo).
+   - Práctica: botón para reabrirlo, visible solo los 5 días siguientes
+     a que saliera (y durante la ventana del Wrapped anual).
 
-   window.ResumenMes.datosDe(anio, mes)  -> objeto para pintar (mes 0-11)
-   window.ResumenMes.pendiente()         -> datos del mes anterior si toca
-                                            enseñarlo (o null)
-   window.ResumenMes.ultimoMes()         -> { anio, mes } del mes anterior
-   window.ResumenMes.marcarVisto(a, m)
+   Se calcula al vuelo desde Practica + Diario + Grabaciones + Logros +
+   Conciertos. En Almacen solo se guarda qué se ha visto ya y cuándo
+   ('resumenmes:visto', ':visto-cuando', ':anual-visto').
+
+   window.ResumenMes.datosDe(anio, mes)      -> datos de un mes (0-11)
+   window.ResumenMes.datosAnuales(anio)      -> datos del año (esAnual:true)
+   window.ResumenMes.pendiente()             -> resumen del mes que sale solo en Inicio
+   window.ResumenMes.anualPendiente()        -> Wrapped anual que sale solo (31 dic)
+   window.ResumenMes.disponiblePractica()    -> lo que muestra el botón de Práctica
+   window.ResumenMes.marcarVisto(a, m) / marcarAnualVisto(anio)
    ============================================================ */
 
 window.ResumenMes = (function () {
   'use strict';
 
   var CLAVE_VISTO = 'resumenmes:visto';
+  var CLAVE_CUANDO = 'resumenmes:visto-cuando';        // ISO del día en que salió
+  var CLAVE_CUANDO_CLAVE = 'resumenmes:visto-cuando-de'; // a qué mes ("YYYY-MM") corresponde esa fecha
+  var CLAVE_ANUAL_VISTO = 'resumenmes:anual-visto';     // año del último Wrapped anual visto
   var DIA_TOPE_AUTO = 12;   // pasado el día 12 ya no salta solo (sí desde Práctica)
+  var DIAS_VENTANA_PRACTICA = 5;  // días que el botón sigue visible en Práctica tras salir
 
   var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
                'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -64,18 +74,22 @@ window.ResumenMes = (function () {
     return null;
   }
 
-  function datosDe(anio, mes) {
-    var reg = window.Practica && window.Practica.leer ? window.Practica.leer() : {};
-    var primeroMes = new Date(anio, mes, 1);
-    var diasDelMes = new Date(anio, mes + 1, 0).getDate();
+  /* Recorre día a día un rango de meses (mesIni..mesFin, ambos incluidos, 0-11)
+     y devuelve los agregados en bruto. Lo comparten datosDe (un mes) y
+     datosAnuales (los doce). */
+  var DIAS_SEMANA = ['los domingos', 'los lunes', 'los martes', 'los miércoles',
+                     'los jueves', 'los viernes', 'los sábados'];
 
-    var diasSet = {};            // ISO -> true (días con estudio)
-    var porCancion = {};         // id -> nº de días que aparece
-    var titulos = {};            // id -> titulo
-    var escuchas = 0;
-    var trozos = 0;
-    var aprendidas = [];
-    var vistasAprend = {};
+  function _escanear(anio, mesIni, mesFin) {
+    var reg = window.Practica && window.Practica.leer ? window.Practica.leer() : {};
+    var diasSet = {};       // ISO -> true (días con estudio)
+    var porCancion = {};    // id -> nº de días que aparece
+    var titulos = {};       // id -> titulo
+    var diasPorMes = {};    // mes 0-11 -> nº de días con estudio
+    var porDiaSemana = [0, 0, 0, 0, 0, 0, 0];  // 0=domingo … 6=sábado
+    var reproPorTitulo = {};  // titulo -> nº de veces al play
+    var escuchas = 0, trozos = 0;
+    var aprendidas = [], vistasAprend = {};
 
     // Suma 1 al contador de una canción (una vez por día, con `vistasHoy`).
     function apunta(vistasHoy, id, titulo) {
@@ -85,33 +99,116 @@ window.ResumenMes = (function () {
       if (!titulos[id]) titulos[id] = titulo || _tituloCancion(id) || 'una canción';
     }
 
-    for (var d = 1; d <= diasDelMes; d++) {
-      var iso = _iso(new Date(anio, mes, d));
-      var practica = Array.isArray(reg[iso]) ? reg[iso] : [];
-      var evs = window.Diario && window.Diario.delDia ? window.Diario.delDia(iso) : [];
+    for (var mes = mesIni; mes <= mesFin; mes++) {
+      var diasDelMes = new Date(anio, mes + 1, 0).getDate();
+      for (var d = 1; d <= diasDelMes; d++) {
+        var iso = _iso(new Date(anio, mes, d));
+        var practica = Array.isArray(reg[iso]) ? reg[iso] : [];
+        var evs = window.Diario && window.Diario.delDia ? window.Diario.delDia(iso) : [];
 
-      // Un día "cuenta" si hay práctica registrada o un evento de estudio.
-      var estudiadoHoy = practica.length > 0 ||
-        evs.some(function (ev) { return ev.t === 'estudio'; });
-      if (estudiadoHoy) diasSet[iso] = true;
-
-      // Canciones estudiadas (por día que aparecen). De la práctica y, por si
-      // acaso, de los eventos 'estudio' del diario.
-      var vistasHoy = {};
-      practica.forEach(function (id) { apunta(vistasHoy, id); });
-      evs.forEach(function (ev) {
-        if (ev.t === 'estudio') {
-          apunta(vistasHoy, ev.cancionId || ('marca:' + (ev.marcaId || '')), ev.titulo);
-        } else if (ev.t === 'reproduccion') {
-          escuchas++;
-        } else if (ev.t === 'fragmento') {
-          trozos++;
-        } else if (ev.t === 'estado' && ev.extra && ev.extra.a === 'aprendida') {
-          var tit = ev.titulo || _tituloCancion(ev.cancionId) || 'una canción';
-          if (!vistasAprend[tit]) { vistasAprend[tit] = true; aprendidas.push(tit); }
+        // Un día "cuenta" si hay práctica registrada o un evento de estudio.
+        var estudiadoHoy = practica.length > 0 ||
+          evs.some(function (ev) { return ev.t === 'estudio'; });
+        if (estudiadoHoy) {
+          diasSet[iso] = true;
+          diasPorMes[mes] = (diasPorMes[mes] || 0) + 1;
+          porDiaSemana[new Date(anio, mes, d).getDay()]++;
         }
+
+        var vistasHoy = {};
+        practica.forEach(function (id) { apunta(vistasHoy, id); });
+        evs.forEach(function (ev) {
+          if (ev.t === 'estudio') {
+            apunta(vistasHoy, ev.cancionId || ('marca:' + (ev.marcaId || '')), ev.titulo);
+          } else if (ev.t === 'reproduccion') {
+            escuchas++;
+            var rt = ev.titulo || _tituloCancion(ev.cancionId);
+            if (rt) reproPorTitulo[rt] = (reproPorTitulo[rt] || 0) + 1;
+          } else if (ev.t === 'fragmento') {
+            trozos++;
+          } else if (ev.t === 'estado' && ev.extra && ev.extra.a === 'aprendida') {
+            var tit = ev.titulo || _tituloCancion(ev.cancionId) || 'una canción';
+            if (!vistasAprend[tit]) { vistasAprend[tit] = true; aprendidas.push(tit); }
+          }
+        });
+      }
+    }
+
+    return {
+      diasSet: diasSet, porCancion: porCancion, titulos: titulos,
+      diasPorMes: diasPorMes, porDiaSemana: porDiaSemana, reproPorTitulo: reproPorTitulo,
+      escuchas: escuchas, trozos: trozos, aprendidas: aprendidas,
+    };
+  }
+
+  // Top n canciones más estudiadas (por días abiertos) de un _escanear.
+  function _topEstudiadas(e, min, n) {
+    return Object.keys(e.porCancion)
+      .filter(function (id) { return e.porCancion[id] >= (min || 2); })
+      .sort(function (a, b) { return e.porCancion[b] - e.porCancion[a]; })
+      .slice(0, n || 3)
+      .map(function (id) { return { titulo: e.titulos[id] || 'una canción', veces: e.porCancion[id] }; });
+  }
+
+  // Top n canciones más escuchadas (por veces al play) de un _escanear.
+  function _topEscuchadas(e, min, n) {
+    var m = e.reproPorTitulo;
+    return Object.keys(m)
+      .filter(function (t) { return m[t] >= (min || 3); })
+      .sort(function (a, b) { return m[b] - m[a]; })
+      .slice(0, n || 3)
+      .map(function (t) { return { titulo: t, veces: m[t] }; });
+  }
+
+  // Día de la semana en que más estudia (o null si no destaca).
+  function _diaFavorito(porDiaSemana, minTotal) {
+    var total = porDiaSemana.reduce(function (a, b) { return a + b; }, 0);
+    if (total < (minTotal || 6)) return null;
+    var maxI = 0;
+    for (var i = 1; i < 7; i++) if (porDiaSemana[i] > porDiaSemana[maxI]) maxI = i;
+    if (porDiaSemana[maxI] < 3) return null;
+    var segundo = 0;
+    for (var j = 0; j < 7; j++) if (j !== maxI && porDiaSemana[j] > segundo) segundo = porDiaSemana[j];
+    if (porDiaSemana[maxI] <= segundo) return null;   // hay empate: no destaca
+    return { nombre: DIAS_SEMANA[maxI], veces: porDiaSemana[maxI] };
+  }
+
+  // Grabaciones creadas dentro de un rango [ini, fin) de timestamps.
+  function _grabacionesEntre(iniTs, finTs) {
+    var n = 0, seg = 0;
+    if (window.Grabaciones && window.Grabaciones.listar) {
+      window.Grabaciones.listar().forEach(function (g) {
+        var t = new Date(g.creado || 0).getTime();
+        if (t >= iniTs && t < finTs) { n++; seg += Number(g.dur) || 0; }
       });
     }
+    return { n: n, seg: Math.round(seg) };
+  }
+
+  // Logros conseguidos dentro de un rango [ini, fin) de timestamps.
+  function _logrosEntre(iniTs, finTs) {
+    var out = [];
+    if (window.Logros && window.Logros.listar && window.Logros.fechaDe) {
+      window.Logros.listar().forEach(function (l) {
+        if (!l.hecho) return;
+        var ts = window.Logros.fechaDe(l.id);
+        if (!ts) return;
+        if (ts >= iniTs && ts < finTs) out.push({ titulo: l.titulo, icono: l.icono });
+      });
+    }
+    return out;
+  }
+
+  function datosDe(anio, mes) {
+    var diasDelMes = new Date(anio, mes + 1, 0).getDate();
+
+    var e = _escanear(anio, mes, mes);
+    var diasSet = e.diasSet;
+    var porCancion = e.porCancion;
+    var titulos = e.titulos;
+    var escuchas = e.escuchas;
+    var trozos = e.trozos;
+    var aprendidas = e.aprendidas;
 
     // Canción más trabajada del mes (solo si destaca sobre las demás).
     var ids = Object.keys(porCancion).sort(function (a, b) { return porCancion[b] - porCancion[a]; });
@@ -120,31 +217,16 @@ window.ResumenMes = (function () {
       cancionTop = { titulo: titulos[ids[0]] || 'una canción', veces: porCancion[ids[0]] };
     }
 
-    // Grabaciones del mes (por su timestamp de creación).
-    var grabN = 0, grabSeg = 0;
-    if (window.Grabaciones && window.Grabaciones.listar) {
-      window.Grabaciones.listar().forEach(function (g) {
-        var t = new Date(g.creado || 0);
-        if (t.getFullYear() === anio && t.getMonth() === mes) {
-          grabN++;
-          grabSeg += Number(g.dur) || 0;
-        }
-      });
-    }
+    var topEstudiadas = _topEstudiadas(e, 2, 3);
+    var topEscuchadas = _topEscuchadas(e, 3, 3);
+    var diaSemana = _diaFavorito(e.porDiaSemana, 6);
 
-    // Logros conseguidos ese mes.
-    var logros = [];
-    if (window.Logros && window.Logros.listar && window.Logros.fechaDe) {
-      window.Logros.listar().forEach(function (l) {
-        if (!l.hecho) return;
-        var ts = window.Logros.fechaDe(l.id);
-        if (!ts) return;
-        var t = new Date(ts);
-        if (t.getFullYear() === anio && t.getMonth() === mes) {
-          logros.push({ titulo: l.titulo, icono: l.icono });
-        }
-      });
-    }
+    // Grabaciones y logros del mes (por su timestamp de creación).
+    var iniTs = new Date(anio, mes, 1).getTime();
+    var finTs = new Date(anio, mes + 1, 1).getTime();
+    var grab = _grabacionesEntre(iniTs, finTs);
+    var grabN = grab.n, grabSeg = grab.seg;
+    var logros = _logrosEntre(iniTs, finTs);
 
     var nDias = Object.keys(diasSet).length;
     var nCanciones = Object.keys(porCancion).length;
@@ -160,6 +242,9 @@ window.ResumenMes = (function () {
       rachaMaxMes: _rachaMax(diasSet),
       canciones: nCanciones,
       cancionTop: cancionTop,
+      topEstudiadas: topEstudiadas,
+      topEscuchadas: topEscuchadas,
+      diaSemana: diaSemana,
       aprendidas: aprendidas,
       trozos: trozos,
       escuchas: escuchas,
@@ -169,6 +254,99 @@ window.ResumenMes = (function () {
     datos.hayAlgo = nDias > 0 || grabN > 0 || aprendidas.length > 0 || logros.length > 0;
     datos.frase = frase(datos);
     return datos;
+  }
+
+  /* ---------- Resumen ANUAL (Wrapped especial del 31 de diciembre) ----------
+     Recorre el año entero. Tono cálido, no cabrón: es el regalo dentro del
+     regalo. El recap de diciembre se salta porque este ya lo incluye. */
+  function datosAnuales(anio) {
+    var e = _escanear(anio, 0, 11);
+    var iniTs = new Date(anio, 0, 1).getTime();
+    var finTs = new Date(anio + 1, 0, 1).getTime();
+    var diasDelAnio = Math.round((finTs - iniTs) / 86400000);
+
+    var ids = Object.keys(e.porCancion).sort(function (a, b) {
+      return e.porCancion[b] - e.porCancion[a];
+    });
+    var cancionTop = null;
+    if (ids.length >= 2 && e.porCancion[ids[0]] >= 5 && e.porCancion[ids[0]] > e.porCancion[ids[1]]) {
+      cancionTop = { titulo: e.titulos[ids[0]] || 'una canción', dias: e.porCancion[ids[0]] };
+    }
+
+    // Mes más constante del año.
+    var mesTop = null, mejor = 0;
+    Object.keys(e.diasPorMes).forEach(function (k) {
+      if (e.diasPorMes[k] > mejor) { mejor = e.diasPorMes[k]; mesTop = +k; }
+    });
+    mesTop = (mesTop != null && mejor >= 3) ? { nombre: nombreMes(mesTop), dias: mejor } : null;
+
+    var topEstudiadas = _topEstudiadas(e, 3, 5);   // el anual enseña top 5
+    var topEscuchadas = _topEscuchadas(e, 5, 5);
+    var diaSemana = _diaFavorito(e.porDiaSemana, 20);
+
+    var grab = _grabacionesEntre(iniTs, finTs);
+    var logros = _logrosEntre(iniTs, finTs);
+
+    var conciertos = 0;
+    var recuerdos = [];
+    if (window.Conciertos && window.Conciertos.listar) {
+      window.Conciertos.listar().forEach(function (c) {
+        if (String(c.fecha || '').slice(0, 4) !== String(anio)) return;
+        conciertos++;
+        var r = c.recuerdo || {};
+        if (r.nota || r.foto) {
+          recuerdos.push({
+            titulo: c.lugar || 'Un concierto',
+            fecha: c.fecha,
+            nota: r.nota || '',
+            tieneFoto: !!r.foto,
+            fotoClave: window.Conciertos.claveFoto
+              ? window.Conciertos.claveFoto(c.id) : ('concierto:' + c.id + ':foto'),
+          });
+        }
+      });
+    }
+
+    var nDias = Object.keys(e.diasSet).length;
+    var datos = {
+      esAnual: true,
+      anio: anio,
+      nombreMes: '',
+      etiqueta: String(anio),
+      dias: nDias,
+      diasDelAnio: diasDelAnio,
+      rachaMaxAno: _rachaMax(e.diasSet),
+      canciones: Object.keys(e.porCancion).length,
+      cancionTop: cancionTop,
+      topEstudiadas: topEstudiadas,
+      topEscuchadas: topEscuchadas,
+      diaSemana: diaSemana,
+      aprendidas: e.aprendidas,
+      trozos: e.trozos,
+      escuchas: e.escuchas,
+      grabaciones: grab,
+      logros: logros,
+      mesTop: mesTop,
+      conciertos: conciertos,
+      recuerdos: recuerdos,
+    };
+    datos.hayAlgo = nDias > 0 || grab.n > 0 || e.aprendidas.length > 0 ||
+      logros.length > 0 || recuerdos.length > 0;
+    datos.frase = fraseAnual(datos);
+    return datos;
+  }
+
+  function fraseAnual(d) {
+    if (!d.hayAlgo) {
+      return 'Un año flojito en la app, Ama. El que viene lo llenamos de música, ¿vale?';
+    }
+    return elegir([
+      'Un año entero cantando casi cada día. Bihotsak no sería lo mismo sin ti, Ama.',
+      d.dias + ' días de música en doce meses. Eso no es una afición, es tu manera de vivir.',
+      'Doce meses, muchas canciones y una constancia de las que no se ven. Feliz año, Ama.',
+      'Este año has cantado, has aprendido y casi no has faltado. Orgullo del bueno.',
+      'Cerramos el año como empieza el siguiente: contigo cantando. Gracias por tanto, Ama.'
+    ]);
   }
 
   /* ---------- Frase de cierre (tono cabrón) ---------- */
@@ -205,148 +383,128 @@ window.ResumenMes = (function () {
 
   function elegir(a) { return a[Math.floor(Math.random() * a.length)]; }
 
-  /* ---------- Cuándo enseñarlo ---------- */
+  /* ---------- Cuándo enseñarlo ----------
+     El "resumen del mes" ES el Wrapped a pantalla completa (js/wrapped.js).
+     Aquí solo se decide QUÉ datos tocan y CUÁNDO ofrecerlos. */
+
+  function _hoyISO() { return _iso(new Date()); }
+
+  // Guarda que el resumen del mes (a, m) ya se ha visto, y —solo la primera
+  // vez— la fecha en que "salió", para la ventana de 5 días en Práctica.
   function marcarVisto(a, m) {
-    if (window.Almacen) window.Almacen.guardar(CLAVE_VISTO, claveMes(a, m));
+    if (!window.Almacen) return;
+    var clave = claveMes(a, m);
+    window.Almacen.guardar(CLAVE_VISTO, clave);
+    if (window.Almacen.leer(CLAVE_CUANDO_CLAVE, '') !== clave) {
+      window.Almacen.guardar(CLAVE_CUANDO_CLAVE, clave);
+      window.Almacen.guardar(CLAVE_CUANDO, _hoyISO());
+    }
+  }
+  function marcarAnualVisto(anio) {
+    if (window.Almacen) window.Almacen.guardar(CLAVE_ANUAL_VISTO, String(anio));
   }
 
   function ultimoMes() { return mesAnterior(); }
 
-  // Datos del mes anterior si procede enseñarlo solo (o null).
+  // Días transcurridos entre una fecha ISO y hoy (0 si es hoy).
+  function _diasDesde(iso) {
+    if (!iso) return Infinity;
+    var t = new Date(iso + 'T00:00:00').getTime();
+    if (!isFinite(t)) return Infinity;
+    return Math.floor((Date.now() - t) / 86400000);
+  }
+
+  // ¿Estamos en la ventana del Wrapped anual? (31 dic, y hasta el 5 de enero
+  // para poder reabrirlo desde Práctica). Devuelve el año del recap o null.
+  function _ventanaAnual() {
+    var hoy = new Date();
+    var m = hoy.getMonth(), d = hoy.getDate(), y = hoy.getFullYear();
+    if (m === 11 && d === 31) return y;                       // Nochevieja
+    if (m === 0 && d <= DIAS_VENTANA_PRACTICA) return y - 1;  // primeros días de enero
+    return null;
+  }
+
+  // Wrapped anual que debe SALIR SOLO en Inicio (solo el 31 de diciembre y si
+  // no se ha visto ya este año). O null.
+  function anualPendiente() {
+    if (!window.Almacen) return null;
+    var hoy = new Date();
+    if (hoy.getMonth() !== 11 || hoy.getDate() !== 31) return null;
+    var anio = hoy.getFullYear();
+    if (window.Almacen.leer(CLAVE_ANUAL_VISTO, '') === String(anio)) return null;
+    var d;
+    try { d = datosAnuales(anio); } catch (e) { return null; }
+    return (d && d.hayAlgo) ? d : null;
+  }
+
+  // Resumen mensual que debe SALIR SOLO en Inicio (día 1–12, mes no visto y
+  // con algo que contar). En enero NO sale: el recap de diciembre se lo come
+  // el Wrapped anual del 31.  O null.
   function pendiente() {
     if (!window.Almacen) return null;
     var hoy = new Date();
     var ant = mesAnterior(hoy);
+    if (ant.mes === 11) return null;                       // diciembre: lo cubre el anual
     var clave = claveMes(ant.anio, ant.mes);
     if (window.Almacen.leer(CLAVE_VISTO, '') === clave) return null;
-    if (hoy.getDate() > DIA_TOPE_AUTO) return null; // ya muy metidos en el mes: no saltar solo
+    if (hoy.getDate() > DIA_TOPE_AUTO) return null;
 
     var d = datosDe(ant.anio, ant.mes);
     if (!d.hayAlgo) { marcarVisto(ant.anio, ant.mes); return null; }
     return d;
   }
 
-  /* ---------- Hoja / bottom sheet ---------- */
-  var hoja = null;
+  // Lo que debe verse en el BOTÓN de Práctica: el Wrapped anual durante su
+  // ventana; si no, el resumen del mes anterior pero solo los 5 días
+  // siguientes a que saliera. Fuera de eso, null (el botón se esconde).
+  function disponiblePractica() {
+    if (!window.Almacen) return null;
 
-  var ICO = {
-    racha: '<path d="M12 3s5 4.5 5 9a5 5 0 0 1-10 0c0-1.7.8-3.2 1.7-4.3C9 9 12 8 12 3Z"/>',
-    nota: '<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
-    estrella: '<path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.9 6.7 19.6l1-5.8L3.5 9.7l5.9-.9z"/>',
-    constancia: '<path d="M4 13h3l2-6 3 15 3-19 2.5 13 1.5-3H20"/>',
-    micro: '<rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>',
-    play: '<path d="M8 5.5a1 1 0 0 1 1.53-.85l9 6.5a1 1 0 0 1 0 1.7l-9 6.5A1 1 0 0 1 8 18.5z"/>'
-  };
-  function ico(k) {
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
-      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICO[k] || ICO.nota) + '</svg>';
-  }
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-  function fmtMin(seg) {
-    var m = Math.round((seg || 0) / 60);
-    return m <= 0 ? 'menos de 1 min' : m + ' min';
-  }
-  function fila(k, t) { return '<li>' + ico(k) + '<span>' + esc(t) + '</span></li>'; }
+    var anioAnual = _ventanaAnual();
+    if (anioAnual != null) {
+      try {
+        var da = datosAnuales(anioAnual);
+        if (da && da.hayAlgo) return da;
+      } catch (e) {}
+    }
 
+    var hoy = new Date();
+    var ant = mesAnterior(hoy);
+    if (ant.mes === 11) return null;                       // diciembre: sin resumen suelto
+    var clave = claveMes(ant.anio, ant.mes);
+
+    var d;
+    try { d = datosDe(ant.anio, ant.mes); } catch (e) { return null; }
+    if (!d || !d.hayAlgo) return null;
+
+    var visto = window.Almacen.leer(CLAVE_VISTO, '') === clave;
+    if (visto) {
+      var cuandoClave = window.Almacen.leer(CLAVE_CUANDO_CLAVE, '');
+      var cuando = window.Almacen.leer(CLAVE_CUANDO, '');
+      if (cuandoClave === clave && _diasDesde(cuando) <= DIAS_VENTANA_PRACTICA) return d;
+      return null;   // pasados los 5 días: fuera
+    }
+    // Aún sin ver: disponible mientras siga en la ventana de auto-apertura.
+    return hoy.getDate() <= DIA_TOPE_AUTO ? d : null;
+  }
+
+  /* ---------- Apertura (delega en el Wrapped) ---------- */
   function abrirHoja(d) {
-    cerrarHoja();
-
-    var filas = [];
-    if (d.canciones) {
-      filas.push(fila('nota', d.canciones + (d.canciones === 1 ? ' canción distinta' : ' canciones distintas')));
-    }
-    if (d.rachaMaxMes >= 2) {
-      filas.push(fila('racha', 'Racha más larga del mes: ' + d.rachaMaxMes + ' días'));
-    }
-    if (d.cancionTop) {
-      filas.push(fila('estrella', '«' + d.cancionTop.titulo + '», la más trabajada (' + d.cancionTop.veces + ' veces)'));
-    }
-    if (d.aprendidas.length) {
-      filas.push(fila('estrella',
-        (d.aprendidas.length === 1 ? 'Aprendida: ' : d.aprendidas.length + ' aprendidas: ') +
-        d.aprendidas.slice(0, 4).join(', ') + (d.aprendidas.length > 4 ? '…' : '')));
-    }
-    if (d.trozos) {
-      filas.push(fila('constancia', d.trozos + (d.trozos === 1 ? ' trozo difícil marcado' : ' trozos difíciles marcados')));
-    }
-    if (d.escuchas) {
-      filas.push(fila('play', 'Le diste al play ' + d.escuchas + (d.escuchas === 1 ? ' vez' : ' veces')));
-    }
-    if (d.grabaciones.n) {
-      filas.push(fila('micro', d.grabaciones.n + (d.grabaciones.n === 1 ? ' grabación' : ' grabaciones') +
-        ' (' + fmtMin(d.grabaciones.seg) + ')'));
-    }
-
-    var logrosHtml = '';
-    if (d.logros.length && window.Logros && window.Logros.icono) {
-      logrosHtml = '<div class="mes__logros">' +
-        '<span class="mes__logros-tit">' +
-          (d.logros.length === 1 ? 'Logro del mes' : d.logros.length + ' logros este mes') + '</span>' +
-        '<div class="mes__logros-fila">' +
-          d.logros.map(function (l) {
-            return '<span class="mes__medalla" title="' + esc(l.titulo) + '">' + window.Logros.icono(l.icono) + '</span>';
-          }).join('') +
-        '</div></div>';
-    }
-
-    hoja = document.createElement('div');
-    hoja.className = 'hoja hoja--mes';
-    hoja.innerHTML =
-      '<div class="hoja__fondo" data-cerrar></div>' +
-      '<div class="hoja__panel" role="dialog" aria-modal="true" aria-label="Resumen del mes">' +
-        '<div class="hoja__asa"></div>' +
-        '<p class="mes__eyebrow">Tu ' + esc(d.nombreMes) + ' en ChorApp</p>' +
-        '<div class="mes__grande">' +
-          '<span class="mes__num">' + d.dias + '</span>' +
-          '<span class="mes__num-label">' +
-            (d.dias === 1 ? 'día de estudio' : 'días de estudio') + ' de ' + d.diasDelMes + '</span>' +
-        '</div>' +
-        (filas.length ? '<ul class="mes__lista">' + filas.join('') + '</ul>' : '') +
-        logrosHtml +
-        '<p class="mes__frase">' + esc(d.frase) + '</p>' +
-        '<div class="hoja__acciones">' +
-          '<button type="button" class="btn btn--primario" data-cerrar>Cerrar</button>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(hoja);
-
-    Array.prototype.forEach.call(hoja.querySelectorAll('[data-cerrar]'), function (el) {
-      el.addEventListener('click', cerrarHoja);
-    });
-    document.addEventListener('keydown', _esc);
-
-    // Cerrar si se navega a otra pantalla (el router recrea #vista).
-    var vista = document.getElementById('vista');
-    if (vista && window.MutationObserver) {
-      var obs = new MutationObserver(function () { cerrarHoja(); obs.disconnect(); });
-      obs.observe(vista, { childList: true });
-    }
-
-    void hoja.offsetHeight;
-    hoja.classList.add('is-abierta');
+    if (window.Wrapped && window.Wrapped.abrir) window.Wrapped.abrir(d);
   }
-
-  function _esc(e) { if (e.key === 'Escape') cerrarHoja(); }
   function cerrarHoja() {
-    document.removeEventListener('keydown', _esc);
-    var h = hoja;
-    hoja = null;
-    if (!h) return;
-    h.classList.remove('is-abierta');
-    var quita = function () { if (h.parentNode) h.parentNode.removeChild(h); };
-    h.addEventListener('transitionend', quita, { once: true });
-    setTimeout(quita, 320);
+    if (window.Wrapped && window.Wrapped.cerrar) window.Wrapped.cerrar();
   }
 
   return {
     datosDe: datosDe,
+    datosAnuales: datosAnuales,
     pendiente: pendiente,
+    anualPendiente: anualPendiente,
+    disponiblePractica: disponiblePractica,
     ultimoMes: ultimoMes,
     marcarVisto: marcarVisto,
+    marcarAnualVisto: marcarAnualVisto,
     nombreMes: nombreMes,
     abrirHoja: abrirHoja,
     cerrarHoja: cerrarHoja,

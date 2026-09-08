@@ -179,13 +179,68 @@ button {
   to   { transform: translate3d(1.5%, 1.5%, 0); }
 }
 
-/* El fondo solo respira en las pestañas raíz y en reposo; durante la
-   navegación o dentro de una canción/sesión/estudio se congela. */
-body.navegando .fondo-animado,
-body.navegando .fondo-lineas,
-body:not(.ruta-raiz) .fondo-animado,
-body:not(.ruta-raiz) .fondo-lineas {
-  animation-play-state: paused;
+/* Orbes cobalto que vagan muy despacio. Círculos de degradado suave (SIN
+   filter:blur): el borde ya es difuso por el propio degradado, así que se
+   ven igual en cualquier WebView y solo cuestan una capa de GPU que se
+   traslada (nunca se re-rasteriza). Solo animan `transform`. */
+.fondo-orbe {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--color-acento) 62%, transparent) 0%,
+    color-mix(in srgb, var(--color-acento) 30%, transparent) 38%,
+    transparent 66%);
+  opacity: 0.5;
+  /* Movimiento CONTINUO (linear): sin ease-in-out, que hacía que el orbe
+     casi se parase en cada punto del recorrido y pareciera quieto.
+     Además de trasladarse, "respira" (scale) — también es solo compositor. */
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.fondo-orbe--1 {
+  width: 72vw; height: 72vw; max-width: 320px; max-height: 320px;
+  top: -8%; left: -20%;
+  animation-name: orbe-1;
+  animation-duration: 22s;
+}
+.fondo-orbe--2 {
+  width: 58vw; height: 58vw; max-width: 260px; max-height: 260px;
+  top: 38%; right: -22%;
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--color-acento-oscuro) 58%, transparent) 0%,
+    color-mix(in srgb, var(--color-acento-oscuro) 28%, transparent) 38%,
+    transparent 66%);
+  animation-name: orbe-2;
+  animation-duration: 27s;
+}
+.fondo-orbe--3 {
+  width: 64vw; height: 64vw; max-width: 290px; max-height: 290px;
+  bottom: -14%; left: 22%;
+  animation-name: orbe-3;
+  animation-duration: 20s;
+}
+/* Recorridos cerrados (empiezan y acaban igual → bucle sin salto). Traslados
+   amplios + un poco de escala para que el movimiento se vea de un vistazo. */
+@keyframes orbe-1 {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  25%  { transform: translate3d(44vw, 12vh, 0) scale(1.18); }
+  50%  { transform: translate3d(66vw, 34vh, 0) scale(0.92); }
+  75%  { transform: translate3d(26vw, 46vh, 0) scale(1.1); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes orbe-2 {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  25%  { transform: translate3d(-40vw, -26vh, 0) scale(1.15); }
+  50%  { transform: translate3d(-54vw, 10vh, 0) scale(0.9); }
+  75%  { transform: translate3d(-20vw, 28vh, 0) scale(1.12); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes orbe-3 {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  25%  { transform: translate3d(28vw, -30vh, 0) scale(0.9); }
+  50%  { transform: translate3d(-16vw, -46vh, 0) scale(1.2); }
+  75%  { transform: translate3d(-34vw, -16vh, 0) scale(1.05); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
 }
 
 /* Pentagrama sutil: líneas horizontales finas que reptan muy despacio. */
@@ -225,6 +280,7 @@ body:not(.ruta-raiz) .fondo-lineas {
       color-mix(in srgb, var(--color-acento) 26%, var(--color-fondo)) 0%, transparent 80%);
 }
 :root[data-theme="dark"] .fondo-lineas { opacity: 0.28; }
+:root[data-theme="dark"] .fondo-orbe { opacity: 0.62; }
 
 /* ============================================================
    Cabecera contextual
@@ -313,17 +369,28 @@ body:not(.ruta-raiz) .fondo-lineas {
   min-height: calc(100vh - var(--alto-header));
 }
 
-/* Transición al navegar dentro de una sección: deslizamiento horizontal */
-.pantalla { animation: entra-pagina var(--dur-pagina) var(--curva) both; }
+/* app.js añade la clase de animación (.entra / .entra-fundido) ya con todo
+   el contenido montado por el módulo de la página, en la misma tarea que el
+   innerHTML (antes de que el navegador pinte). Así el trabajo pesado de
+   montar la página (calendario, logros, listas…) no se solapa con la
+   animación y la transición no se traba. Si el módulo falla, la pantalla
+   se ve igual (no hay opacity:0 por defecto). */
+
+/* Navegar dentro de una sección: deslizamiento horizontal corto.
+   Sin `fill-mode`: si por lo que sea la animación no llegara a correr
+   (WebView que congela animaciones), la pantalla se queda en su estado
+   natural (visible), nunca invisible. */
+.pantalla.entra { animation: entra-pagina 220ms var(--curva); }
 @keyframes entra-pagina {
-  from { opacity: 0; transform: translateX(24px); }
+  from { opacity: 0; transform: translateX(18px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-/* Cambio de pestaña del bottom nav: solo fundido */
-.pantalla.fundido { animation: fundido var(--dur-pagina) var(--curva) both; }
+/* Ir a una pestaña del bottom nav (incluido volver de una canción/sesión):
+   fundido puro, sin transform — es lo más barato de animar. */
+.pantalla.entra-fundido { animation: fundido 180ms var(--curva); }
 @keyframes fundido {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* Aparición escalonada de listas (solo primera carga) */
@@ -1142,12 +1209,12 @@ body:not(.ruta-raiz) .fondo-lineas {
     animation-iteration-count: 1 !important;
     transition-duration: 120ms !important;
   }
-  .pantalla { animation: fundido-simple 120ms linear both; }
-  @keyframes fundido-simple { from { opacity: 0; } to { opacity: 1; } }
+  .pantalla { opacity: 1 !important; animation: none !important; }
 
   /* Con "reducir movimiento" el fondo se queda quieto del todo. */
   .fondo-animado { animation: none !important; transform: none !important; }
   .fondo-lineas { animation: none !important; transform: none !important; }
+  .fondo-orbe { animation: none !important; transform: none !important; }
   .hoja__panel { transition: opacity 120ms linear !important; transform: none !important; }
 }
 
@@ -3000,83 +3067,9 @@ body.sin-scroll { overflow: hidden; }
 .btn-mes:active { transform: scale(0.98); }
 @media (prefers-reduced-motion: reduce) { .btn-mes:active { transform: none; } }
 
-/* Hoja "Resumen del mes" */
-.mes__eyebrow {
-  text-align: center;
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-texto-2);
-  margin-bottom: 10px;
-}
-.mes__grande {
-  text-align: center;
-  margin-bottom: 18px;
-}
-.mes__num {
-  display: block;
-  font-family: var(--fuente-titulo);
-  font-size: 52px;
-  line-height: 1;
-  font-weight: 800;
-  color: var(--color-acento);
-}
-.mes__num-label {
-  display: block;
-  margin-top: 6px;
-  font-size: 14px;
-  color: var(--color-texto-2);
-}
-.mes__lista {
-  list-style: none;
-  margin: 0 0 16px;
-  padding: 0;
-}
-.mes__lista li {
-  display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  padding: 9px 0;
-  font-size: 15px;
-  border-bottom: 1px solid var(--color-borde);
-}
-.mes__lista li:last-child { border-bottom: 0; }
-.mes__lista svg { width: 20px; height: 20px; color: var(--color-acento); flex-shrink: 0; margin-top: 1px; }
-.mes__logros {
-  background: var(--color-acento-suave);
-  border-radius: 14px;
-  padding: 12px 14px;
-  margin-bottom: 16px;
-}
-.mes__logros-tit {
-  display: block;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-acento-oscuro);
-  margin-bottom: 8px;
-}
-.mes__logros-fila { display: flex; flex-wrap: wrap; gap: 8px; }
-.mes__medalla {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  background: linear-gradient(150deg, var(--color-acento), var(--color-acento-oscuro));
-}
-.mes__medalla svg { width: 20px; height: 20px; }
-.mes__frase {
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--color-texto);
-  background: var(--color-superficie);
-  border: 1px solid var(--color-borde);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 4px;
-}
+/* El "Resumen del mes" es ahora el Wrapped a pantalla completa
+   (js/wrapped.js). Sus estilos están al final de este archivo
+   (bloque "Wrapped"). El botón .btn-mes de Práctica se conserva arriba. */
 
 /* Bloque de concierto dentro de la hoja "Resumen del día" */
 .resumen__bloque--concierto {
@@ -6146,3 +6139,706 @@ body.app-grabando #btn-parar-grabando {
 @media (prefers-reduced-motion: reduce) {
   .tono__drone.is-activo .tono__drone-punto { animation: none; }
 }
+
+/* ============================================================
+   Wrapped — resumen del mes a pantalla completa (wrapped.js)
+   Estilo "historias": barras arriba, se desliza, un dato por pantalla.
+   ============================================================ */
+body.wrapped-abierto { overflow: hidden; }
+
+.wrapped {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  background-color: #2A24C8;
+  background-image: linear-gradient(165deg, #5A5CF0 0%, #2A24C8 48%, #0B0870 100%);
+  background-size: 100% 220%;
+  background-position: 50% 0%;
+  animation: w-bg 22s ease-in-out infinite alternate;
+  opacity: 0;
+  transition: opacity var(--dur-pagina) var(--curva);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  overflow: hidden;
+}
+.wrapped.is-abierta { opacity: 1; }
+@keyframes w-bg {
+  from { background-position: 50% 0%; }
+  to   { background-position: 50% 100%; }
+}
+
+/* Fondo animado: manchas de color que se desplazan despacio */
+.w-fondo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.w-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(46px);
+  opacity: 0.42;
+}
+.w-blob--1 {
+  width: 82vw; height: 82vw;
+  top: -22%; left: -18%;
+  background: #7C7EFF;
+  animation: w-drift-1 24s ease-in-out infinite alternate;
+}
+.w-blob--2 {
+  width: 78vw; height: 78vw;
+  bottom: -26%; right: -22%;
+  background: #2A24C8;
+  animation: w-drift-2 30s ease-in-out infinite alternate;
+}
+.w-blob--3 {
+  width: 55vw; height: 55vw;
+  top: 34%; right: -12%;
+  background: #4B45E0;
+  opacity: 0.3;
+  animation: w-drift-3 27s ease-in-out infinite alternate;
+}
+@keyframes w-drift-1 { to { transform: translate(22%, 16%); } }
+@keyframes w-drift-2 { to { transform: translate(-18%, -14%); } }
+@keyframes w-drift-3 { to { transform: translate(-14%, 20%); } }
+
+.wrapped--anual {
+  background-color: #1B1466;
+  background-image: linear-gradient(165deg, #3B2E8F 0%, #1B1466 50%, #0B0740 100%);
+}
+.wrapped--anual .w-blob--1 { background: #6E5AD8; }
+.wrapped--anual .w-blob--2 { background: #1B1466; }
+.wrapped--anual .w-blob--3 { background: #8A5CC9; opacity: 0.26; }
+
+/* Barra superior: silencio · progreso · cerrar, todo en una fila alineada */
+.w-top {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px 2px;
+  pointer-events: none;   /* deja pasar el toque a las zonas de avance… */
+}
+.w-top .w-mute,
+.w-top .w-x { pointer-events: auto; }   /* …salvo en los botones */
+.w-progreso {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 5px;
+}
+.w-barra {
+  flex: 1;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  overflow: hidden;
+}
+.w-barra i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #fff;
+  border-radius: 999px;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.w-mute,
+.w-x {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin: -6px 0;                /* que la fila no crezca por los botones */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.9;
+}
+.w-mute:active,
+.w-x:active { opacity: 0.6; }
+.w-mute svg { width: 20px; height: 20px; }
+.w-x svg { width: 20px; height: 20px; }
+.w-mute .w-mute__off { display: none; }
+.w-mute.is-mute .w-mute__on { display: none; }
+.w-mute.is-mute .w-mute__off { display: block; }
+.w-mute.is-mute { opacity: 0.65; }
+
+/* Zonas de toque izquierda / derecha */
+.w-zona {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.w-zona--prev { left: 0; width: 30%; }
+.w-zona--next { right: 0; width: 70%; }
+
+/* Un brillo fijo arriba, para que el degradado no sea plano */
+.wrapped::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: radial-gradient(60% 34% at 30% 4%, rgba(255, 255, 255, 0.14), transparent 70%);
+  pointer-events: none;
+}
+.wrapped--anual::before {
+  background: radial-gradient(60% 34% at 30% 4%, rgba(255, 233, 176, 0.14), transparent 70%);
+}
+
+/* Contenedor de diapositivas */
+.w-slides {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+}
+/* Cada slide ocupa la banda visible (bajo la barra, sobre los botones) */
+.w-slide {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(env(safe-area-inset-top) + 40px);
+  bottom: calc(env(safe-area-inset-bottom) + 66px);
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 14px 26px;
+}
+.w-slide__in {
+  width: 100%;
+  max-width: 440px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;   /* reparte el aire entre los elementos */
+  gap: 10px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.w-slide__in::-webkit-scrollbar { display: none; }
+/* La portada y el cierre respiran mejor centrados */
+.w-slide--portada .w-slide__in { justify-content: center; gap: clamp(14px, 4vh, 30px); }
+.w-slide--cierre .w-slide__in { justify-content: center; gap: clamp(12px, 3vh, 22px); }
+
+/* Entrada en cascada de cada elemento del slide */
+.w-slide--entra .w-slide__in > *:not(.w-tops):not(.w-aprend):not(.w-medallas):not(.w-recuerdo) {
+  animation: w-rise 520ms var(--curva) both;
+}
+.w-slide--entra .w-slide__in > *:nth-child(1) { animation-delay: 50ms; }
+.w-slide--entra .w-slide__in > *:nth-child(2) { animation-delay: 120ms; }
+.w-slide--entra .w-slide__in > *:nth-child(3) { animation-delay: 195ms; }
+.w-slide--entra .w-slide__in > *:nth-child(4) { animation-delay: 270ms; }
+.w-slide--entra .w-slide__in > *:nth-child(5) { animation-delay: 345ms; }
+.w-slide--entra .w-slide__in > *:nth-child(6) { animation-delay: 420ms; }
+@keyframes w-rise {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Listas: los ítems entran escalonados */
+.w-slide--entra .w-tops li { animation: w-rise 460ms var(--curva) both; }
+.w-slide--entra .w-tops li:nth-child(1) { animation-delay: 220ms; }
+.w-slide--entra .w-tops li:nth-child(2) { animation-delay: 320ms; }
+.w-slide--entra .w-tops li:nth-child(3) { animation-delay: 420ms; }
+.w-slide--entra .w-aprend li { animation: w-rise 440ms var(--curva) both; }
+.w-slide--entra .w-aprend li:nth-child(1) { animation-delay: 180ms; }
+.w-slide--entra .w-aprend li:nth-child(2) { animation-delay: 250ms; }
+.w-slide--entra .w-aprend li:nth-child(3) { animation-delay: 320ms; }
+.w-slide--entra .w-aprend li:nth-child(4) { animation-delay: 390ms; }
+.w-slide--entra .w-aprend li:nth-child(5) { animation-delay: 460ms; }
+.w-slide--entra .w-medallas .w-medalla { animation: w-rise 420ms var(--curva) both; }
+.w-slide--entra .w-medallas .w-medalla:nth-child(1) { animation-delay: 200ms; }
+.w-slide--entra .w-medallas .w-medalla:nth-child(2) { animation-delay: 280ms; }
+.w-slide--entra .w-medallas .w-medalla:nth-child(3) { animation-delay: 360ms; }
+.w-slide--entra .w-medallas .w-medalla:nth-child(4) { animation-delay: 440ms; }
+.w-slide--entra .w-medallas .w-medalla:nth-child(n+5) { animation-delay: 520ms; }
+
+.w-slide--entra .w-cifra__n { animation: w-pop 620ms var(--curva) 120ms both; }
+@keyframes w-pop {
+  0%   { opacity: 0; transform: scale(0.55); }
+  70%  { transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Tipografía de las diapositivas — el espaciado lo da el gap de .w-slide__in */
+.w-eyebrow {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0;
+}
+.w-titular {
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  line-height: 1.02;
+  margin: 0;
+}
+.w-titular--mes { font-size: clamp(58px, 21vw, 104px); letter-spacing: -0.01em; }
+.w-sub { font-size: 17px; color: rgba(255, 255, 255, 0.82); margin: 0; }
+.w-pie { font-size: 14px; color: rgba(255, 255, 255, 0.68); margin: 0; }
+
+.w-cifra {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.w-cifra__n {
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: clamp(92px, 34vw, 168px);
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+}
+.w-cifra__de {
+  font-size: clamp(15px, 4.4vw, 19px);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.w-frase {
+  font-size: clamp(18px, 5vw, 22px);
+  line-height: 1.4;
+  margin: 0;
+}
+.w-frase strong { font-weight: 800; }
+.w-nota {
+  font-size: clamp(14px, 4vw, 16px);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.76);
+  margin: 0;
+}
+.w-cancion {
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: clamp(30px, 10vw, 48px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.w-cierre {
+  font-family: var(--fuente-titulo);
+  font-weight: 700;
+  font-size: clamp(23px, 7.2vw, 32px);
+  line-height: 1.3;
+  margin: 0;
+}
+
+.w-aprend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: clamp(16px, 4.6vw, 19px);
+  font-weight: 600;
+}
+.w-aprend__mas { opacity: 0.6; font-weight: 500; font-size: 15px; }
+
+/* Slides de "top" (ranking de canciones) */
+.w-tops {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.w-tops li {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-size: clamp(17px, 5vw, 21px);
+  font-weight: 600;
+  padding: 15px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+.w-tops li:first-child { padding-top: 4px; }
+.w-tops li:last-child { border-bottom: 0; padding-bottom: 4px; }
+.w-tops__pos {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  font-family: var(--fuente-titulo);
+  font-size: 15px;
+  font-weight: 800;
+}
+.w-tops li:first-child .w-tops__pos { background: #fff; color: var(--color-acento-oscuro); }
+.w-tops__tit {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.w-tops__n {
+  flex: none;
+  font-family: var(--fuente-titulo);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: 1.1em;
+  opacity: 0.85;
+}
+.w-tops__pie {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: left;
+}
+.wrapped--anual .w-tops__pos { background: rgba(255, 233, 176, 0.22); color: #FFE9B0; }
+.wrapped--anual .w-tops li:first-child .w-tops__pos {
+  background: linear-gradient(150deg, #FFE9B0, #F3B33F); color: #7A4E00;
+}
+/* con 5 filas (anual) apretamos un poco */
+.w-tops:has(li:nth-child(4)) li { padding: 11px 0; font-size: clamp(16px, 4.6vw, 19px); }
+.w-tops:has(li:nth-child(4)) .w-tops__pos { width: 28px; height: 28px; font-size: 14px; }
+
+/* Slide de presentación (teaser, sin números) */
+.w-slide--teaser .w-slide__in { justify-content: center; gap: clamp(16px, 4.5vh, 34px); }
+.w-teaser {
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: clamp(28px, 8vw, 40px);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+/* Foto resumen en el slide de cierre */
+.w-poster {
+  width: 100%;
+  max-width: 168px;
+  margin: 0 auto;
+  aspect-ratio: 1080 / 1920;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.w-poster__cargando {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 20px;
+  text-align: center;
+}
+.w-poster__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  animation: w-rise 460ms var(--curva) both;
+}
+.w-cierre__botones {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.w-cierre__botones.is-trabajando { opacity: 0.5; pointer-events: none; }
+.w-btn--ghost {
+  background: transparent;
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+}
+.wrapped--anual .w-btn--ghost { color: #fff; }
+.w-cerrar-link {
+  margin: 0 auto;
+  padding: 8px 20px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--fuente-texto);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Mientras la última slide (cierre) está en pantalla, el toque no salta */
+.wrapped.w-cierre-activo .w-zona { pointer-events: none; }
+
+/* Recuerdo de concierto: foto grande + texto sobre degradado */
+.w-slide--recuerdo { padding: 12px 16px; }
+.w-slide--recuerdo .w-slide__in {
+  max-width: 460px;
+  height: 100%;
+  gap: 0;
+  justify-content: stretch;
+}
+.w-recuerdo {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: 22px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+.w-recuerdo__foto {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.07) center/cover no-repeat;
+  opacity: 0;
+  transform: scale(1.06);
+  transition: opacity 500ms var(--curva), transform 6s linear;
+}
+.w-recuerdo__foto.is-cargada { opacity: 1; transform: scale(1); }
+.w-recuerdo__foto--vacia {
+  opacity: 1;
+  transform: none;
+  background:
+    radial-gradient(70% 60% at 50% 30%, rgba(255, 255, 255, 0.12), transparent 70%),
+    rgba(255, 255, 255, 0.06);
+}
+.w-recuerdo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8, 6, 40, 0.15) 0%, transparent 32%, rgba(8, 6, 40, 0.9) 100%);
+}
+.w-recuerdo__txt {
+  position: relative;
+  width: 100%;
+  padding: 20px 20px 22px;
+  text-align: left;
+}
+.w-recuerdo__lugar {
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: clamp(22px, 7vw, 30px);
+  line-height: 1.15;
+  margin: 8px 0 0;
+}
+.w-recuerdo__nota {
+  font-size: clamp(15px, 4.4vw, 17px);
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 10px 0 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.w-slide--entra .w-recuerdo__txt > * { animation: w-rise 480ms var(--curva) both; }
+.w-slide--entra .w-recuerdo__txt > *:nth-child(1) { animation-delay: 260ms; }
+.w-slide--entra .w-recuerdo__txt > *:nth-child(2) { animation-delay: 340ms; }
+.w-slide--entra .w-recuerdo__txt > *:nth-child(3) { animation-delay: 420ms; }
+.w-medallas { margin: 0; }
+
+/* Mini-juego "adivina" */
+.w-slide--quiz .w-slide__in { max-width: 370px; }
+.w-quiz__preg {
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: clamp(21px, 6vw, 27px);
+  line-height: 1.25;
+  margin: 6px 0 22px;
+}
+.w-quiz__ops { display: flex; flex-direction: column; gap: 10px; }
+.w-quiz__op {
+  width: 100%;
+  padding: 15px 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.10);
+  color: #fff;
+  font-family: var(--fuente-texto);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--curva),
+              background var(--dur-micro) var(--curva),
+              border-color var(--dur-micro) var(--curva);
+}
+.w-quiz__op:active { transform: scale(0.98); }
+.w-quiz__op:disabled { cursor: default; opacity: 0.55; }
+.w-quiz__op.is-bien {
+  background: #2f9e5e;
+  border-color: #2f9e5e;
+  opacity: 1;
+}
+.w-quiz__op.is-mal {
+  background: #cf4b4b;
+  border-color: #cf4b4b;
+  opacity: 1;
+}
+.w-quiz__pista {
+  margin: 18px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+.w-reaccion {
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+.w-reaccion.is-mal { color: #ffd2d2; }
+.w-reaccion.is-bien { color: #c6f5da; }
+.wrapped--anual .w-reaccion.is-bien { color: #FFE9B0; }
+
+/* Mientras un quiz espera respuesta, el toque no salta de slide */
+.wrapped.w-quiz-activo .w-zona { pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .w-quiz__op:active { transform: none; }
+}
+.wrapped--sin-motion .w-quiz__op:active { transform: none; }
+.w-medallas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin: 6px 0 16px;
+}
+.w-medalla {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-acento-oscuro);
+  background: #fff;
+}
+.w-medalla svg { width: 28px; height: 28px; }
+
+/* Check de celebración */
+.w-check {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto;
+}
+.w-check svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.w-slide--entra .w-check circle {
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  animation: w-trazo 500ms var(--curva) forwards;
+}
+.w-slide--entra .w-check path {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: w-trazo 360ms var(--curva) 380ms forwards;
+}
+@keyframes w-trazo { to { stroke-dashoffset: 0; } }
+
+/* Botón cerrar de la última slide */
+.w-btn {
+  margin: 6px auto 0;
+  padding: 14px 34px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--color-acento-oscuro);
+  font-family: var(--fuente-texto);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.w-btn:active { transform: scale(0.96); }
+
+/* Pasos manuales abajo (grandes y claros para Maite) */
+.w-pasos {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  gap: 10px;
+  padding: 8px 16px calc(env(safe-area-inset-bottom) + 16px);
+}
+.w-paso {
+  flex: 1;
+  padding: 13px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-family: var(--fuente-texto);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.w-paso--next { background: #fff; color: var(--color-acento-oscuro); border-color: #fff; }
+.w-paso:active { transform: scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wrapped { transition: opacity 120ms linear; animation: none; }
+  .w-blob { animation: none !important; }
+  .w-slide--entra .w-slide__in > *,
+  .w-slide--entra .w-cifra__n,
+  .w-slide--entra .w-tops li,
+  .w-slide--entra .w-aprend li,
+  .w-slide--entra .w-medallas .w-medalla,
+  .w-slide--entra .w-recuerdo__txt > * { animation: none; }
+  .w-slide--entra .w-check circle,
+  .w-slide--entra .w-check path { animation: none; stroke-dashoffset: 0; }
+  .w-recuerdo__foto { transition: opacity 200ms linear; transform: none; }
+  .w-btn:active, .w-paso:active { transform: none; }
+}
+.wrapped--sin-motion { animation: none; }
+.wrapped--sin-motion .w-blob { animation: none !important; }
+.wrapped--sin-motion .w-slide--entra .w-slide__in > *,
+.wrapped--sin-motion .w-slide--entra .w-cifra__n,
+.wrapped--sin-motion .w-slide--entra .w-tops li,
+.wrapped--sin-motion .w-slide--entra .w-aprend li,
+.wrapped--sin-motion .w-slide--entra .w-medallas .w-medalla,
+.wrapped--sin-motion .w-slide--entra .w-recuerdo__txt > * { animation: none; }
+.wrapped--sin-motion .w-slide--entra .w-check circle,
+.wrapped--sin-motion .w-slide--entra .w-check path { animation: none; stroke-dashoffset: 0; }
+.wrapped--sin-motion .w-recuerdo__foto { transition: opacity 200ms linear; transform: none; }
+
+/* ---------- Wrapped ANUAL (31 de diciembre) — el fondo está arriba ---------- */
+.wrapped--anual .w-cifra__n,
+.wrapped--anual .w-titular--mes {
+  background: linear-gradient(180deg, #FFE9B0 0%, #F3B33F 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.wrapped--anual .w-cancion { color: #FFE9B0; }
+.wrapped--anual .w-medalla {
+  color: #7A4E00;
+  background: linear-gradient(150deg, #FFE9B0, #F3B33F);
+}
+.wrapped--anual .w-check svg { stroke: #FFE9B0; }
+.wrapped--anual .w-btn { color: #6E2CC9; }
+.wrapped--anual .w-paso--next { color: #6E2CC9; }

@@ -62,7 +62,10 @@
     cargando = true;
 
     var esPrimeraNav = rutaActual === null;
-    var esCambioDeTab = pantalla.raiz && (rutaActual === null || PANTALLAS[rutaActual].raiz);
+    // Cualquier salto a una pestaña del bottom nav usa fundido (no el
+    // deslizamiento lateral), incluido volver desde una canción/sesión/
+    // estudio: es un cambio de contexto y el fundido es mucho más barato.
+    var esCambioDeTab = pantalla.raiz;
 
     try {
       var html = await fetch('pages/' + pantalla.archivo + '.html').then(function (r) {
@@ -70,11 +73,14 @@
         return r.text();
       });
 
-      // Cambio de pestaña o "reemplazar" (p. ej. cambiar de versión en el
-      // Modo estudio) → fundido suave, no deslizamiento de pantalla entera.
-      var claseAnim = (esCambioDeTab || opts.reemplazar) ? 'fundido' : '';
+      // La pantalla entra invisible (opacity:0 en CSS). La animación NO se
+      // dispara aquí: se añade su clase en el frame siguiente, cuando el
+      // módulo ya ha montado todo el contenido. Así el trabajo pesado de
+      // pintar la página (calendario, logros, listas…) no compite con la
+      // animación y la transición deja de trabarse.
+      var claseAnim = (esCambioDeTab || opts.reemplazar) ? 'entra-fundido' : 'entra';
       vista.innerHTML =
-        '<div class="pantalla ' + claseAnim + '" data-pantalla="' + pantalla.archivo + '">' + html + '</div>';
+        '<div class="pantalla" data-pantalla="' + pantalla.archivo + '">' + html + '</div>';
       var contenedor = vista.firstElementChild;
 
       // Historial: las pestañas raíz reinician la pila; el resto apila.
@@ -98,17 +104,6 @@
       actualizarCabecera(pantalla);
       actualizarNav(ruta);
       window.scrollTo(0, 0);
-
-      // Rendimiento: el fondo animado solo "respira" en las pestañas raíz y
-      // en reposo. `navegando` lo congela durante la transición de pantalla
-      // (evita que fondo + slide + backdrop-filter compitan por el compositor
-      // justo cuando se nota el tirón). Se libera al acabar la animación.
-      document.body.classList.toggle('ruta-raiz', !!pantalla.raiz);
-      document.body.classList.add('navegando');
-      clearTimeout(ir._tNaveg);
-      ir._tNaveg = setTimeout(function () {
-        document.body.classList.remove('navegando');
-      }, 320);
 
       // Espejar la profundidad de `historial` en el historial del navegador,
       // para que el gesto "atrás" de Android (y el del navegador) vuelva
@@ -136,8 +131,15 @@
       // Módulo opcional de la página: js/pages/<archivo>.js expone window.Pagina_<archivo>
       var modulo = window['Pagina_' + pantalla.archivo];
       if (modulo && typeof modulo.iniciar === 'function') {
-        modulo.iniciar(contenedor, opts.datos);
+        try { modulo.iniciar(contenedor, opts.datos); }
+        catch (e) { console.error('Módulo de página falló:', e); }
       }
+
+      // La animación se dispara AHORA, con el contenido ya montado y todavía
+      // en la misma tarea (el navegador aún no ha pintado): así el primer
+      // fotograma ya arranca con `from { opacity: 0 }` y el resto de la
+      // transición es solo opacidad (compositor), sin recalcular layout.
+      contenedor.classList.add(claseAnim);
 
       // Aviso estilo Steam si acaba de caer algún logro nuevo (tras la
       // acción que lo dispara, que casi siempre implica cambiar de pantalla).

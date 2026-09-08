@@ -161,15 +161,14 @@ window.Pagina_practice = (function () {
      ---------------------------------------------------------- */
   function pintarResumenMes(raiz) {
     var btn = raiz.querySelector('[data-resumen-mes]');
-    if (!btn || !window.ResumenMes) return;
+    if (!btn || !window.ResumenMes || !window.ResumenMes.disponiblePractica) return;
 
-    var ant = window.ResumenMes.ultimoMes();
     var d;
-    try { d = window.ResumenMes.datosDe(ant.anio, ant.mes); } catch (e) { return; }
-    if (!d || !d.hayAlgo) return;
+    try { d = window.ResumenMes.disponiblePractica(); } catch (e) { return; }
+    if (!d) return;   // fuera de la ventana de 5 días: el botón no se ve
 
     raiz.querySelector('[data-resumen-mes-texto]').textContent =
-      'Resumen de ' + d.nombreMes;
+      d.esAnual ? ('Tu ' + d.anio + ' en ChorApp') : ('Resumen de ' + d.nombreMes);
     btn.addEventListener('click', function () { window.ResumenMes.abrirHoja(d); });
     btn.hidden = false;
   }

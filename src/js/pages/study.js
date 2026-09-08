@@ -58,6 +58,7 @@ window.Pagina_study = (function () {
   var selEscucha = null;      // selector Altavoz/Auriculares (window.Sincronia)
   var panelTono = null;       // panel "Dame el tono" (window.Tono)
   var tourCapa = null;        // overlay del mini-tutorial (solo la 1ª vez)
+  var tourReubicar = null;    // listener que recoloca el foco si cambia la maqueta
 
   function iniciar(contenedor, datos) {
     destruir();   // por si se re-entra desde otra canción
@@ -96,7 +97,15 @@ window.Pagina_study = (function () {
     construirTomas();
     segIni = marca.segundo || 0;
     segFinRaw = (typeof marca.finSegundo === 'number' && marca.finSegundo > segIni) ? marca.finSegundo : null;
-    pendienteSalto = segIni;
+
+    // Si venimos de la barra flotante (misma sesión + misma marca ya sonando),
+    // NO reposicionamos el audio: se reanuda donde estaba. Solo forzamos el
+    // salto al principio de la canción cuando es una entrada nueva.
+    var ant = window.Almacen.leer('estudio:ultimo', null);
+    var reanudando = ant && ant.sesionId === sesion.id && ant.marcaId === marca.id &&
+      window.CancionActiva && window.CancionActiva.cancionId() === sesion.id &&
+      window.CancionActiva.hayCancion();
+    pendienteSalto = reanudando ? null : segIni;
 
     // Recordar dónde estaba estudiando, para el botón "Continuar" de Inicio.
     window.Almacen.guardar('estudio:ultimo', {
@@ -226,9 +235,6 @@ window.Pagina_study = (function () {
     });
     if (pasos.length < 2) return;   // si apenas hay nada que enseñar, no molestamos
 
-    var reduce = false;
-    try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
-
     var i = 0;
     tourCapa = document.createElement('div');
     tourCapa.className = 'tour';
@@ -247,46 +253,71 @@ window.Pagina_study = (function () {
 
     var foco = tourCapa.querySelector('[data-foco]');
     var globo = tourCapa.querySelector('[data-globo]');
+    var elActual = null;   // elemento resaltado en el paso que se ve ahora
+
+    // Coloca foco + globo sobre un elemento que YA está en su sitio en pantalla.
+    // Se llama tras asentar el scroll y cada vez que la maqueta se mueve.
+    function colocar(el) {
+      if (!tourCapa || !el) return;
+      var r = el.getBoundingClientRect();
+      if (!r.width && !r.height) return;   // aún sin maquetar: se reintenta al reubicar
+      var pad = 8;
+      foco.style.left = (r.left - pad) + 'px';
+      foco.style.top = (r.top - pad) + 'px';
+      foco.style.width = (r.width + pad * 2) + 'px';
+      foco.style.height = (r.height + pad * 2) + 'px';
+
+      // El globo se amolda al ancho del elemento resaltado (con los mismos
+      // 8px de padding del foco), sin salirse de la pantalla.
+      var margen = 12;
+      var ancho = Math.min(window.innerWidth - margen * 2, Math.max(240, r.width + pad * 2));
+      var izq = Math.min(
+        Math.max(margen, r.left - pad),
+        window.innerWidth - margen - ancho
+      );
+      globo.style.left = izq + 'px';
+      globo.style.right = 'auto';
+      globo.style.width = ancho + 'px';
+      globo.style.maxWidth = 'none';
+      globo.style.margin = '0';
+
+      var abajo = window.innerHeight - r.bottom;
+      var arriba = abajo < globo.offsetHeight + 30;
+      globo.classList.toggle('tour__globo--arriba', arriba);
+      globo.style.top = (arriba ? Math.max(12, r.top - globo.offsetHeight - 14)
+                                : r.bottom + 14) + 'px';
+    }
 
     function pinta() {
       var p = pasos[i];
       var el = cont.querySelector(p.sel);
       if (!el) { cerrarTour(true); return; }
-      try { el.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' }); } catch (e) {}
-      setTimeout(function () {
-        if (!tourCapa) return;
-        var r = el.getBoundingClientRect();
-        var pad = 8;
-        foco.style.left = (r.left - pad) + 'px';
-        foco.style.top = (r.top - pad) + 'px';
-        foco.style.width = (r.width + pad * 2) + 'px';
-        foco.style.height = (r.height + pad * 2) + 'px';
-        tourCapa.querySelector('[data-paso-n]').textContent = (i + 1) + ' / ' + pasos.length;
-        tourCapa.querySelector('[data-t]').textContent = p.titulo;
-        tourCapa.querySelector('[data-x]').textContent = p.texto;
-        tourCapa.querySelector('[data-sig]').textContent =
-          (i === pasos.length - 1) ? 'Entendido' : 'Siguiente';
-        // El globo se amolda al ancho del elemento resaltado (con los mismos
-        // 8px de padding del foco), sin salirse de la pantalla.
-        var margen = 12;
-        var ancho = Math.min(window.innerWidth - margen * 2, Math.max(240, r.width + pad * 2));
-        var izq = Math.min(
-          Math.max(margen, r.left - pad),
-          window.innerWidth - margen - ancho
-        );
-        globo.style.left = izq + 'px';
-        globo.style.right = 'auto';
-        globo.style.width = ancho + 'px';
-        globo.style.maxWidth = 'none';
-        globo.style.margin = '0';
+      elActual = el;
 
-        var abajo = window.innerHeight - r.bottom;
-        var arriba = abajo < globo.offsetHeight + 30;
-        globo.classList.toggle('tour__globo--arriba', arriba);
-        globo.style.top = (arriba ? Math.max(12, r.top - globo.offsetHeight - 14)
-                                  : r.bottom + 14) + 'px';
-      }, reduce ? 0 : 240);
+      tourCapa.querySelector('[data-paso-n]').textContent = (i + 1) + ' / ' + pasos.length;
+      tourCapa.querySelector('[data-t]').textContent = p.titulo;
+      tourCapa.querySelector('[data-x]').textContent = p.texto;
+      tourCapa.querySelector('[data-sig]').textContent =
+        (i === pasos.length - 1) ? 'Entendido' : 'Siguiente';
+
+      // Scroll SIN animación: así la posición final del elemento es inmediata y
+      // el foco nunca se dibuja a medio camino (era el origen del desajuste en
+      // "Dame el tono" y "Marca lo difícil", los pasos más abajo del todo).
+      try { el.scrollIntoView({ block: 'center', behavior: 'auto' }); } catch (e) {}
+      // Dos frames: uno deja aplicar el scroll, el otro mide ya asentado.
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          if (tourCapa && elActual === el) colocar(el);
+        });
+      });
     }
+
+    // Si la maqueta se mueve mientras el tour está abierto (imágenes que cargan,
+    // la barra flotante del reproductor, girar el móvil, un scroll de rebote…)
+    // recolocamos el foco sobre el paso actual.
+    tourReubicar = function () { if (elActual) colocar(elActual); };
+    window.addEventListener('resize', tourReubicar);
+    window.addEventListener('scroll', tourReubicar, true);
 
     tourCapa.querySelector('[data-saltar]').addEventListener('click', function () { cerrarTour(true); });
     tourCapa.querySelector('[data-sig]').addEventListener('click', function () {
@@ -499,6 +530,11 @@ window.Pagina_study = (function () {
   function cerrarTour(marcarVisto) {
     if (marcarVisto) { try { localStorage.setItem(TOUR_CLAVE, '1'); } catch (e) {} }
     document.removeEventListener('keydown', tourEsc);
+    if (tourReubicar) {
+      window.removeEventListener('resize', tourReubicar);
+      window.removeEventListener('scroll', tourReubicar, true);
+      tourReubicar = null;
+    }
     var c = tourCapa;
     tourCapa = null;
     if (!c) return;

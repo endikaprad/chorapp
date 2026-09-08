@@ -541,6 +541,20 @@ window.Frases = (function () {
     return t.charAt(0).toUpperCase() + t.slice(1);
   }
 
+  /* Notificación del Wrapped ANUAL (31 de diciembre por la tarde). § = año.
+     Tono cálido: es el regalo dentro del regalo, no toca meter pulla. */
+  var AVISO_ANUAL = [
+    'Se acaba §. Tu año entero en ChorApp ya está listo — este merece sofá y sin prisa.',
+    '§ de música, mes a mes. Abre la app cuando tengas un rato tranquilo: hoy toca celebrarte.',
+    'Tu año en Bihotsak, en una tanda de pantallas. Ábrelo, Ama, que vas a sonreír.',
+    'Último día de §. El resumen de todo el año te espera en ChorApp. Feliz año.'
+  ];
+  function avisoAnual(anio) {
+    var t = AVISO_ANUAL[Math.floor(Math.random() * AVISO_ANUAL.length)];
+    t = t.replace('§', String(anio || 'el año'));
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
   /* ---------- Hora de la notificación según el tipo de fecha ----------
        Su cumpleaños ......... 9:00
        Fiestas .............. 11:00
@@ -613,6 +627,7 @@ window.Frases = (function () {
     hito: hito,
     avisoRacha: avisoRacha,
     avisoMes: avisoMes,
+    avisoAnual: avisoAnual,
     fraseConcierto: fraseConcierto,
     avisoConcierto: avisoConcierto,
     proximasFechas: proximasFechas

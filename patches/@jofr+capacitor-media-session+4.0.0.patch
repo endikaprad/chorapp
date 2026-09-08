@@ -1,0 +1,109 @@
+diff --git a/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionCallback.java b/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionCallback.java
+index e273185..4969aa7 100644
+--- a/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionCallback.java
++++ b/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionCallback.java
+@@ -1,5 +1,6 @@
+ package io.github.jofr.capacitor.mediasessionplugin;
+ 
++import android.os.Bundle;
+ import android.support.v4.media.session.MediaSessionCompat;
+ 
+ import com.getcapacitor.JSObject;
+@@ -54,4 +55,12 @@ public class MediaSessionCallback extends MediaSessionCompat.Callback {
+     public void onStop() {
+         plugin.actionCallback("stop");
+     }
++
++    // ChorApp: las custom actions de saltar 5 s llegan por aquí. El nombre de
++    // la custom action es directamente "seekbackward" / "seekforward", así que
++    // reutiliza el mismo handler JS que los botones estándar.
++    @Override
++    public void onCustomAction(String action, Bundle extras) {
++        plugin.actionCallback(action);
++    }
+ }
+diff --git a/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionService.java b/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionService.java
+index cb0417f..7f0d6c2 100644
+--- a/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionService.java
++++ b/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionService.java
+@@ -51,6 +51,11 @@ public class MediaSessionService extends Service {
+     private long position = 0;
+     private float playbackSpeed = 1.0F;
+ 
++    // ChorApp: acciones estándar activas del PlaybackState (se recalcula en el
++    // bloque possibleActionsUpdate y se reaplica en cada setPlaybackState para
++    // no perderlas al reconstruir el builder con las custom actions).
++    private long activePlaybackStateActions = PlaybackStateCompat.ACTION_PLAY;
++
+     private boolean possibleActionsUpdate = true;
+     private boolean playbackStateUpdate = false;
+     private boolean mediaMetadataUpdate = false;
+@@ -224,7 +229,7 @@ public class MediaSessionService extends Service {
+             notificationBuilder.mActions.clear();
+           }
+ 
+-            long activePlaybackStateActions = 0;
++            activePlaybackStateActions = 0;
+             int[] activeCompactViewActionIndices = new int[3];
+ 
+             int notificationActionIndex = 0;
+@@ -270,7 +275,22 @@ public class MediaSessionService extends Service {
+         }
+ 
+         if (playbackStateUpdate && playbackStateBuilder != null) {
+-            playbackStateBuilder.setState(this.playbackState, this.position, this.playbackSpeed);
++            // ChorApp: reconstruimos el builder para poder colgar las custom
++            // actions de saltar 5 s. Samsung One UI (y varias pantallas de
++            // bloqueo) NO pintan los botones estándar REWIND/FAST_FORWARD en el
++            // reproductor, pero SÍ las custom actions con su propio icono
++            // (igual que el −15 s / +15 s de los podcasts de Spotify).
++            playbackStateBuilder = new PlaybackStateCompat.Builder()
++                    .setActions(activePlaybackStateActions)
++                    .setState(this.playbackState, this.position, this.playbackSpeed);
++            if (plugin.hasActionHandler("seekbackward")) {
++                playbackStateBuilder.addCustomAction(new PlaybackStateCompat.CustomAction.Builder(
++                        "seekbackward", "Atrás 5 segundos", R.drawable.ic_chorapp_replay_5).build());
++            }
++            if (plugin.hasActionHandler("seekforward")) {
++                playbackStateBuilder.addCustomAction(new PlaybackStateCompat.CustomAction.Builder(
++                        "seekforward", "Adelante 5 segundos", R.drawable.ic_chorapp_forward_5).build());
++            }
+             mediaSession.setPlaybackState(playbackStateBuilder.build());
+             playbackStateUpdate = false;
+         }
+diff --git a/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_forward_5.xml b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_forward_5.xml
+new file mode 100644
+index 0000000..cd1f4b3
+--- /dev/null
++++ b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_forward_5.xml
+@@ -0,0 +1,12 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M18,13c0,3.31,-2.69,6,-6,6s-6,-2.69,-6,-6s2.69,-6,6,-6v4l5,-5l-5,-5v4c-4.42,0,-8,3.58,-8,8c0,4.42,3.58,8,8,8c4.42,0,8,-3.58,8,-8H18z" />
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M12.03,15.38c-0.44,0,-0.58,-0.31,-0.6,-0.56h-0.84c0.03,0.85,0.79,1.25,1.44,1.25c0.93,0,1.44,-0.63,1.44,-1.43c0,-1.33,-0.97,-1.44,-1.3,-1.44c-0.2,0,-0.43,0.05,-0.64,0.16l0.11,-0.92h1.7v-0.71h-2.39l-0.25,2.17l0.67,0.17c0.13,-0.13,0.28,-0.23,0.57,-0.23c0.4,0,0.69,0.23,0.69,0.75C12.62,14.64,12.65,15.38,12.03,15.38z" />
++</vector>
+diff --git a/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_replay_5.xml b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_replay_5.xml
+new file mode 100644
+index 0000000..f4fcc23
+--- /dev/null
++++ b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_replay_5.xml
+@@ -0,0 +1,12 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M12,5V1L7,6l5,5V7c3.31,0,6,2.69,6,6s-2.69,6-6,6s-6,-2.69,-6,-6H4c0,4.42,3.58,8,8,8s8,-3.58,8,-8S16.42,5,12,5z" />
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M10.69,13.9l0.25,-2.17h2.39v0.71h-1.7l-0.11,0.92c0.03,-0.02,0.07,-0.03,0.11,-0.05s0.09,-0.04,0.15,-0.05s0.12,-0.03,0.18,-0.04s0.13,-0.02,0.2,-0.02c0.21,0,0.39,0.03,0.55,0.1s0.3,0.16,0.41,0.28s0.2,0.27,0.25,0.45s0.09,0.38,0.09,0.6c0,0.19,-0.03,0.37,-0.09,0.54s-0.15,0.32,-0.27,0.45s-0.27,0.24,-0.45,0.31s-0.39,0.12,-0.64,0.12c-0.18,0,-0.36,-0.03,-0.53,-0.08s-0.32,-0.14,-0.46,-0.24s-0.24,-0.24,-0.32,-0.39s-0.13,-0.33,-0.13,-0.53h0.84c0.02,0.18,0.08,0.32,0.19,0.41s0.25,0.15,0.42,0.15c0.11,0,0.2,-0.02,0.27,-0.06s0.14,-0.1,0.18,-0.17s0.08,-0.15,0.11,-0.25s0.03,-0.2,0.03,-0.31s-0.01,-0.21,-0.04,-0.31s-0.07,-0.17,-0.13,-0.24s-0.13,-0.12,-0.21,-0.15s-0.19,-0.05,-0.3,-0.05c-0.08,0,-0.15,0.01,-0.2,0.02s-0.11,0.03,-0.15,0.05s-0.08,0.05,-0.12,0.07s-0.07,0.06,-0.1,0.09L10.69,13.9z" />
++</vector>

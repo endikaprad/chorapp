@@ -168,29 +168,3 @@ if (cambiado) {
 } else {
   console.log('android-fix: AndroidManifest ya está al día.');
 }
-
-// --- Botones de retroceder/adelantar en la vista COMPACTA del reproductor -
-// @jofr/capacitor-media-session sí añade los botones seekbackward/seekforward
-// a la notificación, pero SOLO en la vista expandida: su lista
-// `possibleCompactViewActions` no los incluye, así que la notificación
-// colapsada (la que ve Maite al salir de la app) enseña únicamente play/pause.
-// Parcheamos el fuente Java del plugin para meter seek(backward|forward) en la
-// vista compacta → quedan [−5s] [play/pause] [+5s]. Idempotente.
-const svcJava = resolve(
-  raiz,
-  'node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionService.java'
-);
-if (existsSync(svcJava)) {
-  let j = readFileSync(svcJava, 'utf8');
-  const viejo = 'Arrays.asList("previoustrack", "play", "pause", "nexttrack", "stop")';
-  const nuevo = 'Arrays.asList("previoustrack", "seekbackward", "play", "pause", "seekforward", "nexttrack", "stop")';
-  if (j.includes(viejo)) {
-    j = j.replace(viejo, nuevo);
-    writeFileSync(svcJava, j);
-    console.log('android-fix: MediaSessionService parcheado — seek en vista compacta.');
-  } else if (j.includes(nuevo)) {
-    console.log('android-fix: MediaSessionService ya parcheado (seek en vista compacta).');
-  } else {
-    console.log('android-fix: OJO — no se pudo parchear MediaSessionService (¿cambió el plugin?).');
-  }
-}

@@ -305,17 +305,22 @@ window.Pagina_home = (function () {
   }
 
   /* ----------------------------------------------------------
-     Resumen del mes — hoja que sale sola el día 1 (y hasta el 12)
-     con el balance del mes anterior. Tono cabrón. Se renderiza en
-     resumenmes.js (también se abre desde Práctica).
+     Resumen del mes — Wrapped a pantalla completa que sale solo:
+     el día 1–12 con el balance del mes anterior (tono cabrón), y el
+     31 de diciembre el Wrapped ANUAL con todo el año (tono cálido).
+     Se renderiza en wrapped.js; también se reabre desde Práctica.
      ---------------------------------------------------------- */
   function mostrarResumenMes() {
-    if (!window.ResumenMes || !window.ResumenMes.pendiente) return;
-    var d;
-    try { d = window.ResumenMes.pendiente(); } catch (e) { d = null; }
+    if (!window.ResumenMes) return;
+    var d = null;
+    try {
+      d = (window.ResumenMes.anualPendiente && window.ResumenMes.anualPendiente()) ||
+          (window.ResumenMes.pendiente && window.ResumenMes.pendiente());
+    } catch (e) { d = null; }
     if (!d) return;
     window.ResumenMes.abrirHoja(d);
-    window.ResumenMes.marcarVisto(d.anio, d.mes);
+    if (d.esAnual) window.ResumenMes.marcarAnualVisto(d.anio);
+    else window.ResumenMes.marcarVisto(d.anio, d.mes);
   }
 
   /* ----------------------------------------------------------

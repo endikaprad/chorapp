@@ -46,20 +46,21 @@ window.Reproductor = (function () {
       artwork: [],
     };
 
+    // Retroceder / adelantar 5 s en la notificación (iconos ⟲5 / ⟳5).
+    //
+    // Se registran como `seekbackward`/`seekforward`. El plugin @jofr está
+    // parcheado (patches/@jofr+capacitor-media-session+4.0.0.patch) para
+    // exponerlos como CUSTOM ACTIONS de la MediaSession con icono propio de
+    // "5 s": Samsung One UI y varias pantallas de bloqueo no pintan los
+    // botones estándar REWIND/FAST_FORWARD, pero sí las custom actions (igual
+    // que el −15 s / +15 s de los podcasts de Spotify).
+    var salto = 5;
     var manejadores = {
       play: function () { acciones.alternar(); },
       pause: function () { acciones.alternar(); },
-      seekbackward: function (d) { acciones.retroceder((d && d.seekOffset) || 5); },
-      seekforward: function (d) { acciones.adelantar((d && d.seekOffset) || 5); },
+      seekbackward: function (d) { acciones.retroceder((d && d.seekOffset) || salto); },
+      seekforward: function (d) { acciones.adelantar((d && d.seekOffset) || salto); },
       seekto: function (d) { if (d && typeof d.seekTime === 'number') acciones.irA(d.seekTime); },
-      // OJO: NO registramos previoustrack/nexttrack. En el reproductor de
-      // Android (notificación / pantalla de bloqueo) esos handlers pintan los
-      // iconos de "canción anterior / siguiente", que aquí no tienen sentido:
-      // no hay lista de reproducción, solo una canción que se estudia. Dejamos
-      // solo seek(backward|forward) → botones de retroceder / adelantar 5 s.
-      // Para que esos botones salgan también en la vista COMPACTA de la
-      // notificación (la que se ve al salir de la app), scripts/android-fix.js
-      // parchea `possibleCompactViewActions` del plugin @jofr/capacitor-media-session.
     };
     var acis = Object.keys(manejadores);
 
