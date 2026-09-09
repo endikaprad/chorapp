@@ -1,18 +1,20 @@
 /* ============================================================
-   wrapped-music.js — La música de fondo del Wrapped, generada.
+   wrapped-music.js — La música de fondo del Wrapped.
 
-   No hay archivos de audio: la música se sintetiza al vuelo con la
-   Web Audio API. Cada mes tiene su propia paleta (tono, escala,
-   progresión, tempo, brillo) así que suena distinta y reconocible.
+   Capa 1 (la que suena): una instrumental real por mes, en
+   audio/wrapped/ (mes-00.mp3 … mes-11.mp3 y anual.mp3). Son cortes
+   de ~80 s con fundido de entrada y salida, hechos para sonar en
+   bucle por debajo de los textos. Música de Scott Buckley
+   (scottbuckley.com.au), CC-BY 4.0 — ver audio/wrapped/CREDITOS.txt.
 
-   Meses: colchón cálido = pad suave + arpegio tipo campana con eco + bajo.
-   Anual (31 dic): otra cosa. Más lento (60 bpm), acordes con 7ª, una
-   CAJA DE MÚSICA con melodía fija por encima, un BORDÓN grave sostenido,
-   un golpe de TIMBAL en cada compás y una sala de eco grande. Debe
-   sentirse "el grande", no un mes más.
+   Capa 2 (red de seguridad): si el MP3 del mes no carga (sin archivo,
+   sin conexión, formato no soportado…), se cae a una música
+   sintetizada al vuelo con la Web Audio API — el motor `Sintetico`
+   de más abajo, que antes era la única fuente. Una paleta por mes;
+   versión especial, más ceremoniosa, para el Wrapped anual.
 
-   Pensado para sonar debajo de los textos. Cuando un slide reproduce
-   una canción de Maite, wrapped-audio.js baja el nivel con nivel().
+   Cuando un slide reproduce una canción de Maite, wrapped-audio.js
+   baja el nivel de fondo con nivel().
 
    window.WrappedMusic.iniciar(mes)   mes 0-11 | 'anual'
    window.WrappedMusic.nivel(v)       0..1 (mute / ducking)
@@ -20,7 +22,11 @@
    window.WrappedMusic.parar()
    ============================================================ */
 
-window.WrappedMusic = (function () {
+/* ------------------------------------------------------------
+   Sintetico — motor de música generada. Red de seguridad del
+   reproductor de MP3. Misma API pública que window.WrappedMusic.
+   ------------------------------------------------------------ */
+var Sintetico = (function () {
   'use strict';
 
   var BASE = 0.85;                 // volumen máximo del bus general
@@ -369,6 +375,146 @@ window.WrappedMusic = (function () {
     }
     ctx = null; master = null; seco = null; envioEco = null; cfg = null;
     nivelActual = 1;
+  }
+
+  return { iniciar: iniciar, nivel: nivel, reanudar: reanudar, parar: parar };
+})();
+
+
+/* ------------------------------------------------------------
+   window.WrappedMusic — reproductor de la instrumental del mes.
+   Intenta el MP3; si falla, delega en `Sintetico`.
+   ------------------------------------------------------------ */
+window.WrappedMusic = (function () {
+  'use strict';
+
+  var RUTA  = 'audio/wrapped/';
+  var TOPE  = 0.9;          // techo de volumen del MP3 (va por debajo del texto)
+  var ESPERA_MS = 5000;     // sin nada reproducible en este tiempo -> Sintetico
+
+  var audio = null;
+  var usandoSint = false;
+  var nivelActual = 1;
+  var vigilante = null;
+  var fadeId = 0;
+  var mesActual = null;
+  var descartando = false;   // true mientras desmontamos un <audio> a propósito
+
+  function archivoDe(mes) {
+    if (mes === 'anual') return RUTA + 'anual.mp3';
+    var n = Number(mes) || 0;
+    return RUTA + 'mes-' + (n < 10 ? '0' + n : '' + n) + '.mp3';
+  }
+
+  // Al vaciar el src saltan eventos 'error'/'emptied' en el propio elemento.
+  // Por eso soltamos la referencia y quitamos los listeners ANTES de tocarlo:
+  // así `alError` ve `this !== audio` (o `descartando`) y no arranca el
+  // motor sintetizado por error (bug: música que seguía sonando al cerrar).
+  function limpiarAudio() {
+    fadeId++;
+    if (vigilante) { clearTimeout(vigilante); vigilante = null; }
+    if (!audio) return;
+    var a = audio;
+    audio = null;
+    descartando = true;
+    try {
+      a.removeEventListener('error', alError);
+      a.removeEventListener('canplay', alCanPlay);
+      a.pause();
+      a.removeAttribute('src');
+      a.load();
+    } catch (e) {}
+    descartando = false;
+  }
+
+  function alError() {
+    if (descartando || this !== audio || usandoSint) return;
+    caerASintetico(mesActual);
+  }
+
+  function alCanPlay() {
+    if (descartando || this !== audio || usandoSint) return;
+    if (vigilante) { clearTimeout(vigilante); vigilante = null; }
+    reproducir();
+    rampa(volObjetivo(), 1400);   // fundido de entrada
+  }
+
+  function volObjetivo() {
+    return Math.max(0, Math.min(1, nivelActual)) * TOPE;
+  }
+
+  // Rampa suave de volumen (ms). Sin Web Audio: sobre audio.volume.
+  function rampa(destino, ms) {
+    if (!audio) return;
+    var a = audio;
+    var ini = a.volume || 0;
+    var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+    var mio = ++fadeId;
+    (function paso() {
+      if (mio !== fadeId || a !== audio) return;
+      var ahora = (window.performance && performance.now) ? performance.now() : Date.now();
+      var k = ms <= 0 ? 1 : Math.min(1, (ahora - t0) / ms);
+      try { a.volume = Math.max(0, Math.min(1, ini + (destino - ini) * k)); } catch (e) {}
+      if (k < 1) requestAnimationFrame(paso);
+    })();
+  }
+
+  function reproducir() {
+    if (!audio) return;
+    try { var p = audio.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+  }
+
+  function caerASintetico(mes) {
+    if (usandoSint) return;
+    usandoSint = true;
+    limpiarAudio();
+    try { Sintetico.iniciar(mes); Sintetico.nivel(nivelActual); } catch (e) {}
+  }
+
+  function iniciar(mes) {
+    parar();
+    usandoSint = false;
+    nivelActual = 1;
+    mesActual = mes;
+
+    try {
+      audio = new Audio(archivoDe(mes));
+      audio.loop = true;
+      audio.preload = 'auto';
+      audio.volume = 0;
+
+      audio.addEventListener('error', alError);
+      audio.addEventListener('canplay', alCanPlay);
+
+      vigilante = setTimeout(function () {
+        if (!usandoSint && (!audio || audio.readyState < 2)) caerASintetico(mes);
+      }, ESPERA_MS);
+
+      reproducir();
+    } catch (e) {
+      caerASintetico(mes);
+    }
+  }
+
+  function nivel(v) {
+    nivelActual = Math.max(0, Math.min(1, v));
+    if (usandoSint) { try { Sintetico.nivel(nivelActual); } catch (e) {} return; }
+    rampa(volObjetivo(), 320);
+  }
+
+  function reanudar() {
+    if (usandoSint) { try { Sintetico.reanudar(); } catch (e) {} return; }
+    if (audio && audio.paused) { reproducir(); rampa(volObjetivo(), 800); }
+  }
+
+  function parar() {
+    limpiarAudio();
+    // Paramos el sintetizado siempre, aunque el flag diga que no lo usamos:
+    // si un evento tardío lo hubiera arrancado, aquí se corta igual.
+    try { Sintetico.parar(); } catch (e) {}
+    usandoSint = false;
+    nivelActual = 1;
+    mesActual = null;
   }
 
   return { iniciar: iniciar, nivel: nivel, reanudar: reanudar, parar: parar };

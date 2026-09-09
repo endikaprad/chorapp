@@ -44,7 +44,7 @@ window.Push = (function () {
 
     // Las push con la app cerrada las pinta Android por su cuenta usando el
     // canal que indique el mensaje (channel_id: "chorapp", ver worker). Nos
-    // aseguramos de que ese canal exista: sin sonido, con vibración.
+    // aseguramos de que ese canal exista: sin sonido, con vibración corta.
     if (window.Avisos && window.Avisos.crearCanal) {
       try { window.Avisos.crearCanal(); } catch (e) {}
     } else if (PN.createChannel) {

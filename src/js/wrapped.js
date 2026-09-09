@@ -253,7 +253,8 @@ window.Wrapped = (function () {
           '<button type="button" class="w-btn w-btn--ghost" data-descargar>Guardar</button>' +
           '<button type="button" class="w-btn" data-compartir>Compartir</button>' +
         '</div>' +
-        '<button type="button" class="w-cerrar-link" data-cerrar>Cerrar</button>'
+        '<button type="button" class="w-cerrar-link" data-cerrar>Cerrar</button>' +
+        '<p class="w-creditos">Música: Scott Buckley · scottbuckley.com.au · CC-BY 4.0</p>'
     };
   }
 
@@ -672,8 +673,15 @@ window.Wrapped = (function () {
       contarHasta(num, num.getAttribute('data-num'));
     }
 
-    // Slide de cierre: prepara la foto resumen para compartir.
-    if (mt.cierre) prepararPoster(slides[n]);
+    // Slide de cierre: prepara la foto resumen para compartir y remata
+    // el resumen con una pequeña celebración háptica.
+    if (mt.cierre) {
+      prepararPoster(slides[n]);
+      if (!slides[n]._vibrado) {
+        slides[n]._vibrado = true;
+        try { if (window.Vibra) window.Vibra.logro(); } catch (e) {}
+      }
+    }
 
     sonarSlide(n);
     arrancarTimer();
@@ -819,6 +827,9 @@ window.Wrapped = (function () {
     });
     var pista = slides[idx].querySelector('[data-quiz-pista]');
     if (pista) pista.textContent = acierto ? '¡Bien!' : 'Casi…';
+
+    // Un golpe de vibración: distinto si acierta o si falla.
+    try { if (window.Vibra) (acierto ? window.Vibra.acierto : window.Vibra.fallo)(); } catch (e) {}
 
     raiz.classList.remove('w-quiz-activo');
     var b = raiz.querySelector('[data-barra="' + idx + '"]');

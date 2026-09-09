@@ -9,6 +9,9 @@ window.Pagina_home = (function () {
     var raiz = contenedor.querySelector('[data-modulo="home"]');
     if (!raiz) return;
 
+    var elAnio = raiz.querySelector('[data-anio]');
+    if (elAnio) elAnio.textContent = new Date().getFullYear();
+
     cargarCoro(raiz);
     pintarFecha(raiz);
     pintarFrase(raiz);
@@ -110,6 +113,7 @@ window.Pagina_home = (function () {
     try { localStorage.setItem(CLAVE, String(racha)); } catch (e) {}
     setTimeout(function () {
       window.UI.aviso(msg, { tipo: 'ok', duracion: 5000 });
+      try { if (window.Vibra) window.Vibra.logro(); } catch (e) {}
     }, 600);
   }
 
@@ -125,6 +129,20 @@ window.Pagina_home = (function () {
     el.textContent = f.texto;
     el.classList.toggle('frase-dia--especial', !!f.especial);
     el.hidden = false;
+
+    // Fecha marcada (cumpleaños, concierto…): un saludo háptico, una vez al día.
+    if (f.especial) {
+      var hoy = new Date().toDateString();
+      var CLAVE = 'chorapp:vibra-especial';
+      var visto = null;
+      try { visto = localStorage.getItem(CLAVE); } catch (e) {}
+      if (visto !== hoy) {
+        try { localStorage.setItem(CLAVE, hoy); } catch (e) {}
+        setTimeout(function () {
+          try { if (window.Vibra) window.Vibra.acierto(); } catch (e) {}
+        }, 500);
+      }
+    }
   }
 
   /* ----------------------------------------------------------

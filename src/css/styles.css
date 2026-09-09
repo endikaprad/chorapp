@@ -6582,6 +6582,17 @@ body.wrapped-abierto { overflow: hidden; }
   cursor: pointer;
 }
 
+/* Crédito de la música (CC-BY 4.0) — discreto, al pie del cierre */
+.w-creditos {
+  margin: 6px auto 0;
+  color: rgba(255, 255, 255, 0.45);
+  font-family: var(--fuente-texto);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
 /* Mientras la última slide (cierre) está en pantalla, el toque no salta */
 .wrapped.w-cierre-activo .w-zona { pointer-events: none; }
 
@@ -6842,3 +6853,1442 @@ body.wrapped-abierto { overflow: hidden; }
 .wrapped--anual .w-check svg { stroke: #FFE9B0; }
 .wrapped--anual .w-btn { color: #6E2CC9; }
 .wrapped--anual .w-paso--next { color: #6E2CC9; }
+
+/* ============================================================
+   Bienvenida — presentación a pantalla completa, solo la 1ª vez.
+   Inmersiva: cada sector con su color, su ilustración y su entrada.
+   Solo se anima transform y opacity.
+   ============================================================ */
+.bv-abierta { overflow: hidden; }
+
+.bv {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  display: flex;
+  flex-direction: column;
+  background: #160B3B;               /* base bajo las capas de fondo */
+  color: #fff;
+  opacity: 0;
+  transition: opacity 300ms var(--curva);
+  -webkit-tap-highlight-color: transparent;
+  /* `clip` y no `hidden`: si un sector desborda (pantallas bajas), NO se
+     crea un contenedor scrollable. Con `hidden`, al tocar un botón a ras
+     del borde el WebView hacía scroll-into-view y el contenido "saltaba"
+     justo antes de la animación de entrada a la app. */
+  overflow: clip;
+}
+.bv.is-abierta { opacity: 1; }
+
+/* --- Capas de fondo (una por sector, fundido cruzado) --- */
+.bv-fondos { position: absolute; inset: 0; z-index: 0; }
+.bv-fondo {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 620ms var(--curva);
+}
+
+/* --- Barra superior: atrás - progreso - saltar --- */
+.bv-top {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px 4px;
+}
+.bv-prog { flex: 1; display: flex; gap: 5px; }
+.bv-seg {
+  flex: 1;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+}
+.bv-seg b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #fff;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.bv-saltar {
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.8);
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 4px;
+}
+.bv-saltar[hidden] { display: none; }
+.bv-saltar:active { opacity: 0.55; }
+
+/* --- Zona de sectores --- */
+.bv-slides { position: relative; z-index: 1; flex: 1; min-height: 0; overflow: clip; }
+.bv-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;          /* grupo centrado: el aire sobra arriba y abajo por igual */
+  gap: clamp(18px, 4.5vh, 40px);
+  padding: 24px 26px;
+  opacity: 0;
+  transform: translateX(0) scale(0.985);
+  transition: opacity 440ms var(--curva), transform 440ms var(--curva);
+}
+.bv-slide[hidden] { display: none; }
+.bv-slide.is-ent-der { opacity: 0; transform: translateX(46px) scale(0.985); }
+.bv-slide.is-ent-izq { opacity: 0; transform: translateX(-46px) scale(0.985); }
+.bv-slide.is-sal-izq { opacity: 0; transform: translateX(-46px) scale(0.985); }
+.bv-slide.is-sal-der { opacity: 0; transform: translateX(46px) scale(0.985); }
+.bv-slide.is-activo { opacity: 1; transform: none; transition-delay: 30ms; }
+
+/* Ilustración: ocupa solo lo que necesita, encima del texto */
+.bv-decor {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+/* Variante decorativa: glifos que flotan por TODO el sector, sin ocupar sitio */
+.bv-decor--fondo {
+  position: absolute;
+  inset: 0;
+  flex: none;
+  pointer-events: none;
+}
+.bv-in { flex: 0 0 auto; max-width: 430px; width: 100%; margin: 0 auto; }
+.bv-in--centro { text-align: center; }
+
+/* --- Tipografía de los sectores --- */
+.bv-eyebrow {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+.bv-h1 {
+  margin: 0 0 14px;
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: clamp(36px, 11vw, 50px);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+}
+.bv-h2 {
+  margin: 0 0 14px;
+  font-family: var(--fuente-titulo);
+  font-weight: 700;
+  font-size: clamp(24px, 6.5vw, 30px);
+  letter-spacing: -0.01em;
+}
+.bv-h3 {
+  margin: 0 0 14px;
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: clamp(26px, 7.4vw, 33px);
+  line-height: 1.14;
+  letter-spacing: -0.015em;
+}
+.bv-sub {
+  margin: 0;
+  font-size: clamp(16px, 4.5vw, 18.5px);
+  line-height: 1.58;
+  color: rgba(255, 255, 255, 0.9);
+}
+/* Firma "— Endika" con letra de mano y que se escribe sola */
+.bv-firma {
+  position: relative;
+  display: inline-block;
+  margin: 20px 0 0;
+  line-height: 1;
+}
+.bv-firma__tx {
+  display: inline-block;
+  font-family: 'Caveat', 'Segoe Script', 'Bradley Hand', cursive;
+  font-size: 34px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  /* de partida, tapada del todo por la derecha */
+  clip-path: inset(-25% 100% -25% -6%);
+}
+.bv-firma__pluma {
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #FFD98A;
+  box-shadow: 0 0 11px 2px rgba(243, 179, 63, 0.75);
+  opacity: 0;
+}
+/* Se escribe a ritmo constante y lento (2 s). El puntito de tinta va
+   con el borde de escritura y, cuando acaba, se apaga poco a poco EN EL
+   SITIO (sin moverse). El puntito dura un poco más que la escritura. */
+.bv-slide.is-activo .bv-firma__tx {
+  animation: bv-firma-escribe 2000ms cubic-bezier(0.32, 0.1, 0.5, 0.95) 1100ms both;
+}
+.bv-slide.is-activo .bv-firma__pluma {
+  animation: bv-firma-pluma-x 2000ms cubic-bezier(0.32, 0.1, 0.5, 0.95) 1100ms both,
+             bv-firma-pluma-o 2650ms linear 1100ms both;
+}
+@keyframes bv-firma-escribe {
+  from { clip-path: inset(-25% 100% -25% -6%); }
+  to   { clip-path: inset(-25% -8% -25% -6%); }
+}
+@keyframes bv-firma-pluma-x {
+  from { left: 0; }
+  to   { left: 100%; }
+}
+@keyframes bv-firma-pluma-o {
+  0%   { opacity: 0; }
+  6%   { opacity: 1; }
+  74%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---- Confirmación al "Saltar" ---- */
+.bv-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: rgba(8, 6, 28, 0.55);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  transition: opacity 220ms var(--curva);
+}
+.bv-confirm.is-visible { opacity: 1; }
+.bv-confirm__caja {
+  width: 100%;
+  max-width: 320px;
+  padding: 22px 20px 16px;
+  border-radius: 18px;
+  background: #fff;
+  color: #1A1A1A;
+  text-align: center;
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.55);
+  transform: translateY(12px) scale(0.95);
+  transition: transform 240ms var(--curva);
+}
+.bv-confirm.is-visible .bv-confirm__caja { transform: none; }
+.bv-confirm__tx {
+  margin: 0 0 16px;
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.42;
+}
+.bv-confirm__bts { display: flex; flex-direction: column; gap: 8px; }
+.bv-confirm__bts button {
+  padding: 12px;
+  border: none;
+  border-radius: 11px;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.bv-confirm__seguir { background: var(--color-acento); color: #fff; }
+.bv-confirm__salir { background: none; color: #8A8A90; font-weight: 600; }
+.bv-confirm__bts button:active { transform: scale(0.98); }
+
+.bv-num {
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: clamp(78px, 26vw, 132px);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  margin-bottom: 2px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E7C7FF 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.bv-llama { display: inline-block; }
+
+/* Cifra secundaria del sector "Lo que llevó": líneas de código */
+.bv-codigo {
+  margin-top: 20px;
+  padding: 14px 20px 15px 22px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  position: relative;
+  overflow: hidden;
+}
+.bv-codigo::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, #FFFFFF, #E7C7FF);
+}
+.bv-codigo__num {
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: clamp(34px, 11vw, 52px);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E7C7FF 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.bv-codigo__pie {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+/* --- Entrada en cascada del contenido: sube, con un pelín de rebote --- */
+.bv-slide.is-activo .bv-in > * {
+  animation: bv-rise 640ms cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
+}
+.bv-slide.is-activo .bv-in > *:nth-child(1) { animation-delay: 60ms; }
+.bv-slide.is-activo .bv-in > *:nth-child(2) { animation-delay: 150ms; }
+.bv-slide.is-activo .bv-in > *:nth-child(3) { animation-delay: 240ms; }
+.bv-slide.is-activo .bv-in > *:nth-child(4) { animation-delay: 330ms; }
+.bv-slide.is-activo .bv-in > *:nth-child(5) { animation-delay: 420ms; }
+.bv-slide.is-activo .bv-in > *:nth-child(6) { animation-delay: 500ms; }
+@keyframes bv-rise {
+  0%   { opacity: 0; transform: translateY(28px) scale(0.95); }
+  55%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.bv-sub--tenue { color: rgba(255, 255, 255, 0.55); font-style: italic; margin-top: 10px; }
+
+/* Botones "Listo" (sector 0) y "Entrar" (cierre) */
+.bv-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: fit-content;
+  margin: 24px auto 0;
+  padding: 15px 28px;
+  border: none;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--color-acento);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.5);
+  transition: transform var(--dur-micro) var(--curva), opacity 320ms var(--curva);
+}
+.bv-cta svg { width: 19px; height: 19px; }
+.bv-cta:active { transform: scale(0.97); }
+.bv-cta.is-ido {
+  animation: none !important;
+  opacity: 0;
+  transform: scale(0.9);
+  pointer-events: none;
+}
+.bv-s--cierre .bv-cta { background: linear-gradient(120deg, #FFE9B0, #F3B33F); color: #5A4300; }
+/* primero entra (bv-rise), luego late sin parar para pedir que la toquen.
+   Selector reforzado para ganar a `.bv-slide.is-activo .bv-in > *`. */
+.bv-slide.bv-s--cierre.is-activo .bv-cta {
+  animation: bv-rise 520ms var(--curva) 320ms both,
+             bv-cta-latido 1.7s ease-in-out 1.5s infinite;
+}
+@keyframes bv-cta-latido {
+  0%, 100% { transform: scale(1); box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.5); }
+  50% { transform: scale(1.055); box-shadow: 0 22px 46px -12px rgba(243, 179, 63, 0.5); }
+}
+
+/* --- Pie: aviso + indicador de pausa --- */
+.bv-pie {
+  position: relative;
+  z-index: 3;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 26px calc(env(safe-area-inset-bottom) + 20px);
+}
+.bv-hint {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.66);
+  transition: opacity 400ms var(--curva);
+}
+.bv-hint.is-fuera { opacity: 0; }
+.bv-pausa {
+  position: absolute;
+  left: 50%;
+  top: 38%;                 /* bien arriba del centro, no pegado abajo */
+  z-index: 4;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 160ms var(--curva), transform 160ms var(--curva);
+  pointer-events: none;
+}
+.bv-pausa svg { width: 18px; height: 18px; }
+.bv.is-pausa .bv-pausa { opacity: 1; transform: none; }
+.bv.is-pausa .bv-hint { opacity: 0; }
+
+/* --- Portada a pantalla completa: "ponte los auriculares" --- */
+.bv-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  background: radial-gradient(120% 80% at 50% 0%, #3B39E8 0%, #1512D6 45%, #0E0B9E 100%);
+  transition: opacity 550ms var(--curva), transform 550ms var(--curva);
+}
+.bv-gate.is-ido { opacity: 0; transform: scale(1.06); pointer-events: none; }
+.bv-gate[hidden] { display: none; }
+.bv-gate__in {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+  color: #fff;
+}
+.bv-gate .bv-cascos {
+  width: clamp(90px, 26vw, 112px);
+  height: auto;
+  margin-bottom: 26px;
+  animation: bv-cascos-late 2.6s var(--curva) infinite;
+}
+@keyframes bv-cascos-late {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.bv-gate__h {
+  margin: 0 0 14px;
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: clamp(32px, 9.5vw, 44px);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+.bv-gate__p {
+  margin: 0 0 4px;
+  font-size: clamp(15.5px, 4.4vw, 17.5px);
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.88);
+}
+.bv-gate__saltar {
+  display: block;
+  margin: 16px auto 0;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.6);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  padding: 6px;
+}
+.bv-gate__saltar:active { opacity: 0.5; }
+
+/* --- Entrar: FUSIÓN con la app = CROSS-FADE PURO. Sin transform en
+   ningún sitio (varias iteraciones: cualquier scale, por pequeño que
+   fuera, se percibía como que "algo se movía" — el slide, la barra de
+   nav…). Ahora SOLO opacidad: el overlay se funde a 0 y, debajo, la app
+   (ya montada) sube de opacidad. Nada se desplaza ni se escala.
+   Se congelan además las animaciones internas del overlay para que se
+   apague quieto. --- */
+.bv.bv--entrando-app {
+  transition: opacity 700ms cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: none;
+  filter: none;
+  pointer-events: none;
+}
+.bv.bv--entrando-app *,
+.bv.bv--entrando-app *::before,
+.bv.bv--entrando-app *::after {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+/* La app aparece por opacidad, en paralelo al fundido del overlay. SIN
+   transform: `#vista` es alto y su centro cae fuera de pantalla, así que
+   cualquier `scale` desplazaba el contenido visible. */
+body.bv-aterriza #vista {
+  animation: bv-aterrizaje 700ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes bv-aterrizaje {
+  0%   { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+/* Golpe corto cuando la instrumental rompe (no cierra: sigue el acto 2) */
+.bv.bv--pulso { animation: bv-pulso 440ms var(--curva) both; }
+.bv.bv--pulso::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: #fff;
+  pointer-events: none;
+  animation: bv-flash 440ms var(--curva) both;
+}
+@keyframes bv-pulso {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+@keyframes bv-flash {
+  0% { opacity: 0; }
+  18% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+
+/* --- Sector "fases": lista con checks que se dibujan --- */
+.bv-fases {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(280px, 76vw);
+}
+.bv-fases li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+.bv-fase__c {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bv-fase__c svg { width: 15px; height: 15px; }
+
+/* La fila aparece con el círculo VACÍO; el tick cae dentro con rebote y
+   el círculo da un "ping". Cada fila, bien separada, para que se vea. */
+.bv-fase__c svg { opacity: 0; }
+.bv-slide.is-activo .bv-fases li {
+  animation: bv-fila-in 460ms cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
+}
+.bv-slide.is-activo .bv-fases li:nth-child(1) { animation-delay: 250ms; }
+.bv-slide.is-activo .bv-fases li:nth-child(2) { animation-delay: 600ms; }
+.bv-slide.is-activo .bv-fases li:nth-child(3) { animation-delay: 950ms; }
+.bv-slide.is-activo .bv-fases li:nth-child(4) { animation-delay: 1300ms; }
+.bv-slide.is-activo .bv-fases li:nth-child(5) { animation-delay: 1650ms; }
+.bv-slide.is-activo .bv-fases li .bv-fase__c svg { animation: bv-tick-pop 480ms cubic-bezier(0.34, 1.7, 0.5, 1) both; }
+.bv-slide.is-activo .bv-fases li .bv-fase__c { animation: bv-tick-ping 480ms var(--curva) both; }
+.bv-slide.is-activo .bv-fases li:nth-child(1) .bv-fase__c,
+.bv-slide.is-activo .bv-fases li:nth-child(1) .bv-fase__c svg { animation-delay: 480ms; }
+.bv-slide.is-activo .bv-fases li:nth-child(2) .bv-fase__c,
+.bv-slide.is-activo .bv-fases li:nth-child(2) .bv-fase__c svg { animation-delay: 830ms; }
+.bv-slide.is-activo .bv-fases li:nth-child(3) .bv-fase__c,
+.bv-slide.is-activo .bv-fases li:nth-child(3) .bv-fase__c svg { animation-delay: 1180ms; }
+.bv-slide.is-activo .bv-fases li:nth-child(4) .bv-fase__c,
+.bv-slide.is-activo .bv-fases li:nth-child(4) .bv-fase__c svg { animation-delay: 1530ms; }
+.bv-slide.is-activo .bv-fases li:nth-child(5) .bv-fase__c,
+.bv-slide.is-activo .bv-fases li:nth-child(5) .bv-fase__c svg { animation-delay: 1880ms; }
+@keyframes bv-fila-in {
+  from { opacity: 0; transform: translateY(15px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes bv-tick-pop {
+  0%   { opacity: 0; transform: scale(0.2) rotate(-30deg); }
+  60%  { opacity: 1; transform: scale(1.25) rotate(6deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes bv-tick-ping {
+  0%, 100% { background: rgba(255, 255, 255, 0.16); transform: scale(1); }
+  45% { background: rgba(150, 210, 255, 0.55); transform: scale(1.18); }
+}
+
+/* --- Glifos flotantes (portada, curro) --- */
+.bv-flota {
+  position: absolute;
+  bottom: -10%;
+  color: rgba(255, 255, 255, 0.5);
+  animation: bv-flota var(--dur, 10s) linear var(--d, 0s) infinite;
+  will-change: transform, opacity;
+}
+@keyframes bv-flota {
+  0%   { opacity: 0; transform: translateY(0) rotate(0deg); }
+  12%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-92vh) rotate(22deg); }
+}
+
+/* --- Logo oficial de la app, como icono cuadrado redondeado --- */
+.bv-logo-wrap { display: inline-flex; margin-bottom: 26px; }
+.bv-logo-chip {
+  display: inline-flex;
+  width: clamp(104px, 29vw, 126px);
+  height: clamp(104px, 29vw, 126px);
+  border-radius: 24%;
+  overflow: hidden;
+  box-shadow: 0 16px 38px -18px rgba(0, 0, 0, 0.45);
+}
+.bv-logo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bv-slide.is-activo .bv-logo-chip { animation: bv-pop 560ms var(--curva) 160ms both; }
+@keyframes bv-draw { to { stroke-dashoffset: 0; } }
+
+/* --- Auriculares (portada) --- */
+.bv-cascos { color: #fff; }
+@keyframes bv-pop {
+  0% { opacity: 0; transform: scale(0.5); }
+  70% { transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* --- Ilustraciones de los sectores de historia --- */
+.bv-arte { width: clamp(128px, 42vw, 176px); height: auto; color: #fff; }
+.bv-arte--libreta { transform: rotate(-3deg); }
+.bv-arte--libreta .bv-arte__l,
+.bv-arte--libreta .bv-arte__n {
+  stroke-dasharray: 70;
+  stroke-dashoffset: 70;
+}
+.bv-slide.is-activo .bv-arte--libreta rect { animation: bv-draw 620ms var(--curva) 120ms both; stroke-dasharray: 360; stroke-dashoffset: 360; }
+.bv-slide.is-activo .bv-arte--libreta .bv-arte__l { animation: bv-draw 380ms var(--curva) both; }
+.bv-slide.is-activo .bv-arte--libreta .bv-arte__l:nth-of-type(2) { animation-delay: 520ms; }
+.bv-slide.is-activo .bv-arte--libreta .bv-arte__l:nth-of-type(3) { animation-delay: 660ms; }
+.bv-slide.is-activo .bv-arte--libreta .bv-arte__l:nth-of-type(4) { animation-delay: 800ms; }
+.bv-slide.is-activo .bv-arte--libreta .bv-arte__n { animation: bv-draw 400ms var(--curva) 940ms both; }
+.bv-slide.is-activo .bv-arte--libreta circle { animation: bv-pop 420ms var(--curva) 1040ms both; }
+
+.bv-arte--corazon .bv-arte__h { stroke-dasharray: 168; stroke-dashoffset: 168; }
+.bv-slide.is-activo .bv-arte--corazon { animation: bv-late 2.6s var(--curva) 1.4s infinite; }
+.bv-slide.is-activo .bv-arte--corazon .bv-arte__h { animation: bv-draw 900ms var(--curva) 160ms forwards; }
+
+@keyframes bv-late {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+/* ======  ACTO 2: las animaciones no paran nunca  ====== */
+
+/* --- Fichas que entran UNA A UNA, alternando lados, en flujo continuo
+   (Sesiones + Modo estudio). Cada ficha entra de su lado, se queda un
+   rato y se va; el desfase (`--n`, negativo) reparte las fichas por el
+   ciclo para que siempre haya varias dentro. --- */
+@keyframes bv-cae-lista {
+  0%        { opacity: 0; transform: translateX(var(--from, 130px)); }
+  9%        { opacity: 1; }
+  15%, 70%  { opacity: 1; transform: translateX(0); }
+  84%, 100% { opacity: 0; transform: translateX(calc(var(--from, 130px) * -0.3)); }
+}
+.bv-cancion, .bv-chip {
+  animation: bv-cae-lista 8s cubic-bezier(0.33, 1, 0.5, 1) infinite;
+  will-change: transform, opacity;
+}
+
+/* --- Sesiones: 4 canciones cayendo dentro de la sesión --- */
+.bv-agrupa {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: min(290px, 78vw);
+  padding: 22px 14px 14px;
+}
+.bv-agrupa__caja {
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 16px;
+}
+.bv-agrupa__caja b {
+  position: absolute;
+  top: -11px;
+  left: 14px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #17408A;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.92);
+}
+.bv-cancion {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+  opacity: 0;
+  animation-delay: calc(var(--n, 0) * -2s);
+}
+.bv-cancion i { font-style: normal; opacity: 0.65; }
+
+/* Que nada se recorte al entrar (fichas, checks que rebotan, medallas…) */
+.bv-s--sesiones .bv-decor,
+.bv-s--estudio .bv-decor,
+.bv-s--fases .bv-decor,
+.bv-s--logros .bv-decor,
+.bv-s--conci .bv-decor,
+.bv-s--compartir .bv-decor,
+.bv-s--notis .bv-decor { overflow: visible; }
+.bv-fases { padding-bottom: 6px; }
+
+/* --- Modo estudio: las 3 vistas entran una a una + el piano toca --- */
+.bv-decor--estudio { flex-direction: column; gap: 20px; }
+.bv-chips { display: flex; flex-direction: column; gap: 10px; width: min(300px, 80vw); }
+.bv-chip {
+  padding: 11px 15px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  opacity: 0;
+  animation-duration: 9s;
+  animation-delay: calc(var(--n, 0) * 0.5s - 0.5s);
+}
+.bv-chip--a { align-self: flex-start; }
+.bv-chip--b { align-self: center; font-style: italic; background: rgba(255,255,255,0.1); }
+.bv-chip--c { align-self: flex-end; }
+.bv-piano {
+  display: flex;
+  gap: 3px;
+  height: 56px;
+  padding: 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+}
+.bv-piano i {
+  width: 15px;
+  border-radius: 0 0 3px 3px;
+  background: rgba(255, 255, 255, 0.9);
+  animation: bv-tecla 3.5s linear infinite;
+  animation-delay: calc(var(--n, 0) * 0.5s);
+}
+.bv-piano i.k {
+  background: rgba(20, 10, 40, 0.85);
+  height: 62%;
+  margin: 0 -8px;
+  z-index: 1;
+  width: 11px;
+  animation: none;
+}
+@keyframes bv-tecla {
+  0%, 3%   { background: #F3B33F; transform: translateY(1.5px); }
+  10%, 100% { background: rgba(255, 255, 255, 0.9); transform: none; }
+}
+
+/* --- Práctica: el calendario se rellena en oleada y vuelve a empezar --- */
+.bv-cal {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 9px;
+  width: min(280px, 74vw);
+}
+.bv-celda {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  animation: bv-relleno 4.5s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.13s);
+}
+.bv-celda.is-hoy {
+  background: linear-gradient(120deg, #FFE9B0, #F3B33F);
+  animation: bv-late 1.8s var(--curva) infinite;
+}
+@keyframes bv-relleno {
+  0%, 8%    { background: rgba(255, 255, 255, 0.14); }
+  26%, 72%  { background: #fff; }
+  92%, 100% { background: rgba(255, 255, 255, 0.14); }
+}
+
+/* --- Grabaciones: micro con ondas (sin recortes) --- */
+.bv-decor.bv-decor--grab {
+  overflow: visible;
+  min-height: 210px;
+}
+.bv-mic {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bv-mic__btn {
+  position: relative;
+  z-index: 1;
+  width: 88px;
+  height: 88px;
+  border-radius: 999px;
+  background: #fff;
+  color: #A11133;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: bv-late 2s var(--curva) infinite;
+}
+.bv-mic__btn svg { width: 38px; height: 38px; }
+.bv-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 88px;
+  height: 88px;
+  margin: -44px 0 0 -44px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.42);
+  animation: bv-ring 2.6s ease-out infinite;
+  animation-delay: calc(var(--i) * 0.86s);
+}
+@keyframes bv-ring {
+  0%   { opacity: 0.55; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.3); }
+}
+
+/* --- Resumen: las barras suben y bajan suave, sin parar --- */
+.bv-barras {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 180px;
+  width: min(300px, 78vw);
+}
+.bv-barras i {
+  flex: 1;
+  border-radius: 6px 6px 3px 3px;
+  background: var(--c, #fff);
+  height: var(--h, 60%);
+  transform-origin: bottom;
+  animation: bv-onda 2.8s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * -0.45s);
+}
+.bv-barras i:nth-child(odd) { animation-duration: 3.3s; }
+.bv-barras i:nth-child(3n) { animation-duration: 2.3s; }
+@keyframes bv-onda {
+  from { transform: scaleY(0.45); }
+  to   { transform: scaleY(1); }
+}
+
+/* --- Logros: medallas que caen y brillan --- */
+.bv-medallas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+  max-width: 260px;
+}
+.bv-medalla {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: radial-gradient(circle at 35% 30%, #fff 0%, var(--c, #F3B33F) 45%, color-mix(in srgb, var(--c, #F3B33F) 60%, #000) 100%);
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.55), inset 0 -3px 6px rgba(0, 0, 0, 0.25);
+}
+.bv-slide.is-activo .bv-medalla {
+  animation: bv-medalla-in 620ms cubic-bezier(0.34, 1.6, 0.5, 1) both,
+             bv-medalla-brillo 3.2s ease-in-out infinite;
+}
+.bv-slide.is-activo .bv-medalla:nth-child(1) { animation-delay: 250ms, 1.4s; }
+.bv-slide.is-activo .bv-medalla:nth-child(2) { animation-delay: 430ms, 1.9s; }
+.bv-slide.is-activo .bv-medalla:nth-child(3) { animation-delay: 610ms, 2.4s; }
+.bv-slide.is-activo .bv-medalla:nth-child(4) { animation-delay: 790ms, 2.9s; }
+.bv-slide.is-activo .bv-medalla:nth-child(5) { animation-delay: 970ms, 3.4s; }
+@keyframes bv-medalla-in {
+  0%   { opacity: 0; transform: translateY(-26px) scale(0.4) rotate(-18deg); }
+  65%  { opacity: 1; transform: translateY(0) scale(1.12) rotate(4deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+}
+@keyframes bv-medalla-brillo {
+  0%, 100% { box-shadow: 0 10px 24px -10px rgba(0,0,0,0.55), inset 0 -3px 6px rgba(0,0,0,0.25); }
+  50% { box-shadow: 0 10px 26px -8px rgba(255,255,255,0.4), inset 0 -3px 6px rgba(0,0,0,0.2); }
+}
+
+/* --- Conciertos: clavas una chincheta en el día y luego se REVELA una
+   foto de carrete del recuerdo. Bucle de 7 s. --- */
+.bv-conci {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+.bv-cal--mini { width: min(200px, 56vw); gap: 7px; }
+.bv-cal--mini .bv-celda { animation: none; background: rgba(255, 255, 255, 0.14); }
+.bv-celda.is-concierto {
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(120deg, #FF8A5B, #E4552E);
+  animation: bv-conci-poke 7s var(--curva) infinite;
+}
+@keyframes bv-conci-poke {
+  0%, 15% { transform: scale(1); filter: brightness(1); }
+  19%     { transform: scale(0.9); filter: brightness(1.55); }
+  25%     { transform: scale(1.07); filter: brightness(1.1); }
+  31%     { transform: scale(1); filter: brightness(1); }
+  100%    { transform: scale(1); filter: brightness(1); }
+}
+
+/* La chincheta cae de arriba y se clava con un rebotito */
+.bv-chincheta {
+  position: absolute;
+  left: 50%;
+  bottom: 40%;
+  width: 30px;
+  transform: translateX(-50%);
+  z-index: 4;
+  opacity: 0;
+}
+.bv-chincheta__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 6px 7px rgba(0, 0, 0, 0.4));
+}
+.bv-chincheta__sombra { fill: rgba(0, 0, 0, 0.28); }
+.bv-slide.is-activo .bv-chincheta { animation: bv-chincheta-clava 7s var(--curva) infinite; }
+@keyframes bv-chincheta-clava {
+  0%, 8%   { opacity: 0; transform: translateX(-50%) translateY(-62px) rotate(-14deg) scale(0.9); }
+  17%      { opacity: 1; transform: translateX(-50%) translateY(6px)  rotate(5deg)  scale(1.05); }
+  21%      { opacity: 1; transform: translateX(-50%) translateY(0)    rotate(-2deg) scale(1); }
+  25%      { opacity: 1; transform: translateX(-50%) translateY(0)    rotate(1.5deg) scale(1); }
+  31%      { opacity: 1; transform: translateX(-50%) translateY(0)    rotate(0)     scale(1); }
+  86%      { opacity: 1; transform: translateX(-50%) translateY(0)    rotate(0)     scale(1); }
+  94%, 100% { opacity: 0; transform: translateX(-50%) translateY(-10px) rotate(0) scale(0.92); }
+}
+
+/* La foto de carrete: cae, se balancea y se "revela" (deja de estar
+   oscura y borrosa) como una instantánea que se acaba de sacar */
+.bv-polaroid {
+  width: 172px;
+  padding: 10px 10px 32px;
+  border-radius: 3px;
+  background: #FDFBF5;
+  box-shadow: 0 22px 42px -16px rgba(0, 0, 0, 0.62);
+  opacity: 0;
+  transform-origin: 50% -10%;
+}
+.bv-slide.is-activo .bv-polaroid { animation: bv-polaroid-in 7s cubic-bezier(0.28, 1, 0.4, 1) infinite; }
+@keyframes bv-polaroid-in {
+  0%, 22%   { opacity: 0; transform: translateY(-14px) rotate(7deg) scale(0.9); }
+  31%       { opacity: 1; transform: translateY(0) rotate(-5deg) scale(1.03); }
+  37%       { opacity: 1; transform: translateY(0) rotate(-3deg) scale(1); }
+  55%       { opacity: 1; transform: translateY(0) rotate(-1.5deg) scale(1); }
+  73%       { opacity: 1; transform: translateY(0) rotate(-4deg) scale(1); }
+  86%       { opacity: 1; transform: translateY(0) rotate(-3deg) scale(1); }
+  93%, 100% { opacity: 0; transform: translateY(12px) rotate(-7deg) scale(0.95); }
+}
+.bv-polaroid__foto {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border-radius: 2px;
+  background: linear-gradient(150deg, #2E5AA8, #6E3AA0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 30px;
+}
+.bv-polaroid__foto img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bv-slide.is-activo .bv-polaroid__foto { animation: bv-foto-nitida 7s var(--curva) infinite; }
+@keyframes bv-foto-nitida {
+  0%, 35%   { filter: blur(3px) saturate(0.35) brightness(0.72); }
+  56%       { filter: blur(0) saturate(1.05) brightness(1); }
+  90%       { filter: blur(0) saturate(1) brightness(1); }
+  100%      { filter: blur(3px) saturate(0.35) brightness(0.72); }
+}
+.bv-polaroid__revela {
+  position: absolute;
+  inset: 0;
+  background: #22222A;
+}
+.bv-slide.is-activo .bv-polaroid__revela { animation: bv-revela 7s var(--curva) infinite; }
+@keyframes bv-revela {
+  0%, 35%  { opacity: 1; }
+  55%      { opacity: 0; }
+  90%      { opacity: 0; }
+  100%     { opacity: 1; }
+}
+.bv-polaroid__pie {
+  margin-top: 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: center;
+  color: #3A342E;
+  opacity: 0;
+}
+.bv-slide.is-activo .bv-polaroid__pie { animation: bv-pie-fade 7s var(--curva) infinite; }
+@keyframes bv-pie-fade {
+  0%, 46%   { opacity: 0; }
+  58%, 86%  { opacity: 1; }
+  94%, 100% { opacity: 0; }
+}
+
+/* --- Avisos: flujo continuo. Cada aviso entra por arriba, se queda un
+   rato y se va por abajo; el desfase hace que siempre haya un par a la
+   vista y no paren de llegar. --- */
+.bv-notis {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(310px, 84vw);
+}
+.bv-noti {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 16px 34px -14px rgba(0, 0, 0, 0.55);
+  color: #1A1A1A;
+  opacity: 0;
+}
+.bv-slide.is-activo .bv-noti {
+  animation: bv-noti-flujo 6s infinite both;
+  animation-delay: calc(var(--n) * -2s);
+}
+/* Entra deslizándose desde arriba con un rebotito (como una notificación
+   nueva de verdad). Al salir, se desliza al lado y se va (como cuando la
+   apartas con el dedo para descartarla). --out = lado (1 der, -1 izq). */
+@keyframes bv-noti-flujo {
+  0%   { opacity: 0; transform: translate(0, -42px) rotate(0) scale(0.95);
+         animation-timing-function: cubic-bezier(0.12, 0.8, 0.25, 1); }
+  9%   { opacity: 1; transform: translate(0, 5px) rotate(0) scale(1.02);
+         animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1); }
+  15%  { opacity: 1; transform: translate(0, 0) rotate(0) scale(1);
+         animation-timing-function: linear; }
+  66%  { opacity: 1; transform: translate(0, 0) rotate(0) scale(1);
+         animation-timing-function: cubic-bezier(0.4, 0, 0.9, 0.35); }
+  74%  { opacity: 1; transform: translate(calc(var(--out, 1) * 26px), 0) rotate(0) scale(1); }
+  88%  { opacity: 0; transform: translate(calc(var(--out, 1) * 380px), -3px)
+                              rotate(calc(var(--out, 1) * 3deg)) scale(0.97); }
+  100% { opacity: 0; transform: translate(calc(var(--out, 1) * 380px), -3px)
+                              rotate(calc(var(--out, 1) * 3deg)) scale(0.97); }
+}
+.bv-noti__ic {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  overflow: hidden;
+}
+.bv-noti__ic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bv-noti__tx { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.bv-noti__tx b { font-size: 12px; font-weight: 700; }
+.bv-noti__tx span {
+  font-size: 12.5px;
+  color: #4A4540;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Compartir: un ensayo que sale volando a WhatsApp, en bucle --- */
+.bv-compartir {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  width: min(300px, 80vw);
+}
+.bv-comp__card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 13px 15px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.bv-comp__ic {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: #fff;
+  color: #1E7A4E;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bv-comp__ic svg { width: 17px; height: 17px; margin-left: 2px; }
+.bv-comp__tx { display: flex; flex-direction: column; gap: 2px; }
+.bv-comp__tx b { font-size: 14px; font-weight: 700; }
+.bv-comp__tx span { font-size: 12px; color: rgba(255, 255, 255, 0.7); }
+.bv-comp__wa {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.4));
+}
+.bv-comp__wa > svg { width: 100%; height: 100%; }
+.bv-slide.is-activo .bv-comp__wa { animation: bv-wa-recibe 3.2s var(--curva) infinite; }
+@keyframes bv-wa-recibe {
+  0%, 62%, 100% { transform: scale(1); }
+  72% { transform: scale(1.16); }
+  82% { transform: scale(1); }
+}
+.bv-comp__check {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #34B7F1;
+  background: #fff;
+  border-radius: 999px;
+  padding: 1px 4px;
+  opacity: 0;
+}
+.bv-slide.is-activo .bv-comp__check { animation: bv-wa-check 3.2s var(--curva) infinite; }
+@keyframes bv-wa-check {
+  0%, 70%, 100% { opacity: 0; transform: scale(0.5); }
+  78%, 94% { opacity: 1; transform: scale(1); }
+}
+/* El "avión" viaja de la tarjeta a WhatsApp, una y otra vez */
+.bv-comp__avion {
+  position: absolute;
+  left: 50%;
+  top: 44px;
+  margin-left: -15px;
+  color: #EAFBF0;
+  opacity: 0;
+  filter: drop-shadow(0 0 8px rgba(37, 211, 102, 0.7));
+}
+.bv-comp__avion svg { width: 30px; height: 30px; }
+.bv-slide.is-activo .bv-comp__avion { animation: bv-avion 3.2s cubic-bezier(0.4, 0, 0.5, 1) infinite; }
+@keyframes bv-avion {
+  0%   { opacity: 0; transform: translate(0, -6px) rotate(10deg) scale(0.6); }
+  16%  { opacity: 1; transform: translate(0, 4px) rotate(10deg) scale(1); }
+  58%  { opacity: 1; transform: translate(0, 62px) rotate(24deg) scale(0.7); }
+  68%, 100% { opacity: 0; transform: translate(0, 82px) rotate(28deg) scale(0.4); }
+}
+.bv-comp__contactos { display: none; }
+
+/* --- Sector 8: cierre --- */
+.bv-cae {
+  position: absolute;
+  top: -12%;
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.55);
+  animation: bv-cae var(--dur, 6s) linear var(--d, 0s) infinite;
+}
+@keyframes bv-cae {
+  0% { opacity: 0; transform: translateY(0) rotate(0deg); }
+  10% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(112vh) rotate(40deg); }
+}
+.bv-check {
+  display: inline-flex;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 18px;
+}
+
+/* El "Feliz cumpleaños, Ama" cabe en 2 líneas, no en 3 */
+.bv-s--cierre .bv-h1 {
+  font-size: clamp(24px, 6.6vw, 31px);
+  line-height: 1.16;
+  letter-spacing: -0.025em;
+}
+.bv-s--cierre .bv-sub { font-size: clamp(14px, 4vw, 16px); }
+.bv-check svg { width: 100%; height: 100%; fill: none; stroke: #fff; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+.bv-check circle { stroke-dasharray: 151; stroke-dashoffset: 151; animation: bv-draw 620ms var(--curva) 200ms forwards; }
+.bv-check path { stroke-dasharray: 40; stroke-dashoffset: 40; animation: bv-draw 420ms var(--curva) 640ms forwards; }
+
+/* --- Pantalla de bloqueo: la notificación del reproductor, botón a botón ---
+   Ciclo de 10 s: 5 botones, 2 s por botón. Cada botón lleva --n (0..4) y
+   arranca su animación con un desfase negativo -> el "foco" recorre los
+   controles en bucle. */
+.bv-s--lock .bv-decor { overflow: visible; }
+.bv-lock {
+  position: relative;
+  width: min(322px, 87vw);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.bv-lock__pull {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: rgba(255, 255, 255, 0.42);
+}
+.bv-lock__pull i { width: 34px; height: 4px; border-radius: 999px; background: currentColor; }
+.bv-lock__pull svg { width: 15px; height: 15px; display: block; }
+.bv-slide.is-activo .bv-lock__pull { animation: bv-lk-pull 10s ease-in-out infinite; }
+@keyframes bv-lk-pull {
+  0%, 84%, 100% { transform: translateY(0); opacity: 0.42; }
+  90%           { transform: translateY(5px); opacity: 0.8; }
+}
+.bv-lock__top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: rgba(255, 255, 255, 0.72);
+}
+.bv-lock__lock svg { width: 14px; height: 14px; display: block; }
+.bv-lock__hora { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+.bv-lock__card {
+  border-radius: 20px;
+  padding: 15px 15px 17px;
+  background: linear-gradient(158deg, #2422E4 0%, #1512D6 55%, #100CA8 100%);
+  box-shadow: 0 24px 48px -18px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.bv-slide.is-activo .bv-lock__card { animation: bv-lk-bob 5.5s ease-in-out infinite; }
+@keyframes bv-lk-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.bv-lock__cab { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
+.bv-lock__ic { flex: none; width: 34px; height: 34px; border-radius: 9px; overflow: hidden; }
+.bv-lock__ic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bv-lock__meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.bv-lock__meta b { font-size: 14px; font-weight: 700; }
+.bv-lock__meta span {
+  font-size: 12px; color: rgba(255, 255, 255, 0.62);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bv-lock__barra { position: relative; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); }
+.bv-lock__fill {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 8%;
+  border-radius: 999px; background: #fff;
+}
+.bv-lock__thumb {
+  position: absolute; top: 50%; left: 8%;
+  width: 11px; height: 11px; border-radius: 999px; background: #fff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.4);
+}
+.bv-slide.is-activo .bv-lock__fill { animation: bv-lk-fill 11s linear infinite; }
+.bv-slide.is-activo .bv-lock__thumb { animation: bv-lk-thumb 11s linear infinite; }
+@keyframes bv-lk-fill { 0% { width: 7%; } 100% { width: 68%; } }
+@keyframes bv-lk-thumb { 0% { left: 7%; } 100% { left: 68%; } }
+.bv-lock__times {
+  display: flex; justify-content: space-between; margin-top: 7px;
+  font-size: 11px; color: rgba(255, 255, 255, 0.55); font-variant-numeric: tabular-nums;
+}
+.bv-lock__ctrl { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.bv-lk__b {
+  position: relative;
+  width: 40px; height: 40px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; flex: none;
+}
+.bv-lk__b::before {
+  content: ""; position: absolute; inset: 0; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18); transform: scale(0.4); opacity: 0;
+}
+.bv-slide.is-activo .bv-lk__b::before {
+  animation: bv-lk-halo 10s ease-in-out infinite;
+  animation-delay: calc(var(--n) * -2s);
+}
+@keyframes bv-lk-halo {
+  0%        { opacity: 0; transform: scale(0.4); }
+  4%        { opacity: 1; transform: scale(1); }
+  14%       { opacity: 1; transform: scale(1); }
+  22%, 100% { opacity: 0; transform: scale(1.18); }
+}
+.bv-slide.is-activo .bv-lk__b {
+  animation: bv-lk-press 10s ease-in-out infinite;
+  animation-delay: calc(var(--n) * -2s);
+}
+@keyframes bv-lk-press {
+  0%, 3%    { transform: scale(1); }
+  8%        { transform: scale(0.84); }
+  17%, 100% { transform: scale(1); }
+}
+.bv-lk__b svg { width: 21px; height: 21px; display: block; }
+.bv-lk__b--play { width: 46px; height: 46px; background: rgba(255, 255, 255, 0.14); }
+.bv-lk__b--play svg { width: 23px; height: 23px; }
+.bv-lk__i { position: absolute; }
+.bv-lk__b--play .bv-lk__i--play { opacity: 0; }
+.bv-slide.is-activo .bv-lk__b--play .bv-lk__i--pause { animation: bv-lk-pause 10s ease infinite; animation-delay: calc(var(--n) * -2s); }
+.bv-slide.is-activo .bv-lk__b--play .bv-lk__i--play  { animation: bv-lk-play  10s ease infinite; animation-delay: calc(var(--n) * -2s); }
+@keyframes bv-lk-pause { 0%, 6% { opacity: 1; transform: scale(1); } 11%, 15% { opacity: 0; transform: scale(0.5); } 20%, 100% { opacity: 1; transform: scale(1); } }
+@keyframes bv-lk-play  { 0%, 6% { opacity: 0; transform: scale(0.5); } 11%, 15% { opacity: 1; transform: scale(1); } 20%, 100% { opacity: 0; transform: scale(0.5); } }
+/* Velocidad: 1x <-> 1.25x */
+.bv-lk__vel { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 20px; font-size: 12.5px; font-weight: 800; font-style: normal; }
+.bv-lk__vel i { font-style: normal; white-space: nowrap; }
+.bv-lk__vel i + i { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 11px; opacity: 0; }
+.bv-slide.is-activo .bv-lk__vel i:first-child { animation: bv-lk-vela 10s ease infinite; }
+.bv-slide.is-activo .bv-lk__vel i:last-child  { animation: bv-lk-velb 10s ease infinite; }
+@keyframes bv-lk-vela { 0%, 7% { opacity: 1; } 11%, 19% { opacity: 0; } 23%, 100% { opacity: 1; } }
+@keyframes bv-lk-velb { 0%, 7% { opacity: 0; } 11%, 19% { opacity: 1; } 23%, 100% { opacity: 0; } }
+/* Repetir: se enciende con su puntito */
+.bv-lk__dot {
+  position: absolute; bottom: 4px; left: 50%;
+  width: 4px; height: 4px; border-radius: 999px; background: #7CF3C6;
+  transform: translateX(-50%) scale(0);
+}
+.bv-slide.is-activo .bv-lk__b--loop .bv-lk__dot { animation: bv-lk-dot 10s ease infinite; animation-delay: calc(var(--n) * -2s); }
+@keyframes bv-lk-dot { 0%, 8% { transform: translateX(-50%) scale(0); } 15% { transform: translateX(-50%) scale(1.5); } 21%, 100% { transform: translateX(-50%) scale(1); } }
+.bv-slide.is-activo .bv-lk__b--loop svg { animation: bv-lk-spin 10s ease infinite; animation-delay: calc(var(--n) * -2s); }
+@keyframes bv-lk-spin { 0%, 8% { transform: rotate(0); } 24%, 100% { transform: rotate(360deg); } }
+
+.bv--sin-motion .bv-lock__pull,
+.bv--sin-motion .bv-lock__card,
+.bv--sin-motion .bv-lock__fill,
+.bv--sin-motion .bv-lock__thumb,
+.bv--sin-motion .bv-lk__b,
+.bv--sin-motion .bv-lk__b::before,
+.bv--sin-motion .bv-lk__i,
+.bv--sin-motion .bv-lk__vel i,
+.bv--sin-motion .bv-lk__b--loop svg,
+.bv--sin-motion .bv-lk__dot { animation: none !important; }
+.bv--sin-motion .bv-lk__b--play .bv-lk__i--play { opacity: 0 !important; }
+.bv--sin-motion .bv-lk__b--play .bv-lk__i--pause { opacity: 1 !important; }
+.bv--sin-motion .bv-lk__vel i:last-child { opacity: 0 !important; }
+.bv--sin-motion .bv-lk__dot { transform: translateX(-50%) scale(1) !important; }
+
+/* --- Accesibilidad: sin movimiento --- */
+.bv--sin-motion .bv-slide {
+  transition: opacity 140ms linear;
+  transform: none !important;
+}
+.bv--sin-motion .bv-slide.is-ent-der,
+.bv--sin-motion .bv-slide.is-ent-izq,
+.bv--sin-motion .bv-slide.is-sal-izq,
+.bv--sin-motion .bv-slide.is-sal-der { transform: none !important; }
+.bv--sin-motion .bv-fondo { transition: opacity 160ms linear; }
+.bv--sin-motion.bv--pulso { animation: none; }
+.bv--sin-motion.bv--pulso::after { animation: bv-flash 260ms linear both; }
+.bv--sin-motion .bv-flota,
+.bv--sin-motion .bv-cae,
+.bv--sin-motion .bv-ring,
+.bv--sin-motion .bv-mic__btn,
+.bv--sin-motion .bv-celda,
+.bv--sin-motion .bv-celda.is-hoy,
+.bv--sin-motion .bv-luna,
+.bv--sin-motion .bv-cancion,
+.bv--sin-motion .bv-agrupa__caja,
+.bv--sin-motion .bv-medalla,
+.bv--sin-motion .bv-celda.is-concierto,
+.bv--sin-motion .bv-chincheta,
+.bv--sin-motion .bv-polaroid__foto,
+.bv--sin-motion .bv-polaroid__revela,
+.bv--sin-motion .bv-notis,
+.bv--sin-motion .bv-comp__wa,
+.bv--sin-motion .bv-comp__avion,
+.bv--sin-motion .bv-comp__check,
+.bv--sin-motion .bv-piano i { animation: none !important; }
+.bv--sin-motion .bv-comp__avion { display: none; }
+.bv--sin-motion .bv-comp__check { opacity: 1 !important; }
+.bv--sin-motion .bv-polaroid__revela { opacity: 0 !important; }
+.bv--sin-motion .bv-polaroid__foto { filter: none !important; }
+.bv--sin-motion .bv-chincheta { opacity: 1 !important; transform: translateX(-50%) !important; }
+.bv--sin-motion .bv-slide.is-activo .bv-in > *,
+.bv--sin-motion .bv-slide.is-activo .bv-chip,
+.bv--sin-motion .bv-slide.is-activo .bv-celda,
+.bv--sin-motion .bv-slide.is-activo .bv-fases li,
+.bv--sin-motion .bv-slide.is-activo .bv-cancion,
+.bv--sin-motion .bv-slide.is-activo .bv-medalla,
+.bv--sin-motion .bv-slide.is-activo .bv-polaroid,
+.bv--sin-motion .bv-slide.is-activo .bv-polaroid__pie,
+.bv--sin-motion .bv-slide.is-activo .bv-noti,
+.bv--sin-motion .bv-slide.is-activo .bv-barras i {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+.bv--sin-motion .bv-firma__tx { animation: none !important; clip-path: none !important; }
+.bv--sin-motion .bv-firma__pluma { display: none; }
+.bv--sin-motion .bv-agrupa__caja { opacity: 1 !important; transform: none !important; }
+.bv--sin-motion .bv-chip { background: rgba(255,255,255,0.18) !important; color: #fff !important; }
+.bv--sin-motion .bv-cascos,
+.bv--sin-motion .bv-logo-chip { animation: none !important; }
+.bv--sin-motion .bv-s--cierre .bv-cta { animation: none !important; transform: none !important; }
+.bv--sin-motion .bv-gate { transition: opacity 140ms linear; }
+.bv--sin-motion .bv-gate.is-ido { transform: none; }
+.bv--sin-motion.bv--entrando-app {
+  transition: opacity 200ms linear;
+  transform: none;
+  filter: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.bv-aterriza #vista { animation: none !important; }
+}
+.bv--sin-motion .bv-celda:nth-child(-n+8) { background: #fff; }
+.bv--sin-motion .bv-fases li .bv-fase__c,
+.bv--sin-motion .bv-fases li .bv-fase__c svg { animation: none !important; opacity: 1 !important; transform: none !important; }
+.bv--sin-motion .bv-arte * { stroke-dashoffset: 0 !important; animation: none !important; opacity: 1 !important; }
+.bv--sin-motion .bv-arte--corazon { animation: none !important; }
+.bv--sin-motion .bv-check circle,
+.bv--sin-motion .bv-check path { stroke-dashoffset: 0; animation: none; }
+.bv--sin-motion .bv-confirm { transition: opacity 120ms linear; }
+.bv--sin-motion .bv-confirm__caja { transition: none; transform: none; }
+.bv--sin-motion .bv-barras i { transform: scaleY(0.85) !important; }
+
+/* Bienvenida — retoques */
+.bv-luna {
+  position: absolute;
+  top: 6%;
+  right: 14%;
+  width: 128px;
+  height: 128px;
+  fill: rgba(255, 255, 255, 0.09);
+  animation: bv-bob 6s ease-in-out infinite;
+}
+@keyframes bv-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(12px); } }
+.bv-eq--card { height: 26px; opacity: 0.9; }
+.bv--sin-motion .bv-luna { animation: none; }

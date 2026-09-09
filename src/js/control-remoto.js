@@ -93,6 +93,12 @@ window.ControlRemoto = (function () {
   }
 
   function sonar(tipo) {
+    // Vibración a juego con el sonido: el aviso llama la atención con
+    // suavidad; el bloqueo, con un zumbido áspero y largo.
+    try {
+      if (window.Vibra) (tipo === 'bloqueo' ? window.Vibra.bloqueo : window.Vibra.aviso)();
+    } catch (e) {}
+
     var ac = ctx();
     if (!ac) return;
     // Si el contexto aún se está reanudando, programar tonos ahora da un

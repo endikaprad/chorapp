@@ -346,11 +346,28 @@ window.Frases = (function () {
     'Día de concierto. Que se note que lo pasas bien. Lo demás lo ponen las otras 39.',
   ];
 
+  /* ---------- El día DESPUÉS del concierto (mediodía) ----------
+     Notificación cabrona preguntando qué tal fue y empujándola a añadir
+     el recuerdo (foto + nota) del concierto en Práctica. */
+  var AVISOS_POSTCONCIERTO = [
+    '¿Qué tal el concierto, Ama? Seguro que las otras 39 lo taparon bien. Añade una foto del recuerdo antes de que se te olvide.',
+    'Concierto de ayer: sobreviviste. El coro también. Métele foto y una nota al recuerdo, que para eso está.',
+    'Ayer cantasteis. Bueno, ellas cantaron y tú acompañaste. Ponle una foto al recuerdo del concierto.',
+    '¿Cómo fue ayer? Si nadie te miró raro, buena señal. Abre Práctica y guarda una foto y cuatro palabras del concierto.',
+    'Ya pasó el concierto. Ahora la parte fácil: añadir la foto del recuerdo. Esa sí te sale bien.',
+    'Concierto hecho. Que no se pierda: mete foto y nota del recuerdo en Práctica. El agudo ya lo perdiste tú sola, no perdamos también la foto.',
+    '¿Qué tal ayer, Ama? Cuéntaselo al recuerdo del concierto: una foto, una frase, y a otra cosa.',
+    'Ayer al escenario, hoy a documentarlo. Abre el concierto en Práctica y añádele la foto antes de que la memoria te falle más que el oído.',
+  ];
+
   function fraseConcierto(fecha) {
     return CONCIERTOS[Math.floor(Math.random() * CONCIERTOS.length)];
   }
   function avisoConcierto() {
     return AVISOS_CONCIERTO[Math.floor(Math.random() * AVISOS_CONCIERTO.length)];
+  }
+  function avisoPostConcierto() {
+    return AVISOS_POSTCONCIERTO[Math.floor(Math.random() * AVISOS_POSTCONCIERTO.length)];
   }
 
   /* ---------- Utilidades de fecha ---------- */
@@ -630,6 +647,7 @@ window.Frases = (function () {
     avisoAnual: avisoAnual,
     fraseConcierto: fraseConcierto,
     avisoConcierto: avisoConcierto,
+    avisoPostConcierto: avisoPostConcierto,
     proximasFechas: proximasFechas
   };
 })();

@@ -37,6 +37,10 @@ window.CancionActiva = (function () {
   var ultimoEstado = { reproduciendo: false, actual: 0, total: 0, velocidad: 1, bucle: null };
   var barra = null;         // UI flotante (o null si aún no se creó)
   var arrastrandoBarra = false; // Maite tiene el dedo en la barra de progreso
+  var bucleVentana = false; // "repetir la canción entera sin parar": al llegar
+                            // al final de la ventana vuelve al principio. Lo
+                            // alternan el botón del modo estudio y el de la
+                            // notificación del móvil; persiste al navegar.
   var recorte = null;       // { ini, fin } en segundos: la canción es un TROZO
                             // del audio (una marca dentro del ensayo). La barra
                             // flotante trabaja relativa a esa ventana, no al
@@ -68,6 +72,15 @@ window.CancionActiva = (function () {
         sesionId: cancionActual.id,
         titulo: cancionActual.titulo,
       });
+    }
+    s.repite = bucleVentana;
+    // Repetir la canción entera: al llegar al final de su ventana, al principio.
+    if (bucleVentana && s.reproduciendo) {
+      var w = ventana(s);
+      if (w.fin > w.ini && s.actual >= w.fin - 0.15) {
+        proxy('irA')(w.ini);
+        return;
+      }
     }
     ultimoEstado = s;
     for (var i = 0; i < subs.length; i++) {
@@ -120,7 +133,9 @@ window.CancionActiva = (function () {
     control = window.Reproductor.crear(audio, {
       meta: { titulo: cancionActual.titulo, compositor: cancionActual.compositor },
       onEstado: emitir,
+      onAlternarBucle: alternarBucle,   // botón "loop" de la notificación
     });
+    if (control.marcarBucle) control.marcarBucle(bucleVentana);
 
     var id = cancion.id;
     return Promise.resolve(fuenteUrl).then(function (u) {
@@ -140,6 +155,7 @@ window.CancionActiva = (function () {
     if (urlActual) { window.Archivos.liberar(urlActual); urlActual = null; }
     cancionActual = null;
     recorte = null;
+    bucleVentana = false;
     forzarBarra = false;
     ultimoEstado = { reproduciendo: false, actual: 0, total: 0, velocidad: 1, bucle: null };
     ocultarBarra();
@@ -167,6 +183,24 @@ window.CancionActiva = (function () {
     var v = VELOCIDADES[(idx + 1) % VELOCIDADES.length];
     return proxy('fijarVelocidad')(v);
   }
+
+  function bucleActivo() { return bucleVentana; }
+
+  // Alterna "repetir la canción entera". Si se activa estando al final (o antes
+  // del principio de la ventana), rebobina para que empiece a repetir ya.
+  function fijarBucleVentana(on) {
+    bucleVentana = !!on;
+    if (control && control.marcarBucle) control.marcarBucle(bucleVentana);
+    if (bucleVentana) {
+      var w = ventana(ultimoEstado);
+      var t = ultimoEstado.actual || 0;
+      if (w.span && (t >= w.fin - 0.3 || t < w.ini)) proxy('irA')(w.ini);
+      if (!ultimoEstado.reproduciendo) proxy('alternar')();
+    }
+    ultimoEstado.repite = bucleVentana;
+    emitir(ultimoEstado);
+  }
+  function alternarBucle() { fijarBucleVentana(!bucleVentana); }
 
   /* ---------- Vista de estudio abierta / cerrada ---------- */
 
@@ -331,6 +365,8 @@ window.CancionActiva = (function () {
         ? control.fijarBucle(a, b) : undefined;
     },
     quitarBucle: proxy('quitarBucle'),
+    alternarBucle: alternarBucle,
+    bucleActivo: bucleActivo,
     get reproduciendo() { return !!(control && control.reproduciendo); },
   };
 })();

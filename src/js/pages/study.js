@@ -39,7 +39,18 @@ window.Pagina_study = (function () {
   // entera: así es más fácil moverse por ella.
   var segIni = 0;             // segundo real donde empieza la canción
   var segFinRaw = null;       // segundo real donde acaba (o null = hasta el final del audio)
-  var bucleClip = false;      // repetir la canción entera sin parar (botón "Bucle")
+  // El bucle de "repetir la canción entera" vive en window.CancionActiva
+  // (persiste al salir del modo estudio y lo controla también la notificación
+  // del móvil). Aquí solo lo leemos/alternamos.
+  function enBucle() {
+    return !!(window.CancionActiva && window.CancionActiva.bucleActivo &&
+              window.CancionActiva.bucleActivo());
+  }
+  function alternarBucleClip() {
+    if (window.CancionActiva && window.CancionActiva.alternarBucle) {
+      window.CancionActiva.alternarBucle();
+    }
+  }
   function segFin() { return (segFinRaw != null && segFinRaw > segIni) ? segFinRaw : duracionAudio; }
   function segTotal() { return Math.max(0, segFin() - segIni); }
   function rel(t) { return Math.min(segTotal(), Math.max(0, (t || 0) - segIni)); }
@@ -190,7 +201,6 @@ window.Pagina_study = (function () {
     if (panelTono) { panelTono.destruir(); panelTono = null; }
     reproductor = null;
     selEscucha = null;
-    bucleClip = false;
     if (grabadora) { grabadora.cancelar(); grabadora = null; }
     if (cronoNota) { clearInterval(cronoNota); cronoNota = null; }
     estaGrabando = false;
@@ -347,13 +357,23 @@ window.Pagina_study = (function () {
 
   function contenidoCompartible() {
     if (!cancion || !window.CompartirCancion) return null;
+    // Trozos difíciles: valen tanto los que tienen nota como los que solo
+    // marcan un minuto (en el resumen se muestra la hora igualmente).
     var frags = (marca && Array.isArray(marca.fragmentos))
-      ? marca.fragmentos.filter(function (f) { return f.texto && f.texto.trim(); }) : [];
-    var partIm = cancion.archivos && cancion.archivos.partitura &&
-                 /^image\//.test(cancion.archivos.partitura.mime || '');
+      ? marca.fragmentos.filter(function (f) {
+          return (f.texto && f.texto.trim()) ||
+                 (typeof f.segundo === 'number' && isFinite(f.segundo));
+        })
+      : [];
+    var arch = cancion.archivos || {};
     // Con que haya una canción del repertorio ya se puede compartir (aunque
     // sea solo el título y el compositor). El resumen crece con lo que tenga.
-    return { frags: frags, partIm: partIm };
+    return {
+      frags: frags,
+      archPartitura: !!arch.partitura,
+      archLetra: !!arch.letra,
+      archFonetica: !!arch.fonetica,
+    };
   }
 
   function montarCompartirCancion() {
@@ -379,7 +399,7 @@ window.Pagina_study = (function () {
       '<div class="hoja__panel" role="dialog" aria-modal="true" aria-label="Compartir la canción">' +
         '<div class="hoja__asa"></div>' +
         '<h2 class="hoja__titulo">Compartir «' + escapar(cancion.titulo) + '»</h2>' +
-        '<p class="comp-cc__nota">Un resumen con la letra, la partitura y los trozos difíciles, con el diseño de ChorApp. Tus grabaciones nunca se comparten.</p>' +
+        '<p class="comp-cc__nota">Un resumen con la letra, la partitura (también en PDF) y los trozos difíciles con su minuto, con el diseño de ChorApp. Tus grabaciones no se comparten, solo cuántas llevas.</p>' +
 
         '<div class="comp-cc__previa" data-comp-previa aria-hidden="true">' +
           '<div class="comp-cc__previa-carga"><span></span><span></span><span></span></div>' +
@@ -429,14 +449,31 @@ window.Pagina_study = (function () {
     accionesActivas(false);
 
     // Genera el resumen una sola vez y lo cachea en compGen.
-    var partPromesa = cont2.partIm && window.Archivos
-      ? window.Archivos.obtener(cancion.id + ':partitura').catch(function () { return null; })
-      : Promise.resolve(null);
-    compGen = partPromesa.then(function (partBlob) {
+    var A = window.Archivos;
+    function pedir(clave, cond) {
+      return (cond && A)
+        ? A.obtener(cancion.id + ':' + clave).catch(function () { return null; })
+        : Promise.resolve(null);
+    }
+    var sinLetraTexto = !(cancion.letraTexto || '').trim();
+    var sinFonTexto = !(cancion.letraFonetica || '').trim();
+    var numGrab = 0;
+    try {
+      numGrab = window.Grabaciones.listarDeToma(sesion.id, marca.id, claveGrab()).length;
+    } catch (e) {}
+
+    compGen = Promise.all([
+      pedir('partitura', cont2.archPartitura),
+      pedir('letra', cont2.archLetra && sinLetraTexto),
+      pedir('fonetica', cont2.archFonetica && sinFonTexto),
+    ]).then(function (bs) {
       return window.CompartirCancion.generar(cancion, {
         fragmentos: cont2.frags,
         notaToma: marca ? marca.nota : '',
-        partitura: partBlob,
+        partitura: bs[0],
+        letra: bs[1],
+        fonetica: bs[2],
+        numGrabaciones: numGrab,
       });
     });
 
@@ -857,7 +894,7 @@ window.Pagina_study = (function () {
       // principio y seguir; si no, parar ahí (no seguir con el resto del ensayo).
       var finReal = (segFinRaw != null) ? segFinRaw : (s.total || 0);
       if (finReal && s.reproduciendo && s.actual >= finReal - 0.15) {
-        if (bucleClip) {
+        if (enBucle()) {
           window.CancionActiva.irA(segIni);
         } else if (segFinRaw != null) {
           window.CancionActiva.alternar();
@@ -874,6 +911,7 @@ window.Pagina_study = (function () {
       velValor.textContent = fmtVel(s.velocidad);
       if (!velBarra.matches(':active')) velBarra.value = String(s.velocidad);
       pintarBucle(s.bucle);
+      pintarReplay();
       sincronizarTransporte(s);
     });
 
@@ -956,18 +994,15 @@ window.Pagina_study = (function () {
 
     var btnReplay = q('[data-replay]');
     function pintarReplay() {
-      btnReplay.classList.toggle('is-activo', bucleClip);
-      btnReplay.setAttribute('aria-pressed', bucleClip ? 'true' : 'false');
+      var on = enBucle();
+      if (btnReplay) {
+        btnReplay.classList.toggle('is-activo', on);
+        btnReplay.setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
     }
     btnReplay.addEventListener('click', function () {
-      bucleClip = !bucleClip;
+      alternarBucleClip();
       pintarReplay();
-      if (bucleClip) {
-        // Al activar: si estamos al final (o fuera), reiniciar la canción.
-        var st = window.CancionActiva.estado();
-        if (st.actual >= segFin() - 0.3 || st.actual < segIni) window.CancionActiva.irA(segIni);
-        if (!st.reproduciendo) reproductor.alternar();
-      }
     });
     pintarReplay();
     velBarra.addEventListener('input', function () {
@@ -1036,17 +1071,13 @@ window.Pagina_study = (function () {
       if (window.CancionActiva.estado().actual < segIni) window.CancionActiva.irA(segIni);
     });
     transporte.querySelector('[data-tp-replay]').addEventListener('click', function () {
-      bucleClip = !bucleClip;
+      alternarBucleClip();
+      var on = enBucle();
       var b = q('[data-replay]');
-      if (b) { b.classList.toggle('is-activo', bucleClip); b.setAttribute('aria-pressed', bucleClip ? 'true' : 'false'); }
+      if (b) { b.classList.toggle('is-activo', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
       var t = transporte.querySelector('[data-tp-replay]');
-      t.classList.toggle('is-activo', bucleClip);
-      t.setAttribute('aria-pressed', bucleClip ? 'true' : 'false');
-      if (bucleClip) {
-        var st = window.CancionActiva.estado();
-        if (st.actual >= segFin() - 0.3 || st.actual < segIni) window.CancionActiva.irA(segIni);
-        if (!st.reproduciendo) reproductor.alternar();
-      }
+      t.classList.toggle('is-activo', on);
+      t.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
 
     // Mostrarlo solo cuando hay un visor a pantalla completa abierto.
@@ -1109,8 +1140,9 @@ window.Pagina_study = (function () {
     btn.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
     var tRep = transporte.querySelector('[data-tp-replay]');
     if (tRep) {
-      tRep.classList.toggle('is-activo', bucleClip);
-      tRep.setAttribute('aria-pressed', bucleClip ? 'true' : 'false');
+      var on = enBucle();
+      tRep.classList.toggle('is-activo', on);
+      tRep.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
     transporte.querySelector('[data-tp-tiempo]').textContent = fmtTiempo(rel(s.actual));
   }

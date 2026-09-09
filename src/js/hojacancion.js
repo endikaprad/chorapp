@@ -572,6 +572,7 @@ window.HojaCancion = (function () {
       (frase ? '<p class="celebra__frase"></p>' : '');
     if (frase) el.querySelector('.celebra__frase').textContent = frase;
     document.body.appendChild(el);
+    try { if (window.Vibra) window.Vibra.logro(); } catch (e) {}
     var quita = function () { if (el.parentNode) el.remove(); };
 
     if (!frase) { setTimeout(quita, 1000); return; }

@@ -15,6 +15,9 @@ window.Reproductor = (function () {
   var VEL_MAX = 2.5;
   var VEL_PASO = 0.05;
 
+  // Velocidades que rota el botón "1×" (barra flotante y notificación del móvil).
+  var VELOCIDADES = [0.75, 1, 1.25];
+
   function limitarVel(v) {
     v = Math.round((v || 1) / VEL_PASO) * VEL_PASO;
     return Math.min(VEL_MAX, Math.max(VEL_MIN, Number(v.toFixed(2))));
@@ -61,8 +64,24 @@ window.Reproductor = (function () {
       seekbackward: function (d) { acciones.retroceder((d && d.seekOffset) || salto); },
       seekforward: function (d) { acciones.adelantar((d && d.seekOffset) || salto); },
       seekto: function (d) { if (d && typeof d.seekTime === 'number') acciones.irA(d.seekTime); },
+      // Custom actions extra (solo plugin nativo parcheado): rotar velocidad
+      // y activar/quitar el bucle de la canción entera. En la web navigator
+      // .mediaSession no las conoce y setActionHandler lanza → va en try/catch.
+      speed: function () { if (acciones.siguienteVelocidad) acciones.siguienteVelocidad(); },
+      loop: function () { if (acciones.alternarBucle) acciones.alternarBucle(); },
     };
     var acis = Object.keys(manejadores);
+
+    // Estado del bucle "repetir la canción entera". Lo decide window.CancionActiva
+    // (que sabe si la canción es un trozo de un ensayo) y nos lo empuja aquí para
+    // que el icono "loop" de la notificación lleve (o no) el puntito de activado.
+    var bucleNativo = false;
+    function empujarBucle(b) {
+      if (arguments.length) bucleNativo = !!b;
+      try {
+        if (nativo && nativoListo && nativo.setLoop) nativo.setLoop({ loop: bucleNativo });
+      } catch (e) {}
+    }
 
     // --- Plugin nativo (@jofr/capacitor-media-session) ---
     // No tocamos el plugin hasta la 1ª reproducción real: así su servicio en
@@ -78,6 +97,7 @@ window.Reproductor = (function () {
         acis.forEach(function (a) {
           try { nativo.setActionHandler({ action: a }, manejadores[a]); } catch (e) {}
         });
+        empujarBucle();
       } catch (e) { nativoListo = false; }
     }
 
@@ -121,7 +141,7 @@ window.Reproductor = (function () {
     audio.addEventListener('timeupdate', sincronizar);
     audio.addEventListener('loadedmetadata', sincronizar);
 
-    return function desconectar() {
+    function desconectar() {
       audio.removeEventListener('play', sincronizar);
       audio.removeEventListener('pause', sincronizar);
       audio.removeEventListener('timeupdate', sincronizar);
@@ -138,13 +158,16 @@ window.Reproductor = (function () {
         });
         try { web.metadata = null; } catch (e) {}
       }
-    };
+    }
+
+    return { desconectar: desconectar, empujarBucle: empujarBucle };
   }
 
   function crear(audio, cb) {
     cb = cb || {};
     var velocidad = 1;
     var bucle = null;   // { a, b } en segundos: repite ese trozo sin parar
+    var bucleMarca = false;  // "repetir la canción entera" (lo fija CancionActiva)
 
     function emitir() {
       if (cb.onEstado) cb.onEstado({
@@ -153,6 +176,7 @@ window.Reproductor = (function () {
         total: isFinite(audio.duration) ? audio.duration : 0,
         velocidad: velocidad,
         bucle: bucle ? { a: bucle.a, b: bucle.b } : null,
+        repite: bucleMarca,
       });
     }
 
@@ -192,7 +216,28 @@ window.Reproductor = (function () {
       velocidad = limitarVel(v);
       audio.playbackRate = velocidad;
       emitir();
+      // Refresca ya la notificación del móvil (su icono "1x/1.25x/0.75x"
+      // se recalcula al recibir el nuevo playbackRate vía setPositionState).
+      try { audio.dispatchEvent(new Event('timeupdate')); } catch (e) {}
       return velocidad;
+    }
+    // Rota entre 0.75× / 1× / 1.25× (botón "1×" de la notificación).
+    function siguienteVelocidad() {
+      var idx = 0;
+      for (var i = 0; i < VELOCIDADES.length; i++) {
+        if (VELOCIDADES[i] <= velocidad + 0.001) idx = i;
+      }
+      return fijarVelocidad(VELOCIDADES[(idx + 1) % VELOCIDADES.length]);
+    }
+    // "Repetir la canción entera": CancionActiva decide (sabe si es un trozo de
+    // un ensayo) y aquí solo guardamos el estado y se lo empujamos al icono de
+    // la notificación. La repetición en sí la hace quien llame (bucle A–B para
+    // trozos, o CancionActiva saltando al inicio al llegar al final).
+    function marcarBucle(b) {
+      bucleMarca = !!b;
+      ms.empujarBucle(bucleMarca);
+      emitir();
+      return bucleMarca;
     }
     function fijarBucle(a, b) {
       a = Math.max(0, Number(a) || 0);
@@ -209,13 +254,15 @@ window.Reproductor = (function () {
       bucle = null;
       emitir();
     }
-    var desconectarMS = conectarMediaSession(audio, cb.meta, {
+    var ms = conectarMediaSession(audio, cb.meta, {
       alternar: alternar, retroceder: retroceder, adelantar: adelantar, irA: irA,
+      siguienteVelocidad: siguienteVelocidad,
+      alternarBucle: function () { if (cb.onAlternarBucle) cb.onAlternarBucle(); },
     });
 
     function destruir() {
       bucle = null;
-      desconectarMS();
+      ms.desconectar();
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
@@ -227,6 +274,8 @@ window.Reproductor = (function () {
       adelantar: adelantar,
       irA: irA,
       fijarVelocidad: fijarVelocidad,
+      siguienteVelocidad: siguienteVelocidad,
+      marcarBucle: marcarBucle,
       fijarBucle: fijarBucle,
       quitarBucle: quitarBucle,
       destruir: destruir,

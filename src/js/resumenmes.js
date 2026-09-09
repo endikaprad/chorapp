@@ -8,12 +8,13 @@
      cabrón). En enero NO: el recap de diciembre lo absorbe el Wrapped
      anual del 31 de diciembre (tono cálido, es el regalo dentro del
      regalo).
-   - Práctica: botón para reabrirlo, visible solo los 5 días siguientes
-     a que saliera (y durante la ventana del Wrapped anual).
+   - Práctica: botón para reabrirlo. El mensual, los 5 días siguientes a
+     que saliera. El anual dura mucho más: 30 días desde que se vio (y si
+     no se llegó a ver, durante la ventana de captura 31 dic – 12 ene).
 
    Se calcula al vuelo desde Practica + Diario + Grabaciones + Logros +
    Conciertos. En Almacen solo se guarda qué se ha visto ya y cuándo
-   ('resumenmes:visto', ':visto-cuando', ':anual-visto').
+   ('resumenmes:visto', ':visto-cuando', ':anual-visto', ':anual-visto-cuando').
 
    window.ResumenMes.datosDe(anio, mes)      -> datos de un mes (0-11)
    window.ResumenMes.datosAnuales(anio)      -> datos del año (esAnual:true)
@@ -30,8 +31,10 @@ window.ResumenMes = (function () {
   var CLAVE_CUANDO = 'resumenmes:visto-cuando';        // ISO del día en que salió
   var CLAVE_CUANDO_CLAVE = 'resumenmes:visto-cuando-de'; // a qué mes ("YYYY-MM") corresponde esa fecha
   var CLAVE_ANUAL_VISTO = 'resumenmes:anual-visto';     // año del último Wrapped anual visto
+  var CLAVE_ANUAL_CUANDO = 'resumenmes:anual-visto-cuando'; // ISO del día en que se vio el anual
   var DIA_TOPE_AUTO = 12;   // pasado el día 12 ya no salta solo (sí desde Práctica)
-  var DIAS_VENTANA_PRACTICA = 5;  // días que el botón sigue visible en Práctica tras salir
+  var DIAS_VENTANA_PRACTICA = 5;   // días que el botón MENSUAL sigue visible en Práctica tras salir
+  var DIAS_VENTANA_ANUAL = 30;     // el Wrapped ANUAL dura mucho más: un mes desde que sale
 
   var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
                'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -400,8 +403,13 @@ window.ResumenMes = (function () {
       window.Almacen.guardar(CLAVE_CUANDO, _hoyISO());
     }
   }
+  // Marca el Wrapped anual como visto y —solo la primera vez de ese año— guarda
+  // la fecha, para la ventana de 30 días en Práctica.
   function marcarAnualVisto(anio) {
-    if (window.Almacen) window.Almacen.guardar(CLAVE_ANUAL_VISTO, String(anio));
+    if (!window.Almacen) return;
+    var previo = window.Almacen.leer(CLAVE_ANUAL_VISTO, '');
+    window.Almacen.guardar(CLAVE_ANUAL_VISTO, String(anio));
+    if (previo !== String(anio)) window.Almacen.guardar(CLAVE_ANUAL_CUANDO, _hoyISO());
   }
 
   function ultimoMes() { return mesAnterior(); }
@@ -414,23 +422,50 @@ window.ResumenMes = (function () {
     return Math.floor((Date.now() - t) / 86400000);
   }
 
-  // ¿Estamos en la ventana del Wrapped anual? (31 dic, y hasta el 5 de enero
-  // para poder reabrirlo desde Práctica). Devuelve el año del recap o null.
-  function _ventanaAnual() {
-    var hoy = new Date();
-    var m = hoy.getMonth(), d = hoy.getDate(), y = hoy.getFullYear();
-    if (m === 11 && d === 31) return y;                       // Nochevieja
-    if (m === 0 && d <= DIAS_VENTANA_PRACTICA) return y - 1;  // primeros días de enero
+  // Año del recap anual "vigente" según el calendario: en diciembre es el año
+  // en curso; en enero, el que acaba de terminar; el resto del año, ninguno.
+  function _anioRecapCalendario(hoy) {
+    var m = hoy.getMonth(), y = hoy.getFullYear();
+    if (m === 11) return y;
+    if (m === 0) return y - 1;
     return null;
   }
 
-  // Wrapped anual que debe SALIR SOLO en Inicio (solo el 31 de diciembre y si
-  // no se ha visto ya este año). O null.
+  // ¿Estamos aún en la ventana de "captura" en la que el anual puede aparecer
+  // por primera vez? (Nochevieja y los primeros días de enero.)
+  function _enCapturaAnual(hoy) {
+    var m = hoy.getMonth(), d = hoy.getDate();
+    if (m === 11) return d === 31;
+    if (m === 0) return d <= DIA_TOPE_AUTO;
+    return false;
+  }
+
+  // Año del Wrapped anual que debe verse en el BOTÓN de Práctica, o null.
+  // - Si ya se vio: mientras no pasen DIAS_VENTANA_ANUAL desde que se vio.
+  // - Si aún no se vio: durante la ventana de captura (31 dic – 12 ene).
+  function _anualParaPractica() {
+    var hoy = new Date();
+    var anioCal = _anioRecapCalendario(hoy);
+
+    var vistoAnio = window.Almacen.leer(CLAVE_ANUAL_VISTO, '');
+    if (vistoAnio) {
+      var cuando = window.Almacen.leer(CLAVE_ANUAL_CUANDO, '');
+      if (_diasDesde(cuando) <= DIAS_VENTANA_ANUAL) return parseInt(vistoAnio, 10);
+      // Ventana agotada. Si era el recap del año en curso, fuera del todo;
+      // si es de un año viejo, seguimos por si toca uno nuevo sin ver.
+      if (String(anioCal) === vistoAnio) return null;
+    }
+    return _enCapturaAnual(hoy) ? anioCal : null;
+  }
+
+  // Wrapped anual que debe SALIR SOLO en Inicio: Nochevieja y —si no se abrió la
+  // app ese día— también los primeros días de enero, mientras no se haya visto.
   function anualPendiente() {
     if (!window.Almacen) return null;
     var hoy = new Date();
-    if (hoy.getMonth() !== 11 || hoy.getDate() !== 31) return null;
-    var anio = hoy.getFullYear();
+    if (!_enCapturaAnual(hoy)) return null;
+    var anio = _anioRecapCalendario(hoy);
+    if (anio == null) return null;
     if (window.Almacen.leer(CLAVE_ANUAL_VISTO, '') === String(anio)) return null;
     var d;
     try { d = datosAnuales(anio); } catch (e) { return null; }
@@ -460,7 +495,7 @@ window.ResumenMes = (function () {
   function disponiblePractica() {
     if (!window.Almacen) return null;
 
-    var anioAnual = _ventanaAnual();
+    var anioAnual = _anualParaPractica();
     if (anioAnual != null) {
       try {
         var da = datosAnuales(anioAnual);

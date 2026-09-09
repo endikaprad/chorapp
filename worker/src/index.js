@@ -92,8 +92,12 @@ export default {
               icon: 'ic_stat_bihotsak',
               color: '#1512D6',
               // Canal "chorapp" (lo crea la app): SIN sonido, CON vibración.
+              // En Android 8+ manda el patrón del canal; esto es el respaldo
+              // para cuando la push llega antes de que la app cree el canal:
+              // una única vibración corta, nada de zumbido largo.
               channel_id: 'chorapp',
-              default_vibrate_timings: true,
+              default_vibrate_timings: false,
+              vibrate_timings: ['0s', '0.4s'],
             },
           },
         },

@@ -448,6 +448,10 @@ window.Logros = (function () {
     void el.offsetWidth;
     el.classList.add('is-visible');
     try { _sonido(indice || 0); } catch (e) {}
+    // El primero de la tanda vibra como celebración; los siguientes, un toque.
+    try {
+      if (window.Vibra) (indice ? window.Vibra.toque : window.Vibra.logro)();
+    } catch (e) {}
 
     var cerrado = false;
     function cerrar() {

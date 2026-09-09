@@ -1,0 +1,48 @@
+Música de fondo del Wrapped de ChorApp
+======================================
+
+Toda la música es de Scott Buckley — www.scottbuckley.com.au
+Licencia: Creative Commons Attribution 4.0 (CC-BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Cada archivo es un fragmento de ~80 s (con fundido de entrada y de
+salida, normalizado de volumen) del tema original, pensado para sonar
+en bucle por debajo de los textos del resumen.
+
+  archivo        mes          tema original
+  -----------    ---------    -----------------------------
+  mes-00.mp3     enero        "First Snow"
+  mes-01.mp3     febrero      "Reverie"
+  mes-02.mp3     marzo        "Wildflowers"
+  mes-03.mp3     abril        "Cicadas"
+  mes-04.mp3     mayo         "Effervescence"
+  mes-05.mp3     junio        "Home Was You"
+  mes-06.mp3     julio        "Echoes Of Home"
+  mes-07.mp3     agosto       "Life Is"
+  mes-08.mp3     septiembre   "In This Moment"
+  mes-09.mp3     octubre      "Permafrost"
+  mes-10.mp3     noviembre    "Childhood"
+  mes-11.mp3     diciembre    "Cobalt"
+  anual.mp3      resumen del año  "Amberlight"
+
+Atribución (formato que pide el autor), por tema:
+
+  'First Snow' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+  'Reverie' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+  'Wildflowers' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+  'Cicadas' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+  'Effervescence' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+  'Home Was You' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+  'Echoes Of Home' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+  'Life Is' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+  'In This Moment' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+  'Permafrost' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+  'Childhood' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+  'Cobalt' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+  'Amberlight' by Scott Buckley - released under CC-BY 4.0. www.scottbuckley.com.au
+
+El crédito visible en la app está en el último slide del Wrapped
+(slideCierre en src/js/wrapped.js) y en la pantalla de agradecimientos.
+
+Los archivos de esta carpeta se copian tal cual a www/ en `npm run build`
+y viajan dentro del APK.

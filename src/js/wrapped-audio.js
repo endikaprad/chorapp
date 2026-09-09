@@ -2,9 +2,9 @@
    wrapped-audio.js — El sonido del Wrapped.
 
    Dos capas:
-   1. Música de fondo, generada al vuelo por wrapped-music.js (una
-      paleta por mes; versión especial para el Wrapped anual). No hay
-      archivos: siempre suena, sin depender de assets.
+   1. Música de fondo, servida por wrapped-music.js: una instrumental
+      real por mes (audio/wrapped/), con red de seguridad sintetizada
+      si el MP3 no carga. Versión especial para el Wrapped anual.
    2. Cuando un slide habla de una canción concreta de Maite, esa
       canción suena unos segundos —empezando por la mitad, no desde el
       principio— por encima de la música de fondo, que baja de volumen.

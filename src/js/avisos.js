@@ -42,7 +42,8 @@ window.Avisos = (function () {
   // Canal de notificación (Android 8+). TODOS los avisos van por aquí:
   //   - sin sonido (apunta a un audio mudo en res/raw/silencio.wav que
   //     genera scripts/android-fix.js),
-  //   - con vibración,
+  //   - con vibración corta (el patrón por defecto de Android para
+  //     importancia "normal": un único zumbido breve, nada agresivo),
   //   - importancia "normal" (aparece en la barra, no salta como pop-up).
   // OJO: una vez creado, Android NO deja cambiar sonido/vibración del canal
   // por código (solo la usuaria en ajustes). Si hay que cambiarlo, subir el
@@ -66,6 +67,7 @@ window.Avisos = (function () {
   // entra en dos semanas. Tono cariñosamente cabrón.
   var ID_VAGA = 17777777;
   var ID_VAGA2 = 17777778;
+  var ID_VAGA3 = 17777779;   // "¿te has olvidado de mí?" al mes largo
   var HORA_VAGA = 15;
   var MIN_VAGA = 30;
 
@@ -82,11 +84,20 @@ window.Avisos = (function () {
   var ID_MES_MIN = 17200000;
   var ID_MES_MAX = 17200010;
   var ID_ANUAL = 17200020;   // Wrapped anual (31 de diciembre)
+
+  // "¿Qué tal el concierto?": el día DESPUÉS de cada concierto, a las 12:00.
+  // Pregunta cómo fue y la empuja a añadir el recuerdo (foto + nota) en
+  // Práctica. Tono cabrón. id = ID_POST_BASE + AAAAMMDD del día del concierto.
+  var ID_POST_MIN = 51000000;
+  var ID_POST_MAX = 52000000;
+  var ID_POST_BASE = 51000000;
+  var HORA_POST = 12;
   var HORA_MES = 10;
   var HORA_ANUAL = 12;
   var MESES_NOMBRE = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
                       'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  // Dos toques: a los 14 días y, si sigue sin aparecer, a los 28. Ahí paramos.
+  // Tres toques: a los 14 días, a los 28 y, si un mes largo después sigue
+  // sin aparecer, uno último a los 45 en plan "¿te has olvidado de mí?".
   var AVISOS_VAGA = [
     {
       id: ID_VAGA,
@@ -107,6 +118,19 @@ window.Avisos = (function () {
         'Cuatro semanas. La app se rinde. El coro no debería, pero la app sí.',
         'Último aviso: 28 días sin estudiar. A partir de aquí es cosa tuya.',
         'Un mes fuera. Espero que al menos estés cantando en la ducha.'
+      ]
+    },
+    {
+      id: ID_VAGA3,
+      dias: 45,
+      textos: [
+        'Ama, me pasé meses haciendo esta app para ti. Mes y medio sin abrirla. No pasa nada. Solo eran meses de mi vida.',
+        'Tu hijo, currándose esta app noche tras noche durante meses. Tú: 45 días sin tocarla. Pero tranquila, que yo encantado.',
+        'Meses programando esto para que estudies mejor. Mes y medio criando polvo. Al menos dime que cantas en la ducha, Ama.',
+        'Hola, soy la app que tu hijo tardó meses en hacer con todo el cariño. ¿Un huequito para mí esta semana? ¿No? Vale.',
+        '45 días. Me acuerdo de las noches montando el reproductor, la grabadora, el calendario... para esto. Un abrazo igualmente, Ama.',
+        'Meses de trabajo, un regalo hecho a mano, y lleva mes y medio cerrado. No me enfado. Solo me quedo aquí, esperando. Como siempre.',
+        'Podrías abrir la app de tu hijo aunque sea por pena. Mes y medio, Ama. Que le eché horas de las de verdad.'
       ]
     }
   ];
@@ -206,6 +230,33 @@ window.Avisos = (function () {
     });
   }
 
+  /* Notificación del día después de cada concierto (12:00): "¿qué tal fue?"
+     + recuérdale añadir el recuerdo. Recorre los conciertos y programa
+     los que su "día siguiente a las 12:00" aún esté por llegar. */
+  function agregarAvisosPostConcierto(notifs) {
+    if (!window.Conciertos || !window.Conciertos.listar) return;
+    var textoDe = (window.Frases && window.Frases.avisoPostConcierto) || null;
+    var lista = [];
+    try { lista = window.Conciertos.listar() || []; } catch (e) { return; }
+
+    lista.forEach(function (c) {
+      var p = /^(\d{4})-(\d{2})-(\d{2})$/.exec((c && c.fecha) || '');
+      if (!p) return;
+      // día siguiente al concierto, a las 12:00
+      var at = new Date(+p[1], +p[2] - 1, +p[3] + 1, HORA_POST, 0, 0, 0);
+      if (at.getTime() <= Date.now()) return;
+      var ymd = (+p[1]) * 10000 + (+p[2]) * 100 + (+p[3]);
+      notifs.push({
+        id: ID_POST_BASE + ymd,
+        title: 'ChorApp',
+        body: textoDe ? textoDe()
+          : '¿Qué tal el concierto de ayer? Añade una foto al recuerdo en Práctica.',
+        channelId: CANAL_ID,
+        schedule: { at: at, allowWhileIdle: true }
+      });
+    });
+  }
+
   function plugin() {
     var Cap = window.Capacitor;
     return (Cap && Cap.Plugins && Cap.Plugins.LocalNotifications) || null;
@@ -233,6 +284,21 @@ window.Avisos = (function () {
     listenerPuesto = true;
     LN.addListener('localNotificationActionPerformed', function (ev) {
       var id = ev && ev.notification && ev.notification.id;
+
+      // "¿Qué tal el concierto?": abre Práctica en el resumen de ese día,
+      // desde donde puede añadir el recuerdo (foto + nota).
+      if (id >= ID_POST_MIN && id <= ID_POST_MAX) {
+        var ymd = id - ID_POST_BASE;
+        var yy = Math.floor(ymd / 10000);
+        var mm = Math.floor((ymd % 10000) / 100);
+        var dd = ymd % 100;
+        var iso = yy + '-' + (mm < 10 ? '0' : '') + mm + '-' + (dd < 10 ? '0' : '') + dd;
+        if (window.App && window.App.ir) {
+          window.App.ir('practica', { reemplazar: true, datos: { conciertoDia: iso } });
+        }
+        return;
+      }
+
       var esResumen = (id >= ID_MES_MIN && id <= ID_MES_MAX) || id === ID_ANUAL;
       if (!esResumen) return;
       if (window.App && window.App.ir) window.App.ir('inicio', { reemplazar: true });
@@ -283,10 +349,11 @@ window.Avisos = (function () {
         // quita las que hayan cambiado de texto).
         var mias = ((pend && pend.notifications) || []).filter(function (n) {
           return (n.id >= ID_MIN && n.id < ID_MAX) ||
-                 n.id === ID_VAGA || n.id === ID_VAGA2 ||
+                 n.id === ID_VAGA || n.id === ID_VAGA2 || n.id === ID_VAGA3 ||
                  (n.id >= ID_RACHA_MIN && n.id <= ID_RACHA_MAX) ||
                  (n.id >= ID_MES_MIN && n.id <= ID_MES_MAX) ||
-                 n.id === ID_ANUAL;
+                 n.id === ID_ANUAL ||
+                 (n.id >= ID_POST_MIN && n.id <= ID_POST_MAX);
         });
         if (!mias.length) return;
         return LN.cancel({ notifications: mias.map(function (n) { return { id: n.id }; }) });
@@ -318,6 +385,9 @@ window.Avisos = (function () {
         // Resumen del mes (día 1, 10:00) y Wrapped anual (31 dic, 12:00).
         agregarAvisosMes(notifs);
         agregarAvisoAnual(notifs);
+
+        // "¿Qué tal el concierto?" el día después de cada concierto (12:00).
+        agregarAvisosPostConcierto(notifs);
 
         return LN.schedule({ notifications: notifs });
       });

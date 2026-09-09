@@ -22,11 +22,30 @@ index e273185..4969aa7 100644
 +        plugin.actionCallback(action);
 +    }
  }
+diff --git a/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionPlugin.java b/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionPlugin.java
+index 6f54b7f..d0b950a 100644
+--- a/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionPlugin.java
++++ b/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionPlugin.java
+@@ -187,6 +187,14 @@ public class MediaSessionPlugin extends Plugin {
+         call.resolve();
+     }
+ 
++    // ChorApp: estado del bucle (para el puntito del icono "loop").
++    @PluginMethod
++    public void setLoop(PluginCall call) {
++        boolean loop = Boolean.TRUE.equals(call.getBoolean("loop", false));
++        if (service != null) { service.setLoop(loop); }
++        call.resolve();
++    }
++
+     @PluginMethod(returnType = PluginMethod.RETURN_CALLBACK)
+     public void setActionHandler(PluginCall call) {
+         call.setKeepAlive(true);
 diff --git a/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionService.java b/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionService.java
-index cb0417f..7f0d6c2 100644
+index cb0417f..23c513e 100644
 --- a/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionService.java
 +++ b/node_modules/@jofr/capacitor-media-session/android/src/main/java/io/github/jofr/capacitor/mediasessionplugin/MediaSessionService.java
-@@ -51,6 +51,11 @@ public class MediaSessionService extends Service {
+@@ -51,6 +51,23 @@ public class MediaSessionService extends Service {
      private long position = 0;
      private float playbackSpeed = 1.0F;
  
@@ -35,10 +54,22 @@ index cb0417f..7f0d6c2 100644
 +    // no perderlas al reconstruir el builder con las custom actions).
 +    private long activePlaybackStateActions = PlaybackStateCompat.ACTION_PLAY;
 +
++    // ChorApp: ¿la canción está sonando en bucle? El icono de la custom action
++    // "loop" lleva un puntito debajo cuando está activo.
++    private boolean loopActivo = false;
++
++    public void setLoop(boolean loop) {
++        if (this.loopActivo != loop) {
++            this.loopActivo = loop;
++            playbackStateUpdate = true;
++            update();
++        }
++    }
++
      private boolean possibleActionsUpdate = true;
      private boolean playbackStateUpdate = false;
      private boolean mediaMetadataUpdate = false;
-@@ -224,7 +229,7 @@ public class MediaSessionService extends Service {
+@@ -224,7 +241,7 @@ public class MediaSessionService extends Service {
              notificationBuilder.mActions.clear();
            }
  
@@ -47,19 +78,26 @@ index cb0417f..7f0d6c2 100644
              int[] activeCompactViewActionIndices = new int[3];
  
              int notificationActionIndex = 0;
-@@ -270,7 +275,22 @@ public class MediaSessionService extends Service {
+@@ -270,7 +287,42 @@ public class MediaSessionService extends Service {
          }
  
          if (playbackStateUpdate && playbackStateBuilder != null) {
 -            playbackStateBuilder.setState(this.playbackState, this.position, this.playbackSpeed);
-+            // ChorApp: reconstruimos el builder para poder colgar las custom
-+            // actions de saltar 5 s. Samsung One UI (y varias pantallas de
-+            // bloqueo) NO pintan los botones estándar REWIND/FAST_FORWARD en el
-+            // reproductor, pero SÍ las custom actions con su propio icono
-+            // (igual que el −15 s / +15 s de los podcasts de Spotify).
++            // ChorApp: reconstruimos el PlaybackState para colgar los controles
++            // como custom actions (velocidad, ±5 s, bucle) con icono propio.
++            //
++            // Quitamos los bits estándar REWIND / FAST_FORWARD: si se dejan,
++            // realme UI / One UI pintan SUS propios botones de saltar además de
++            // los nuestros y el reproductor sale con controles duplicados.
++            long accionesLimpias = activePlaybackStateActions
++                    & ~(PlaybackStateCompat.ACTION_REWIND | PlaybackStateCompat.ACTION_FAST_FORWARD);
 +            playbackStateBuilder = new PlaybackStateCompat.Builder()
-+                    .setActions(activePlaybackStateActions)
++                    .setActions(accionesLimpias)
 +                    .setState(this.playbackState, this.position, this.playbackSpeed);
++            // realme UI reparte las 4 custom actions así (play/pausa fijo en el
++            // centro): pares/impares a cada lado, el par izquierdo en orden
++            // inverso. Con add = [⟲5, ⟳5, velocidad, bucle] se pinta:
++            //   [1x] [⟲5] (play/pausa) [⟳5] [bucle]
 +            if (plugin.hasActionHandler("seekbackward")) {
 +                playbackStateBuilder.addCustomAction(new PlaybackStateCompat.CustomAction.Builder(
 +                        "seekbackward", "Atrás 5 segundos", R.drawable.ic_chorapp_replay_5).build());
@@ -67,6 +105,19 @@ index cb0417f..7f0d6c2 100644
 +            if (plugin.hasActionHandler("seekforward")) {
 +                playbackStateBuilder.addCustomAction(new PlaybackStateCompat.CustomAction.Builder(
 +                        "seekforward", "Adelante 5 segundos", R.drawable.ic_chorapp_forward_5).build());
++            }
++            if (plugin.hasActionHandler("speed")) {
++                // El icono ES el texto de la velocidad actual (0.75x / 1x / 1.25x).
++                int speedIcon = R.drawable.ic_chorapp_speed_1;
++                if (this.playbackSpeed < 0.9f) speedIcon = R.drawable.ic_chorapp_speed_075;
++                else if (this.playbackSpeed > 1.1f) speedIcon = R.drawable.ic_chorapp_speed_125;
++                playbackStateBuilder.addCustomAction(new PlaybackStateCompat.CustomAction.Builder(
++                        "speed", "Velocidad", speedIcon).build());
++            }
++            if (plugin.hasActionHandler("loop")) {
++                int loopIcon = loopActivo ? R.drawable.ic_chorapp_loop_on : R.drawable.ic_chorapp_loop;
++                playbackStateBuilder.addCustomAction(new PlaybackStateCompat.CustomAction.Builder(
++                        "loop", "Repetir la canción", loopIcon).build());
 +            }
              mediaSession.setPlaybackState(playbackStateBuilder.build());
              playbackStateUpdate = false;
@@ -89,6 +140,53 @@ index 0000000..cd1f4b3
 +        android:fillColor="#FFFFFFFF"
 +        android:pathData="M12.03,15.38c-0.44,0,-0.58,-0.31,-0.6,-0.56h-0.84c0.03,0.85,0.79,1.25,1.44,1.25c0.93,0,1.44,-0.63,1.44,-1.43c0,-1.33,-0.97,-1.44,-1.3,-1.44c-0.2,0,-0.43,0.05,-0.64,0.16l0.11,-0.92h1.7v-0.71h-2.39l-0.25,2.17l0.67,0.17c0.13,-0.13,0.28,-0.23,0.57,-0.23c0.4,0,0.69,0.23,0.69,0.75C12.62,14.64,12.65,15.38,12.03,15.38z" />
 +</vector>
+diff --git a/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_loop.xml b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_loop.xml
+new file mode 100644
+index 0000000..9747ca8
+--- /dev/null
++++ b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_loop.xml
+@@ -0,0 +1,16 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <group
++        android:pivotX="12"
++        android:pivotY="12"
++        android:scaleX="0.82"
++        android:scaleY="0.82"
++        android:translateY="-1.5">
++        <path
++            android:fillColor="#FFFFFFFF"
++            android:pathData="M7,7h10v3l4,-4l-4,-4v3H5v6h2V7zM17,17H7v-3l-4,4l4,4v-3h12v-6h-2V17z" />
++    </group>
++</vector>
+diff --git a/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_loop_on.xml b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_loop_on.xml
+new file mode 100644
+index 0000000..f440242
+--- /dev/null
++++ b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_loop_on.xml
+@@ -0,0 +1,19 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <group
++        android:pivotX="12"
++        android:pivotY="12"
++        android:scaleX="0.82"
++        android:scaleY="0.82"
++        android:translateY="-3">
++        <path
++            android:fillColor="#FFFFFFFF"
++            android:pathData="M7,7h10v3l4,-4l-4,-4v3H5v6h2V7zM17,17H7v-3l-4,4l4,4v-3h12v-6h-2V17z" />
++    </group>
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M12,21.5m-2.3,0a2.3,2.3 0,1 1,4.6 0a2.3,2.3 0,1 1,-4.6 0" />
++</vector>
 diff --git a/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_replay_5.xml b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_replay_5.xml
 new file mode 100644
 index 0000000..f4fcc23
@@ -106,4 +204,61 @@ index 0000000..f4fcc23
 +    <path
 +        android:fillColor="#FFFFFFFF"
 +        android:pathData="M10.69,13.9l0.25,-2.17h2.39v0.71h-1.7l-0.11,0.92c0.03,-0.02,0.07,-0.03,0.11,-0.05s0.09,-0.04,0.15,-0.05s0.12,-0.03,0.18,-0.04s0.13,-0.02,0.2,-0.02c0.21,0,0.39,0.03,0.55,0.1s0.3,0.16,0.41,0.28s0.2,0.27,0.25,0.45s0.09,0.38,0.09,0.6c0,0.19,-0.03,0.37,-0.09,0.54s-0.15,0.32,-0.27,0.45s-0.27,0.24,-0.45,0.31s-0.39,0.12,-0.64,0.12c-0.18,0,-0.36,-0.03,-0.53,-0.08s-0.32,-0.14,-0.46,-0.24s-0.24,-0.24,-0.32,-0.39s-0.13,-0.33,-0.13,-0.53h0.84c0.02,0.18,0.08,0.32,0.19,0.41s0.25,0.15,0.42,0.15c0.11,0,0.2,-0.02,0.27,-0.06s0.14,-0.1,0.18,-0.17s0.08,-0.15,0.11,-0.25s0.03,-0.2,0.03,-0.31s-0.01,-0.21,-0.04,-0.31s-0.07,-0.17,-0.13,-0.24s-0.13,-0.12,-0.21,-0.15s-0.19,-0.05,-0.3,-0.05c-0.08,0,-0.15,0.01,-0.2,0.02s-0.11,0.03,-0.15,0.05s-0.08,0.05,-0.12,0.07s-0.07,0.06,-0.1,0.09L10.69,13.9z" />
++</vector>
+diff --git a/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_speed_075.xml b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_speed_075.xml
+new file mode 100644
+index 0000000..c5f40fe
+--- /dev/null
++++ b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_speed_075.xml
+@@ -0,0 +1,13 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:strokeColor="#FFFFFFFF"
++        android:strokeWidth="1.7"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="#00000000"
++        android:pathData="M1,7.5 L4.8,7.5 L4.8,17 L1,17 Z M6.3,16.5 L6.3,17 M8.3,7.5 L12.1,7.5 L10,17 M17.6,7.5 L13.8,7.5 L13.8,12 L17.6,12 L17.6,17 L13.8,17 M19.2,10 L23.2,17 M23.2,10 L19.2,17" />
++</vector>
+diff --git a/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_speed_1.xml b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_speed_1.xml
+new file mode 100644
+index 0000000..ce56d5f
+--- /dev/null
++++ b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_speed_1.xml
+@@ -0,0 +1,13 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:strokeColor="#FFFFFFFF"
++        android:strokeWidth="2"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="#00000000"
++        android:pathData="M7,9 L10.5,7 L10.5,17.5 M7.5,17.5 L13.5,17.5 M14.5,10.5 L20,17.5 M20,10.5 L14.5,17.5" />
++</vector>
+diff --git a/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_speed_125.xml b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_speed_125.xml
+new file mode 100644
+index 0000000..3a01514
+--- /dev/null
++++ b/node_modules/@jofr/capacitor-media-session/android/src/main/res/drawable/ic_chorapp_speed_125.xml
+@@ -0,0 +1,13 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:strokeColor="#FFFFFFFF"
++        android:strokeWidth="1.7"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:fillColor="#00000000"
++        android:pathData="M1,8.5 L2.8,7.5 L2.8,17 M1.3,17 L4.6,17 M6,16.5 L6,17 M8,7.5 L11.8,7.5 L11.8,12 L8,12 L8,17 L11.8,17 M17.3,7.5 L13.5,7.5 L13.5,12 L17.3,12 L17.3,17 L13.5,17 M19,10 L23,17 M23,10 L19,17" />
 +</vector>

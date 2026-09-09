@@ -303,7 +303,13 @@
     var arranque = (window.Sesiones && window.Sesiones.migrarDesdeCanciones)
       ? window.Sesiones.migrarDesdeCanciones().catch(function () {})
       : Promise.resolve();
-    arranque.then(function () { ir('inicio'); });
+    arranque.then(function () {
+      ir('inicio');
+      // Presentación a pantalla completa, SOLO la primera vez que se abre.
+      if (window.Bienvenida && window.Bienvenida.iniciarSiPrimeraVez) {
+        window.Bienvenida.iniciarSiPrimeraVez();
+      }
+    });
     // Notificaciones en fechas señaladas (cumpleaños, fiestas…). Solo APK.
     if (window.Avisos && window.Avisos.iniciar) {
       setTimeout(function () { window.Avisos.iniciar(); }, 1500);
