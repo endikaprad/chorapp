@@ -139,6 +139,55 @@ debe devolver un JSON con `imagen`, `texto`, `fecha`, `enlace`. Si da
 
 ---
 
+## Ayuda de IA para las letras — ruta `POST /ia`
+
+El mismo Worker genera **cómo se pronuncia** una letra (y, si se quiere, su
+traducción) con **Gemini Flash** (`gemini-flash-latest`), el modelo gratuito
+de Google AI Studio. La
+app (botón *"Generar cómo se pronuncia"* del Modo estudio) manda
+`{ tarea, texto, idioma }` y recibe `{ texto }`. La clave vive solo en el
+Worker, nunca en el APK. El resultado se **cachea 30 días por contenido**, así
+que volver a pulsar el botón no gasta cuota.
+
+Uso real (una sola persona, letras cortas, con caché): unas pocas peticiones al
+mes. Imposible salirse del nivel gratuito.
+
+### Montarlo
+
+1. **Clave de Gemini** (gratis, sin tarjeta): entra en
+   <https://aistudio.google.com/apikey> con tu cuenta Google → *Create API key*.
+
+2. **Dársela al Worker**:
+   ```bash
+   cd worker
+   npx wrangler secret put GEMINI_API_KEY
+   # pega la clave y Enter
+
+   # Opcional, recomendado: una verja suave para que nadie más use tu cuota.
+   # Inventa una frase larga; ponla también en src/data/coro.json ("iaToken").
+   npx wrangler secret put IA_TOKEN
+
+   npx wrangler deploy
+   ```
+
+3. **Conectar la app**: en `src/data/coro.json` ya está `worker` (la misma URL).
+   Si pusiste `IA_TOKEN`, añade `"iaToken": "la-misma-frase"`.
+
+4. `npm run sync`, regenera el APK y reinstala.
+
+Probar:
+```bash
+curl -X POST https://chorapp-push.TU-SUBDOMINIO.workers.dev/ia \
+  -H 'Content-Type: application/json' \
+  -d '{"tarea":"fonetica","idioma":"Latín","texto":"Kyrie eleison\nChriste eleison"}'
+```
+Debe devolver `{"texto":"kírie eléison\nkríste eléison"}` (aprox.).
+
+> Si `data/coro.json` no tiene `worker`, o el Worker no responde, el botón
+> simplemente muestra un aviso y la app sigue funcionando igual que antes.
+
+---
+
 ## Ojo con el ahorro de batería (Xiaomi, Huawei, Samsung, Oppo…)
 
 Algunas capas de Android matan la app y bloquean las push si no la marcas como

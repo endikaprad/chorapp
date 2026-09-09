@@ -1,6 +1,7 @@
 {
   "_ayuda": "Sección 'Del coro' de la pantalla de Inicio: última publicación del perfil PÚBLICO de Instagram ('instagram', sin @). Instagram bloquea las peticiones directas (401) desde el móvil Y desde Cloudflare, así que el flujo es: la app pide a 'worker' -> el Worker lee un feed JSON de RSS.app (secreto CORO_FEED_URL del Worker) -> normaliza y cachea. Montaje completo en worker/README.md, sección 'Del coro'. Pon en 'worker' la MISMA URL del Worker del panel, sin barra final. Si nada responde, la app sigue mostrando la última publicación guardada. Para cambiar de cuenta: edita 'instagram', 'usuario', 'perfil' y regenera el feed de RSS.app.",
   "worker": "https://chorapp-push.bihotsak-coro.workers.dev",
+  "iaToken": "",
   "usuario": "@bihotsak",
   "instagram": "bihotsak",
   "perfil": "https://www.instagram.com/bihotsak/"

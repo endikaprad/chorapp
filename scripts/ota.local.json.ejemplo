@@ -1,0 +1,6 @@
+{
+  "bucket": "chorapp-updates",
+  "publicBase": "https://pub-XXXXXXXXXXXX.r2.dev",
+  "workerUrl": "https://chorapp-push.TU-SUBDOMINIO.workers.dev",
+  "secret": "la-MISMA-frase-larga-que-PANEL_SECRET-del-worker"
+}

@@ -15,6 +15,10 @@ keystore.properties
 # APK generado (no versionar binarios de build)
 *.apk
 
+# OTA: config local (bucket + secreto) y zips generados
+scripts/ota.local.json
+dist/
+
 # Firebase (cache local del deploy del panel)
 .firebase/
 

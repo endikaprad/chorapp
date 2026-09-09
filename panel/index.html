@@ -192,6 +192,23 @@
     </section>
 
     <section>
+      <h2>Actualización de la app (OTA)</h2>
+      <p class="estado" id="ota-estado">Consultando…</p>
+      <textarea id="ota-nota" placeholder="Nota que verá Maite en el aviso (opcional)" style="margin-top:8px"></textarea>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px">
+        <input type="checkbox" id="ota-obligatoria" style="width:auto" />
+        Obligatoria (se aplica sin preguntar)
+      </label>
+      <div class="fila">
+        <button class="primario" id="btn-ota-guardar" style="flex:1">Guardar cambios</button>
+      </div>
+      <div class="fila">
+        <button class="peligro" id="btn-ota-revertir" style="flex:1">Volver a la versión anterior</button>
+      </div>
+      <p class="pista">La subida del zip se hace desde el PC con <b>npm run ota</b>. Aquí solo se ajusta la nota, se marca como obligatoria o se revierte.</p>
+    </section>
+
+    <section>
       <h2>Cómo va Maite</h2>
       <div id="progreso-cont" class="progreso">Consultando…</div>
     </section>
@@ -381,6 +398,66 @@ function desbloquear() {
     .catch(function (e) { flash('Error: ' + e.message, true); });
 }
 
+/* ---------- Actualización OTA (/updates) ---------- */
+function consultarOTA() {
+  $('ota-estado').textContent = 'Consultando…';
+  tokenValido().then(function (token) {
+    return fetch(FIREBASE.dbUrl + '/updates/latest.json?auth=' + token).then(function (r) { return r.json(); });
+  }).then(function (u) {
+    if (!u || !u.bundle) {
+      $('ota-estado').textContent = 'Todavía no se ha publicado ninguna actualización.';
+      return;
+    }
+    $('ota-estado').innerHTML =
+      'Última publicada: <b>bundle ' + u.bundle + '</b> (' + esc(u.nombre || '') + ')<br>' +
+      'Publicada ' + haceCuanto(u.fecha || Date.now()) +
+      (u.obligatoria ? ' · <b>obligatoria</b>' : '');
+    $('ota-nota').value = u.nota || '';
+    $('ota-obligatoria').checked = !!u.obligatoria;
+  }).catch(function (e) {
+    $('ota-estado').textContent = 'No se pudo consultar (' + e.message + ')';
+  });
+}
+
+function guardarOTA() {
+  tokenValido().then(function (token) {
+    return fetch(FIREBASE.dbUrl + '/updates/latest.json?auth=' + token, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nota: $('ota-nota').value.trim(),
+        obligatoria: $('ota-obligatoria').checked
+      })
+    });
+  }).then(function (r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    flash('Actualización ajustada ✓');
+    consultarOTA();
+  }).catch(function (e) { flash('No se pudo guardar: ' + e.message, true); });
+}
+
+function revertirOTA() {
+  if (!confirm('¿Volver a la versión anterior? Maite recibirá el bundle previo en la próxima apertura.')) return;
+  tokenValido().then(function (token) {
+    return fetch(FIREBASE.dbUrl + '/updates/anterior.json?auth=' + token)
+      .then(function (r) { return r.json(); })
+      .then(function (prev) {
+        if (!prev || !prev.bundle) throw new Error('no hay versión anterior guardada');
+        prev.fecha = Date.now();
+        prev.nota = 'Se ha vuelto a una versión anterior.';
+        return fetch(FIREBASE.dbUrl + '/updates/latest.json?auth=' + token, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(prev)
+        });
+      });
+  }).then(function (r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    flash('Revertido a la versión anterior ✓');
+    consultarOTA();
+  }).catch(function (e) { flash('No se pudo revertir: ' + e.message, true); });
+}
+
 /* ---------- lectura de /status ---------- */
 function consultarEstado() {
   $('estado-texto').textContent = 'Consultando…';
@@ -494,6 +571,7 @@ function mostrarPanel() {
   $('panel').classList.remove('oculto');
   pintarBotones();
   consultarEstado();
+  consultarOTA();
 }
 
 /* ---------- eventos ---------- */
@@ -522,7 +600,9 @@ $('btn-bloqueo-libre').addEventListener('click', function () {
   bloquear($('min-libre').value, $('motivo-bloqueo').value);
 });
 $('btn-desbloquear').addEventListener('click', desbloquear);
-$('btn-refrescar').addEventListener('click', consultarEstado);
+$('btn-ota-guardar').addEventListener('click', guardarOTA);
+$('btn-ota-revertir').addEventListener('click', revertirOTA);
+$('btn-refrescar').addEventListener('click', function () { consultarEstado(); consultarOTA(); });
 $('btn-salir').addEventListener('click', cerrarSesion);
 
 /* ---------- arranque ---------- */

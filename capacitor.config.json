@@ -12,6 +12,11 @@
     "CapacitorHttp": {
       "enabled": true
     },
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "resetWhenUpdate": true,
+      "directUpdate": false
+    },
     "LocalNotifications": {
       "smallIcon": "ic_stat_bihotsak",
       "iconColor": "#1512D6"

@@ -47,6 +47,24 @@ export default {
       return coro(searchParams.get('handle') || '', cors, env);
     }
 
+    // --- Ayuda de IA para las letras: ruta POST /ia ---
+    // La app (APK y navegador) llama aquí para generar "cómo se pronuncia"
+    // una letra o su traducción. El prompt se arma en el servidor; el móvil
+    // solo manda { tarea, texto, idioma }. Usa Gemini Flash (nivel gratuito
+    // de Google AI Studio) y cachea el resultado por texto para no gastar
+    // cuota si Maite vuelve a pulsar el botón. Ver worker/README.md.
+    if (request.method === 'POST' && /\/ia\/?$/.test(pathname)) {
+      return ia(request, cors, env);
+    }
+
+    // --- Actualización por wifi (OTA): ruta POST /ota ---
+    // La lanza scripts/ota.js con el secreto del panel. Escribe
+    // /updates/latest en la RTDB (y guarda la anterior en /updates/anterior)
+    // y manda una notificación a Maite. Ver docs/actualizaciones.md.
+    if (request.method === 'POST' && /\/ota\/?$/.test(pathname)) {
+      return ota(request, cors, env);
+    }
+
     if (request.method !== 'POST') {
       return json({ error: 'usa POST' }, 405, cors);
     }
@@ -124,11 +142,255 @@ export default {
   },
 };
 
+/* ---------- Actualización por wifi (ruta POST /ota) ---------- */
+
+async function ota(request, cors, env) {
+  // Mismo secreto que las push del panel.
+  const auth = request.headers.get('Authorization') || '';
+  const dado = auth.replace(/^Bearer\s+/i, '').trim();
+  if (!env.PANEL_SECRET || dado !== env.PANEL_SECRET) {
+    return json({ error: 'no autorizado' }, 401, cors);
+  }
+
+  let c;
+  try { c = await request.json(); } catch (e) { c = {}; }
+  const bundle = parseInt(c.bundle, 10);
+  const url = String(c.url || '').trim();
+  if (!bundle || bundle < 1) return json({ error: 'falta "bundle" (entero ≥ 1)' }, 400, cors);
+  if (!/^https:\/\/.+\.zip($|\?)/i.test(url)) return json({ error: '"url" debe ser un https://…zip' }, 400, cors);
+
+  const registro = {
+    bundle,
+    nombre: String(c.nombre || bundle).slice(0, 40),
+    url,
+    sha256: String(c.sha256 || '').slice(0, 64),
+    nota: String(c.nota || '').slice(0, 240),
+    obligatoria: !!c.obligatoria,
+    fecha: Date.now(),
+  };
+
+  let sa;
+  try { sa = JSON.parse(env.SERVICE_ACCOUNT); }
+  catch (e) { return json({ error: 'SERVICE_ACCOUNT no es JSON válido' }, 500, cors); }
+
+  const dbUrl = String(env.DB_URL || '').replace(/\/+$/, '');
+
+  try {
+    const accessToken = await getAccessToken(sa);
+    const q = `?access_token=${encodeURIComponent(accessToken)}`;
+
+    // Guarda la última como "anterior" (para el botón "volver atrás" del panel).
+    try {
+      const prev = await (await fetch(`${dbUrl}/updates/latest.json${q}`)).json();
+      if (prev && typeof prev === 'object' && prev.bundle) {
+        await fetch(`${dbUrl}/updates/anterior.json${q}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(prev),
+        });
+      }
+    } catch (e) { /* no crítico */ }
+
+    const put = await fetch(`${dbUrl}/updates/latest.json${q}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(registro),
+    });
+    if (!put.ok) {
+      return json({ error: 'no se pudo escribir /updates/latest', detalle: await put.text() }, 502, cors);
+    }
+
+    // Notificación a Maite (mejor esfuerzo: si no hay token, no es error).
+    let push = false;
+    try {
+      push = await enviarPush(sa, accessToken, {
+        title: 'ChorApp 🎶',
+        body: registro.nota || 'Hay una actualización lista. Ábrela para ponerte al día.',
+        data: { tipo: 'ota', bundle: String(bundle) },
+      }, dbUrl);
+    } catch (e) { /* da igual */ }
+
+    return json({ ok: true, bundle, push }, 200, cors);
+  } catch (e) {
+    return json({ error: String((e && e.message) || e) }, 500, cors);
+  }
+}
+
+// Envía una notificación al móvil de Maite vía FCM. Devuelve true si se envió.
+async function enviarPush(sa, accessToken, { title, body, data }, dbUrl) {
+  const tRes = await fetch(
+    `${dbUrl}/status/fcmToken.json?access_token=${encodeURIComponent(accessToken)}`
+  );
+  const fcmToken = await tRes.json();
+  if (!fcmToken || typeof fcmToken !== 'string') return false;
+
+  const msg = {
+    message: {
+      token: fcmToken,
+      notification: { title, body },
+      data: data || {},
+      android: {
+        priority: 'high',
+        notification: {
+          icon: 'ic_stat_bihotsak',
+          color: '#1512D6',
+          channel_id: 'chorapp',
+          default_vibrate_timings: false,
+          vibrate_timings: ['0s', '0.4s'],
+        },
+      },
+    },
+  };
+  const r = await fetch(
+    `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(msg),
+    }
+  );
+  return r.ok;
+}
+
 function json(obj, status, cors) {
   return new Response(JSON.stringify(obj), {
     status: status || 200,
     headers: { 'Content-Type': 'application/json', ...(cors || {}) },
   });
+}
+
+/* ---------- Ayuda de IA para las letras (ruta POST /ia) ---------- */
+
+// Modelo Flash actual (sept 2026). Historial de este proyecto:
+//   gemini-2.0-flash  -> retirado
+//   gemini-2.5-flash  -> retirado para cuentas nuevas
+//   gemini-flash-latest -> apunta a preview (3.8) con cuota mínima (5/min) y 503 frecuentes
+// gemini-3.6-flash es el que Google recomienda y tiene límite gratuito holgado.
+// El reintento de abajo cubre los 429/503 puntuales igualmente.
+const IA_MODELO = 'gemini-3.6-flash';
+const IA_MAX_CARACTERES = 6000;
+
+// Arma el prompt según la tarea. `idioma` es el nombre en español
+// ('Latín', 'Alemán'…) o '' si no se sabe.
+function promptIA(tarea, texto, idioma) {
+  const deIdioma = idioma
+    ? `en ${idioma}`
+    : 'en su idioma original (detéctalo tú)';
+
+  if (tarea === 'traduccion') {
+    return (
+      `Traduce al español esta letra de una canción ${deIdioma}. ` +
+      `Es un texto para cantar en un coro: prioriza una traducción natural y fiel al sentido. ` +
+      `Mantén EXACTAMENTE la misma estructura de versos y líneas que el original ` +
+      `(una línea de salida por cada línea de entrada, en el mismo orden). ` +
+      `Devuelve ÚNICAMENTE la traducción, sin títulos, notas ni comentarios.\n\n` +
+      `Letra:\n${texto}`
+    );
+  }
+  // 'fonetica' (por defecto)
+  return (
+    `Eres una ayuda para una integrante de un coro que habla español. ` +
+    `Te doy la letra de una canción ${deIdioma}. ` +
+    `Devuelve ÚNICAMENTE cómo se pronuncia, escrita para que una persona hispanohablante ` +
+    `la lea tal cual y suene bien al cantar. Usa solo letras del español, NADA de alfabeto ` +
+    `fonético (AFI) ni símbolos raros. Separa las sílabas largas con guiones si ayuda. ` +
+    `Mantén EXACTAMENTE la misma estructura de versos y líneas que el original ` +
+    `(una línea de salida por cada línea de entrada, en el mismo orden). ` +
+    `Sin títulos, explicaciones ni comentarios.\n\n` +
+    `Letra:\n${texto}`
+  );
+}
+
+async function ia(request, cors, env) {
+  if (!env.GEMINI_API_KEY) {
+    return json({ error: 'IA no configurada (falta GEMINI_API_KEY)' }, 500, cors);
+  }
+
+  // Verja suave: si hay IA_TOKEN definido, la app debe mandarlo. No es un
+  // secreto de verdad (viaja en el APK), solo frena el abuso casual.
+  if (env.IA_TOKEN) {
+    const dado = (request.headers.get('X-IA-Token') || '').trim();
+    if (dado !== env.IA_TOKEN) return json({ error: 'no autorizado' }, 401, cors);
+  }
+
+  let cuerpo;
+  try { cuerpo = await request.json(); } catch (e) { cuerpo = {}; }
+  const tarea = cuerpo.tarea === 'traduccion' ? 'traduccion' : 'fonetica';
+  const idioma = String(cuerpo.idioma || '').trim().slice(0, 40);
+  let texto = String(cuerpo.texto || '').replace(/\r\n?/g, '\n').trim();
+  if (!texto) return json({ error: 'falta "texto"' }, 400, cors);
+  if (texto.length > IA_MAX_CARACTERES) texto = texto.slice(0, IA_MAX_CARACTERES);
+
+  // Cache por contenido: misma letra + tarea + idioma => misma respuesta,
+  // sin volver a gastar cuota de Gemini. 30 días.
+  const cache = caches.default;
+  const hash = await sha256(tarea + '|' + idioma + '|' + texto);
+  const claveCache = new Request('https://ia.cache/' + hash);
+  try {
+    const hit = await cache.match(claveCache);
+    if (hit) {
+      const body = await hit.text();
+      return new Response(body, {
+        headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT', ...cors },
+      });
+    }
+  } catch (e) { /* sin cache: seguimos */ }
+
+  try {
+    const cuerpoGemini = JSON.stringify({
+      contents: [{ parts: [{ text: promptIA(tarea, texto, idioma) }] }],
+      generationConfig: { temperature: 0.2 },
+    });
+    const urlGemini =
+      'https://generativelanguage.googleapis.com/v1beta/models/' +
+      IA_MODELO + ':generateContent?key=' + encodeURIComponent(env.GEMINI_API_KEY);
+
+    // Reintenta ante 429/503 (saturación o cuota momentánea): 3 intentos con
+    // espera creciente. Los 4xx "de verdad" (400, 401…) no se reintentan.
+    let r, data;
+    for (let intento = 0; intento < 3; intento++) {
+      if (intento > 0) await new Promise((res) => setTimeout(res, intento * 2500));
+      r = await fetch(urlGemini, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: cuerpoGemini,
+      });
+      data = await r.json();
+      if (r.ok || (r.status !== 429 && r.status !== 503)) break;
+    }
+    if (!r.ok) {
+      const detalle = (data && data.error && data.error.message) || ('HTTP ' + r.status);
+      return json({ error: 'Gemini rechazó la petición', detalle }, 502, cors);
+    }
+    const partes =
+      (data.candidates && data.candidates[0] &&
+        data.candidates[0].content && data.candidates[0].content.parts) || [];
+    const salida = partes.map((p) => p.text || '').join('')
+      .replace(/\n{3,}/g, '\n\n').trim();
+    if (!salida) return json({ error: 'Gemini no devolvió texto' }, 502, cors);
+
+    const respuesta = JSON.stringify({ texto: salida });
+    try {
+      await cache.put(
+        claveCache,
+        new Response(respuesta, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=2592000',
+          },
+        })
+      );
+    } catch (e) { /* sin cache: da igual */ }
+
+    return new Response(respuesta, {
+      headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS', ...cors },
+    });
+  } catch (e) {
+    return json({ error: String((e && e.message) || e) }, 500, cors);
+  }
+}
+
+async function sha256(texto) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /* ---------- Tarjeta "Del coro" (Instagram público) ---------- */

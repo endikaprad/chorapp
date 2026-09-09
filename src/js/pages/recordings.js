@@ -18,6 +18,10 @@ window.Pagina_recordings = (function () {
   var calibrando = false;
   var primeraLista = true;   // 1ª pintada = aparición escalonada; luego, fundido
   var selEscucha = null;   // { refrescar } del selector Altavoz/Auriculares
+  var tourCapa = null;       // overlay del mini-tutorial (solo la 1ª vez)
+  var tourReubicar = null;   // listener que recoloca el foco si cambia la maqueta
+  var tourClaveActiva = null; // clave localStorage del tour que se ve ahora
+  var tourCmpLanzado = false; // ya se ha intentado el tour de comparación en esta pintada
 
   function iniciar(contenedor) {
     limpiar();
@@ -62,10 +66,16 @@ window.Pagina_recordings = (function () {
       if (!document.body.contains(raiz)) destruir();
     });
     obs.observe(vista, { childList: true, subtree: true });
+
+    // Mini-tutorial: solo la primera vez que se llega a Grabaciones.
+    var visto = false;
+    try { visto = !!localStorage.getItem(TOUR_CLAVE); } catch (e) {}
+    if (!visto) setTimeout(tourGrabaciones, 700);
   }
 
   function destruir() {
     if (obs) { obs.disconnect(); obs = null; }
+    cerrarTour(false);
     selEscucha = null;
     var ov = document.querySelector('.calib-overlay');
     if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
@@ -368,6 +378,7 @@ window.Pagina_recordings = (function () {
   function pintarLista() {
     urls.forEach(function (u) { window.Archivos.liberar(u); });
     urls = [];
+    tourCmpLanzado = false;   // se reevalúa en cada pintada
 
     var filtroId = selCancion && selCancion.value ? selCancion.value : null;
     var grabs = window.Grabaciones
@@ -653,6 +664,18 @@ window.Pagina_recordings = (function () {
             ref.querySelector('[data-relleno]'), ref.querySelector('[data-t]'),
             function () { return modo === 'mix'; }, getLat);
         })();
+
+        // Mini-tutorial de la comparación: la 1ª vez que se ve una fila así.
+        if (!tourCmpLanzado) {
+          tourCmpLanzado = true;
+          var vistoCmp = false;
+          try { vistoCmp = !!localStorage.getItem(TOUR_CMP_CLAVE); } catch (e) {}
+          if (!vistoCmp) {
+            (function (filaCmp) {
+              setTimeout(function () { tourComparar(filaCmp); }, 800);
+            })(fila);
+          }
+        }
       }
       fila.querySelector('.ficha__quitar').addEventListener('click', function () {
         window.UI.confirmar('¿Eliminar esta grabación? No se puede deshacer.', {
@@ -833,6 +856,194 @@ window.Pagina_recordings = (function () {
     fila.appendChild(det);
   }
 
+  /* ------------------------------------------------------------
+     Mini-tutoriales de Grabaciones (cada uno una sola vez):
+       · Tour 1: al llegar a la sección — lo básico.
+       · Tour 2: la 1ª grabación sobre una sesión del coro — la
+         comparación (voz encima / canción debajo) y los milisegundos.
+     Mismo patrón que el de Modo estudio y con las mismas defensas
+     contra el desajuste del foco que arreglamos allí:
+       · scroll SIN animación (behavior:'auto') para que la posición
+         final del elemento sea inmediata y el foco no se pinte a
+         medio camino;
+       · doble requestAnimationFrame antes de medir (un frame aplica
+         el scroll, el otro mide ya asentado);
+       · si la maqueta se mueve con el tour abierto (el selector de
+         escucha o el panel de calibración que se montan/ocultan,
+         girar el móvil, un scroll de rebote…) se recoloca el foco
+         sobre el paso actual (resize + scroll en captura).
+     ---------------------------------------------------------- */
+  var TOUR_CLAVE = 'chorapp:grabaciones:tour-visto';
+  var TOUR_CMP_CLAVE = 'chorapp:grabaciones:tour-comparar-visto';
+
+  // Tour 1: la 1ª vez que se llega a Grabaciones. Presenta lo básico.
+  var PASOS_TOUR = [
+    { sel: '.grabador__para', titulo: 'Para qué canción',
+      texto: 'Elige aquí la canción antes de grabar. La toma se guarda con ella para que luego la encuentres agrupada.' },
+    { sel: '[data-rec]', titulo: 'Grábate cantando',
+      texto: 'Pulsa para empezar y otra vez para parar. Si tienes una sesión del coro sonando, la toma se sincroniza sola con esa pista.' },
+    { sel: '[data-escucha]', titulo: 'Cómo estás escuchando',
+      texto: 'Dile si oyes por el altavoz o por auriculares. Así tus grabaciones encajan bien con la canción al compararlas.' },
+  ];
+
+  // Tour 2: la 1ª vez que aparece una grabación hecha SOBRE una sesión del
+  // coro (la que trae el bloque de comparación). Explica escuchar tu voz por
+  // encima con la canción sonando por debajo, y cómo cuadrar los milisegundos
+  // si no van juntas. Los selectores se buscan DENTRO de esa fila.
+  var PASOS_TOUR_CMP = [
+    { sel: '.ref-modo', titulo: 'Tu voz, con la canción debajo',
+      texto: 'Escúchate sola, o con la canción del ensayo sonando por debajo a la vez que tu voz por encima. Así oyes si vas afinada y a tiempo.' },
+    { sel: '[data-volbox]', titulo: 'Volumen de la canción',
+      texto: 'Baja la canción de fondo si te tapa. Solo cambia lo que oyes ahora, no toca tu grabación.' },
+    { sel: '.ref-ajuste__cab', titulo: 'Cuadrar los milisegundos',
+      texto: 'Si tu voz y la canción no van juntas, abre aquí y muévelo con − y + hasta que encajen. Puedes guardarlo para las próximas grabaciones.' },
+  ];
+
+  function tourGrabaciones() {
+    lanzarTour(TOUR_CLAVE, PASOS_TOUR, function () { return raiz; });
+  }
+
+  // Se llama desde pintarLista cuando se pinta la 1ª fila con comparación.
+  function tourComparar(fila) {
+    if (!fila) return;
+    lanzarTour(TOUR_CMP_CLAVE, PASOS_TOUR_CMP, function () {
+      return document.body.contains(fila) ? fila : null;
+    });
+  }
+
+  // `ambito()` devuelve el elemento dentro del cual se buscan los pasos
+  // (la página entera o una fila concreta), o null si ya no está en el DOM.
+  function lanzarTour(clave, PASOS, ambito) {
+    var base = ambito();
+    if (!base || !document.body.contains(base) || tourCapa) return;
+
+    var pasos = PASOS.filter(function (p) {
+      var el = base.querySelector(p.sel);
+      return el && !el.hidden && el.offsetParent !== null;
+    });
+    if (pasos.length < 2) return;   // si apenas hay nada que enseñar, no molestamos
+    tourClaveActiva = clave;
+
+    var i = 0;
+    tourCapa = document.createElement('div');
+    tourCapa.className = 'tour';
+    tourCapa.innerHTML =
+      '<div class="tour__foco" data-foco></div>' +
+      '<div class="tour__globo" data-globo>' +
+        '<span class="tour__paso" data-paso-n></span>' +
+        '<h4 class="tour__titulo" data-t></h4>' +
+        '<p class="tour__texto" data-x></p>' +
+        '<div class="tour__acc">' +
+          '<button type="button" class="tour__saltar" data-saltar>Saltar</button>' +
+          '<button type="button" class="btn btn--primario tour__sig" data-sig>Siguiente</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(tourCapa);
+
+    var foco = tourCapa.querySelector('[data-foco]');
+    var globo = tourCapa.querySelector('[data-globo]');
+    var elActual = null;   // elemento resaltado en el paso que se ve ahora
+
+    // Coloca foco + globo sobre un elemento que YA está en su sitio en pantalla.
+    function colocar(el) {
+      if (!tourCapa || !el) return;
+      var r = el.getBoundingClientRect();
+      if (!r.width && !r.height) return;   // aún sin maquetar: se reintenta al reubicar
+      var pad = 8;
+      foco.style.left = (r.left - pad) + 'px';
+      foco.style.top = (r.top - pad) + 'px';
+      foco.style.width = (r.width + pad * 2) + 'px';
+      foco.style.height = (r.height + pad * 2) + 'px';
+
+      var margen = 12;
+      var ancho = Math.min(window.innerWidth - margen * 2, Math.max(240, r.width + pad * 2));
+      var izq = Math.min(
+        Math.max(margen, r.left - pad),
+        window.innerWidth - margen - ancho
+      );
+      globo.style.left = izq + 'px';
+      globo.style.right = 'auto';
+      globo.style.width = ancho + 'px';
+      globo.style.maxWidth = 'none';
+      globo.style.margin = '0';
+
+      var abajo = window.innerHeight - r.bottom;
+      var arriba = abajo < globo.offsetHeight + 30;
+      globo.classList.toggle('tour__globo--arriba', arriba);
+      globo.style.top = (arriba ? Math.max(12, r.top - globo.offsetHeight - 14)
+                                : r.bottom + 14) + 'px';
+    }
+
+    function pinta() {
+      var p = pasos[i];
+      var b = ambito();
+      var el = b && b.querySelector(p.sel);
+      if (!el) { cerrarTour(true); return; }
+      elActual = el;
+
+      tourCapa.querySelector('[data-paso-n]').textContent = (i + 1) + ' / ' + pasos.length;
+      tourCapa.querySelector('[data-t]').textContent = p.titulo;
+      tourCapa.querySelector('[data-x]').textContent = p.texto;
+      tourCapa.querySelector('[data-sig]').textContent =
+        (i === pasos.length - 1) ? 'Entendido' : 'Siguiente';
+
+      // Scroll SIN animación: la posición final es inmediata y el foco nunca
+      // se dibuja a medio camino (era el origen del desajuste en Modo estudio).
+      try { el.scrollIntoView({ block: 'center', behavior: 'auto' }); } catch (e) {}
+      // Se coloca ya (por si los rAF llegan tarde en un WebView que no está
+      // pintando) y se reajusta en los dos frames siguientes, cuando el
+      // scroll ya se ha asentado. Un último intento por setTimeout como red.
+      colocar(el);
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          if (tourCapa && elActual === el) colocar(el);
+        });
+      });
+      setTimeout(function () { if (tourCapa && elActual === el) colocar(el); }, 80);
+    }
+
+    tourReubicar = function () { if (elActual) colocar(elActual); };
+    window.addEventListener('resize', tourReubicar);
+    window.addEventListener('scroll', tourReubicar, true);
+
+    tourCapa.querySelector('[data-saltar]').addEventListener('click', function () { cerrarTour(true); });
+    tourCapa.querySelector('[data-sig]').addEventListener('click', function () {
+      if (i >= pasos.length - 1) { cerrarTour(true); return; }
+      i++; pinta();
+    });
+    tourCapa.addEventListener('click', function (ev) {
+      if (ev.target === tourCapa || ev.target === foco) {
+        if (i >= pasos.length - 1) cerrarTour(true);
+        else { i++; pinta(); }
+      }
+    });
+    document.addEventListener('keydown', tourEsc);
+
+    void tourCapa.offsetHeight;
+    tourCapa.classList.add('is-visible');
+    pinta();
+  }
+
+  function tourEsc(e) { if (e.key === 'Escape') cerrarTour(true); }
+
+  function cerrarTour(marcarVisto) {
+    if (marcarVisto && tourClaveActiva) {
+      try { localStorage.setItem(tourClaveActiva, '1'); } catch (e) {}
+    }
+    tourClaveActiva = null;
+    document.removeEventListener('keydown', tourEsc);
+    if (tourReubicar) {
+      window.removeEventListener('resize', tourReubicar);
+      window.removeEventListener('scroll', tourReubicar, true);
+      tourReubicar = null;
+    }
+    var c = tourCapa;
+    tourCapa = null;
+    if (!c) return;
+    c.classList.remove('is-visible');
+    setTimeout(function () { if (c.parentNode) c.remove(); }, 220);
+  }
+
   /* ---------- Utilidades ---------- */
 
   // Anima la salida de una fila (colapso de altura + fade) y luego llama a
@@ -896,5 +1107,19 @@ window.Pagina_recordings = (function () {
     });
   }
 
-  return { iniciar: iniciar };
+  return {
+    iniciar: iniciar,
+    // Ayuda de pruebas: vuelve a lanzar el mini-tutorial.
+    tour: function () {
+      try { localStorage.removeItem(TOUR_CLAVE); } catch (e) {}
+      tourGrabaciones();
+    },
+    // Relanza el mini-tutorial de la comparación (voz encima / canción debajo
+    // + milisegundos). Necesita que haya una grabación sobre una sesión.
+    tourComparar: function () {
+      try { localStorage.removeItem(TOUR_CMP_CLAVE); } catch (e) {}
+      var fila = raiz && raiz.querySelector('.grabacion__ref');
+      tourComparar(fila ? fila.closest('.grabacion') : null);
+    },
+  };
 })();

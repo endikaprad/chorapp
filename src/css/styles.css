@@ -499,10 +499,27 @@ button {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-concierto) 45%, transparent); }
   50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-concierto) 22%, transparent); }
 }
+
+/* A menos de un día: los bordes de la tarjeta laten (brillan y se apagan) */
+.cuenta-concierto--inminente {
+  border-color: color-mix(in srgb, var(--color-concierto) 70%, var(--color-borde));
+  animation: frase-dia-in 420ms var(--curva) both, cc-brillo 2s var(--curva) infinite;
+}
+@keyframes cc-brillo {
+  0%, 100% {
+    border-color: color-mix(in srgb, var(--color-concierto) 38%, var(--color-borde));
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-concierto) 0%, transparent);
+  }
+  50% {
+    border-color: color-mix(in srgb, var(--color-concierto) 95%, var(--color-borde));
+    box-shadow: 0 0 14px 1px color-mix(in srgb, var(--color-concierto) 40%, transparent);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .cuenta-concierto { animation: frase-dia-fade 120ms linear both; }
   .cuenta-concierto:active { transform: none; }
   .cuenta-concierto--hoy .cuenta-concierto__ico { animation: none; }
+  .cuenta-concierto--inminente { animation: frase-dia-fade 120ms linear both; }
 }
 
 .seccion-titulo {
@@ -7382,21 +7399,21 @@ body.bv-aterriza #vista {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  width: min(280px, 76vw);
+  gap: 18px;
+  width: min(320px, 84vw);
 }
 .bv-fases li {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 15.5px;
+  gap: 15px;
+  font-size: 19px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
 }
 .bv-fase__c {
   flex: none;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.16);
   color: #fff;
@@ -7404,7 +7421,7 @@ body.bv-aterriza #vista {
   align-items: center;
   justify-content: center;
 }
-.bv-fase__c svg { width: 15px; height: 15px; }
+.bv-fase__c svg { width: 18px; height: 18px; }
 
 /* La fila aparece con el círculo VACÍO; el tick cae dentro con rebote y
    el círculo da un "ping". Cada fila, bien separada, para que se vea. */
@@ -7621,6 +7638,192 @@ body.bv-aterriza #vista {
   0%, 3%   { background: #F3B33F; transform: translateY(1.5px); }
   10%, 100% { background: rgba(255, 255, 255, 0.9); transform: none; }
 }
+
+/* --- Modo estudio: pastillas de velocidad que se encienden en bucle --- */
+.bv-vel { display: flex; gap: 8px; }
+.bv-vel span {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.12);
+  animation: bv-vel-on 4.5s var(--curva) infinite;
+  animation-delay: calc(var(--n, 0) * 1.5s);
+}
+@keyframes bv-vel-on {
+  0%, 22%, 100% { background: rgba(255, 255, 255, 0.12); color: #fff; box-shadow: none; transform: none; }
+  8%, 14% { background: rgba(255, 255, 255, 0.92); color: #2E1466; box-shadow: 0 0 18px rgba(255, 255, 255, 0.5); transform: translateY(-2px); }
+}
+
+/* --- IA (Gemini): un haz de luz lee el euskera, la estrella suelta una
+   onda y las letras SALEN de la estrella y vuelan a su sitio para escribir
+   PRIMERO cómo se pronuncia y DESPUÉS la traducción. El euskera se queda
+   arriba de referencia. Ciclo de 11 s. Solo transform/opacity/blur breve. */
+.bv-decor--ia { flex-direction: column; gap: 16px; overflow: visible; }
+.bv-ia {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  overflow: visible;
+}
+
+/* Origen: el euskera, con un haz de luz que lo recorre cada 5,5 s */
+.bv-ia__fuente {
+  position: relative; margin: 0;
+  max-width: 90vw;
+  font-size: 14px; font-weight: 600; letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.42);
+  overflow: hidden;
+}
+.bv-ia__scan {
+  position: absolute; top: 0; bottom: 0; left: -55%;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(188, 198, 255, 0.6), transparent);
+  animation: bv-ia-scan 5.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes bv-ia-scan {
+  0%, 100%  { transform: translateX(0); opacity: 0; }
+  4%        { opacity: 1; }
+  17%       { transform: translateX(340%); opacity: 1; }
+  22%, 100% { transform: translateX(340%); opacity: 0; }
+}
+
+/* La estrella: núcleo que centellea + dos ondas, una por cada salida */
+.bv-ia__estrella {
+  position: relative;
+  width: 50px; height: 50px;
+  display: grid; place-items: center;
+}
+.bv-ia__estrella svg {
+  display: block; width: 100%; height: 100%;
+  filter: drop-shadow(0 0 12px rgba(155, 170, 255, 0.8));
+  animation: bv-gem-nucleo 5.5s var(--curva) infinite;
+}
+@keyframes bv-gem-nucleo {
+  0%, 100%  { transform: rotate(0) scale(1); filter: drop-shadow(0 0 10px rgba(155,170,255,0.55)); }
+  10%       { transform: rotate(32deg) scale(1.3); filter: drop-shadow(0 0 20px rgba(184,194,255,1)); }
+  20%, 68%  { transform: rotate(45deg) scale(1.08); filter: drop-shadow(0 0 13px rgba(160,175,255,0.8)); }
+}
+.bv-ia__pulso {
+  position: absolute; inset: 4px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(175, 187, 255, 0.7);
+  opacity: 0;
+  animation: bv-ia-pulso 5.5s var(--curva) infinite;
+}
+.bv-ia__pulso--2 { animation-delay: 0.4s; }
+@keyframes bv-ia-pulso {
+  0%, 5%  { transform: scale(0.4); opacity: 0; }
+  10%     { opacity: 0.85; }
+  36%     { transform: scale(3); opacity: 0; }
+  100%    { transform: scale(3); opacity: 0; }
+}
+
+/* Salida: las dos líneas en el mismo hueco, alternándose en el ciclo */
+.bv-ia__salida {
+  position: relative;
+  width: min(340px, 92vw); height: 30px;
+}
+.bv-ia__linea {
+  position: absolute; inset: 0; margin: 0;
+  display: flex; justify-content: center; flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.bv-ia__linea--fon {
+  font-size: 15.5px; font-weight: 600; font-style: italic;
+  letter-spacing: 0.02em;
+  color: #EAECFF;
+}
+.bv-ia__linea--es {
+  font-size: 18.5px; font-weight: 700;
+  color: #fff;
+}
+.bv-ia__linea i {
+  --ox: calc((0.5 - var(--k, 0) / var(--n, 1)) * 190px);
+  display: inline-block; font-style: inherit;
+  opacity: 0;
+  text-shadow: 0 0 11px rgba(150, 170, 255, 0.6);
+  animation-duration: 11s;
+  animation-timing-function: cubic-bezier(0.16, 0.8, 0.3, 1);
+  animation-iteration-count: infinite;
+  animation-delay: calc(var(--k, 0) * 0.05s);
+}
+.bv-ia__linea .bv-ia__sp { width: 0.32em; }
+.bv-ia__linea .bv-ia__dot { opacity: 0.4; margin: 0 0.02em; }
+.bv-ia__linea--fon i { animation-name: bv-ia-mat-fon; }
+.bv-ia__linea--es i  { animation-name: bv-ia-mat-es; }
+@keyframes bv-ia-mat-fon {
+  0%        { opacity: 0; transform: translate(var(--ox), -48px) scale(0.3); filter: blur(4px); }
+  5%        { opacity: 1; }
+  13%, 36%  { opacity: 1; transform: translate(0, 0) scale(1); filter: blur(0); }
+  43%, 100% { opacity: 0; transform: translate(0, -8px) scale(0.9); filter: blur(1.5px); }
+}
+@keyframes bv-ia-mat-es {
+  0%, 49%   { opacity: 0; transform: translate(var(--ox), -48px) scale(0.3); filter: blur(4px); }
+  55%       { opacity: 1; }
+  63%, 90%  { opacity: 1; transform: translate(0, 0) scale(1); filter: blur(0); }
+  96%, 100% { opacity: 0; transform: translate(0, -8px) scale(0.9); filter: blur(1.5px); }
+}
+
+.bv-ia__etqs { display: flex; align-items: center; gap: 9px; }
+.bv-ia__etq {
+  padding: 5px 12px; border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+}
+.bv-ia__etq--src {
+  color: #fff; border-color: rgba(255, 255, 255, 0.38); background: rgba(255, 255, 255, 0.1);
+  animation: bv-ia-src-lee 5.5s var(--curva) infinite;
+}
+@keyframes bv-ia-src-lee {
+  0%, 26%, 100% { box-shadow: 0 0 0 rgba(184, 194, 255, 0); }
+  12%           { box-shadow: 0 0 13px rgba(184, 194, 255, 0.55); }
+}
+.bv-ia__etq-slot { position: relative; display: inline-block; width: 116px; height: 24px; }
+.bv-ia__etq-slot .bv-ia__etq {
+  position: absolute; left: 0; top: 0; width: 100%;
+  text-align: center;
+  color: #fff;
+  border-color: rgba(160, 172, 255, 0.55);
+  background: rgba(150, 162, 255, 0.16);
+}
+.bv-ia__etq--fon {
+  font-style: italic; text-transform: none; letter-spacing: 0.02em;
+  animation: bv-ia-lab-fon 11s var(--curva) infinite;
+}
+.bv-ia__etq--tra { animation: bv-ia-lab-tra 11s var(--curva) infinite; }
+@keyframes bv-ia-lab-fon {
+  0%, 38%   { opacity: 1; }
+  46%, 94%  { opacity: 0; }
+  100%      { opacity: 1; }
+}
+@keyframes bv-ia-lab-tra {
+  0%, 42%   { opacity: 0; }
+  50%, 92%  { opacity: 1; }
+  98%, 100% { opacity: 0; }
+}
+.bv-ia__flecha { color: rgba(255, 255, 255, 0.5); font-size: 15px; }
+
+/* Eyebrow con la palabra Gemini en degradado y un brillo que barre el texto */
+.bv-eyebrow--gem {
+  display: inline-flex; align-items: center; gap: 7px;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: 13.5px;
+}
+.bv-gem-ic { width: 15px; height: 15px; flex: 0 0 auto; }
+.bv-gem-ic svg { display: block; width: 100%; height: 100%; }
+.bv-gem-tx {
+  background: linear-gradient(100deg, #6BA9FF 0%, #A98BFF 30%, #F0A6C8 48%, #A98BFF 68%, #6BA9FF 100%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  animation: bv-gem-sheen 4.5s linear infinite;
+}
+@keyframes bv-gem-sheen { to { background-position: -260% 0; } }
 
 /* --- Práctica: el calendario se rellena en oleada y vuelve a empezar --- */
 .bv-cal {
@@ -8231,7 +8434,24 @@ body.bv-aterriza #vista {
 .bv--sin-motion .bv-comp__wa,
 .bv--sin-motion .bv-comp__avion,
 .bv--sin-motion .bv-comp__check,
-.bv--sin-motion .bv-piano i { animation: none !important; }
+.bv--sin-motion .bv-piano i,
+.bv--sin-motion .bv-vel span,
+.bv--sin-motion .bv-ia__estrella svg,
+.bv--sin-motion .bv-ia__linea i,
+.bv--sin-motion .bv-ia__etq--src,
+.bv--sin-motion .bv-ia__etq--fon,
+.bv--sin-motion .bv-ia__etq--tra,
+.bv--sin-motion .bv-gem-tx { animation: none !important; }
+.bv--sin-motion .bv-ia__linea i {
+  opacity: 1 !important; transform: none !important; filter: none !important;
+}
+.bv--sin-motion .bv-ia__salida { height: auto; }
+.bv--sin-motion .bv-ia__linea--fon { display: none; }
+.bv--sin-motion .bv-ia__linea--es { position: static; }
+.bv--sin-motion .bv-ia__etq--fon { display: none; }
+.bv--sin-motion .bv-ia__etq--tra { position: static; opacity: 1 !important; }
+.bv--sin-motion .bv-ia__pulso,
+.bv--sin-motion .bv-ia__scan { display: none; }
 .bv--sin-motion .bv-comp__avion { display: none; }
 .bv--sin-motion .bv-comp__check { opacity: 1 !important; }
 .bv--sin-motion .bv-polaroid__revela { opacity: 0 !important; }
@@ -8292,3 +8512,85 @@ body.bv-aterriza #vista {
 @keyframes bv-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(12px); } }
 .bv-eq--card { height: 26px; opacity: 0.9; }
 .bv--sin-motion .bv-luna { animation: none; }
+
+/* ============================================================
+   OTA — tarjeta de "hay novedades" (js/ota.js).
+   Aparece anclada abajo, sobre el bottom nav. Solo opacity y
+   transform. La versión obligatoria no muestra tarjeta: se
+   aplica sola.
+   ============================================================ */
+.ota-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--alto-nav) + env(safe-area-inset-bottom) + 12px);
+  z-index: 18000;
+  display: flex;
+  justify-content: center;
+  padding: 0 12px;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity var(--dur-pagina) var(--curva),
+              transform var(--dur-pagina) var(--curva);
+  pointer-events: none;
+}
+.ota-banner.is-visible { opacity: 1; transform: none; pointer-events: auto; }
+
+.ota-banner__caja {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 440px;
+  padding: 12px 14px;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio);
+  box-shadow: 0 12px 34px rgba(7, 7, 7, 0.18);
+}
+.ota-banner__ic {
+  flex: 0 0 auto;
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  color: var(--color-acento);
+}
+.ota-banner__ic svg { width: 100%; height: 100%; }
+.ota-banner__txt { flex: 1 1 auto; min-width: 0; }
+.ota-banner__titulo {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-texto);
+}
+.ota-banner__nota {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--color-texto-2);
+}
+.ota-banner__acciones {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ota-banner__acciones .btn--primario { padding: 9px 14px; font-size: 13px; }
+.ota-banner__luego {
+  border: 0;
+  background: none;
+  padding: 2px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-texto-2);
+  cursor: pointer;
+}
+
+@media (max-width: 380px) {
+  .ota-banner__caja { flex-wrap: wrap; }
+  .ota-banner__acciones { flex-direction: row; width: 100%; align-items: center; }
+  .ota-banner__acciones .btn--primario { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ota-banner { transition: opacity 120ms linear; transform: none; }
+}

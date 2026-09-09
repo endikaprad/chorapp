@@ -317,6 +317,71 @@ window.Bienvenida = (function () {
     return '<div class="bv-piano" aria-hidden="true">' + s + '</div>';
   }
 
+  // Sector Modo estudio: pastillas de velocidad (0.75x / 1x / 1.25x) que
+  // se van encendiendo en bucle, como al tocarlas.
+  function velIlustra() {
+    return '<div class="bv-vel" aria-hidden="true">' +
+      '<span style="--n:0">0.75&times;</span>' +
+      '<span style="--n:1">1&times;</span>' +
+      '<span style="--n:2">1.25&times;</span>' +
+    '</div>';
+  }
+
+  // Estrella de 4 puntas estilo Gemini, con relleno degradado.
+  function estrellaGemini(id) {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1">' +
+        '<stop offset="0" stop-color="#6BA9FF"/>' +
+        '<stop offset="0.5" stop-color="#A98BFF"/>' +
+        '<stop offset="1" stop-color="#F0A6C8"/>' +
+      '</linearGradient></defs>' +
+      '<path fill="url(#' + id + ')" d="M12 0c.5 5 4.2 9.4 12 12-7.8 2.6-11.5 7-12 12-.5-5-4.2-9.4-12-12 7.8-2.6 11.5-7 12-12Z"/>' +
+    '</svg>';
+  }
+
+  // Parte un texto en <i> por carácter (respeta entidades &x;, espacios y
+  // los puntos medios · de la fonética). Cada letra lleva su índice --k.
+  function partirLetras(txt) {
+    var trozos = txt.match(/&[a-z]+;|[\s\S]/g) || [];
+    return {
+      n: trozos.length,
+      html: trozos.map(function (ch, k) {
+        if (ch === ' ') return '<i class="bv-ia__sp" style="--k:' + k + '">&nbsp;</i>';
+        if (ch === '·') return '<i class="bv-ia__dot" style="--k:' + k + '">·</i>';
+        return '<i style="--k:' + k + '">' + ch + '</i>';
+      }).join('')
+    };
+  }
+
+  // Sector IA: Gemini LEE la línea en euskera (un haz de luz la recorre) y
+  // la estrella suelta una onda; las letras SALEN de la estrella y vuelan a
+  // su sitio para escribir, primero CÓMO SE PRONUNCIA y después LA TRADUCCIÓN.
+  // El euskera se queda arriba de referencia: se ve la correspondencia.
+  function iaIlustra() {
+    var fon = partirLetras('bi·ó·tse·ko  ta·u·pá·dak');
+    var es = partirLetras('Los latidos del corazón');
+    return '<div class="bv-ia" aria-hidden="true">' +
+      '<p class="bv-ia__fuente">Bihotzeko taupadak<span class="bv-ia__scan"></span></p>' +
+      '<span class="bv-ia__estrella">' +
+        '<span class="bv-ia__pulso"></span>' +
+        '<span class="bv-ia__pulso bv-ia__pulso--2"></span>' +
+        estrellaGemini('bv-gem-b') +
+      '</span>' +
+      '<div class="bv-ia__salida">' +
+        '<p class="bv-ia__linea bv-ia__linea--fon" style="--n:' + fon.n + '">' + fon.html + '</p>' +
+        '<p class="bv-ia__linea bv-ia__linea--es" style="--n:' + es.n + '">' + es.html + '</p>' +
+      '</div>' +
+      '<div class="bv-ia__etqs">' +
+        '<span class="bv-ia__etq bv-ia__etq--src">euskera</span>' +
+        '<span class="bv-ia__flecha">&rarr;</span>' +
+        '<span class="bv-ia__etq-slot">' +
+          '<span class="bv-ia__etq bv-ia__etq--fon">c&oacute;mo suena</span>' +
+          '<span class="bv-ia__etq bv-ia__etq--tra">traducci&oacute;n</span>' +
+        '</span>' +
+      '</div>' +
+    '</div>';
+  }
+
   // Sector Pantalla de bloqueo: la notificación del reproductor con sus
   // cinco botones (velocidad, −5 s, play/pausa, +5 s, repetir) reaccionando
   // uno a uno, en bucle. Igual que la ve Ama al bajar las notificaciones.
@@ -497,18 +562,33 @@ window.Bienvenida = (function () {
         clase: 'bv-s--estudio',
         html:
           '<div class="bv-decor bv-decor--estudio">' +
-            '<div class="bv-chips" aria-hidden="true">' +
-              '<span class="bv-chip bv-chip--a" style="--n:0;--from:-130px">Bihotzeko taupadak…</span>' +
-              '<span class="bv-chip bv-chip--b" style="--n:1;--from:130px">bi-hóts-ko tau-pá-dak</span>' +
-              '<span class="bv-chip bv-chip--c" style="--n:2;--from:-130px">Latidos del corazón</span>' +
-            '</div>' +
+            velIlustra() +
             pianoMelodia() +
           '</div>' +
           '<div class="bv-in">' +
             '<p class="bv-eyebrow">Modo estudio</p>' +
             '<h3 class="bv-h3">Cada canción, por dentro</h3>' +
-            '<p class="bv-sub">La letra, cómo se pronuncia, la traducción, el audio a cámara ' +
-              'lenta y un piano que te da el tono de entrada.</p>' +
+            '<p class="bv-sub">La letra a la vista, el audio a cámara lenta para pillar los ' +
+              'pasajes rápidos y un piano que te da el tono de entrada.</p>' +
+          '</div>'
+      },
+
+      // 6b — Inteligencia artificial: pronunciación y traducción
+      {
+        dur: 12,
+        bg: 'radial-gradient(120% 85% at 78% 6%, #2A2CC0 0%, #4A1D8F 52%, #16086B 100%)',
+        clase: 'bv-s--ia',
+        html:
+          '<div class="bv-decor bv-decor--ia">' + iaIlustra() + '</div>' +
+          '<div class="bv-in">' +
+            '<p class="bv-eyebrow bv-eyebrow--gem">' +
+              '<span class="bv-gem-ic">' + estrellaGemini('bv-gem-a') + '</span>' +
+              '<span class="bv-gem-tx">Con Gemini 2.5 Flash</span>' +
+            '</p>' +
+            '<h3 class="bv-h3">La letra, en tu idioma</h3>' +
+            '<p class="bv-sub">La inteligencia artificial de Google te escribe cómo se pronuncia ' +
+              'cada palabra y te traduce la letra entera. Aunque la canción esté en euskera, ' +
+              'latín o alemán.</p>' +
           '</div>'
       },
 

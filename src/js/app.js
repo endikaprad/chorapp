@@ -322,5 +322,11 @@
     if (window.Progreso && window.Progreso.iniciar) {
       setTimeout(function () { window.Progreso.iniciar(); }, 2200);
     }
+    // Actualizaciones por wifi (OTA) del contenido web. Solo APK.
+    // Pronto: notifyAppReady() debe llegar antes de que Capgo dé el
+    // bundle por roto (~10 s) y revierta.
+    if (window.OTA && window.OTA.iniciar) {
+      setTimeout(function () { window.OTA.iniciar(); }, 400);
+    }
   });
 })();

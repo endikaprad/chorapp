@@ -13,3 +13,6 @@ DB_URL = "https://chorapp-d06a8-default-rtdb.europe-west1.firebasedatabase.app"
 # Secretos (NO van aquí, se ponen con wrangler):
 #   npx wrangler secret put SERVICE_ACCOUNT   -> pega el JSON del service account
 #   npx wrangler secret put PANEL_SECRET      -> una frase larga, igual que en el panel
+#   npx wrangler secret put CORO_FEED_URL     -> URL del feed JSON de RSS.app (tarjeta "Del coro")
+#   npx wrangler secret put GEMINI_API_KEY    -> clave de Google AI Studio (ruta /ia: "cómo se pronuncia")
+#   npx wrangler secret put IA_TOKEN          -> opcional: frase larga, verja suave de la ruta /ia

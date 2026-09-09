@@ -1,7 +1,72 @@
 # Mantenimiento de ChorApp
 
-Guía breve para el desarrollo continuo (añadir canciones, publicar el APK).
+Guía breve para el desarrollo continuo (añadir canciones, publicar versiones).
 El uso diario de Maite **no necesita nada de esto**: ella solo abre la app.
+
+---
+
+## Publicar una versión nueva — cuál de los dos caminos
+
+Hay dos formas de que un cambio llegue al móvil de Maite. **Elige según lo
+que hayas tocado:**
+
+### ▶ Camino A — OTA (por wifi, sin cable)  ·  el 90 % de las veces
+
+Para cambios que van **solo dentro de `src/`**: pantallas, CSS, JS, textos,
+animaciones, audios de `src/audio/`, frases, lógica de una página.
+
+```bash
+npm run dev            # 1. haces el cambio en src/ y lo pruebas
+npm run ota            # 2. publica: sube el bundle, zip a R2, avisa a Maite
+git add -A && git commit -m "OTA bundle N — <qué cambia>"   # 3. guarda
+```
+
+En el móvil de Maite sale la tarjeta *"Hay novedades 🎶 · Actualizar"* al abrir
+la app (o le llega notificación si está cerrada). Toca y en 2-3 s está.
+
+Opciones de `npm run ota`:
+
+| Comando | Efecto |
+|---|---|
+| `npm run ota` | sube el nº de bundle (+1), mantiene el nombre visible |
+| `npm run ota 1.18` | además fija el nombre visible a `1.18` |
+| `npm run ota -- --nota "Arreglado el visor de partituras"` | texto que ve Maite en la tarjeta |
+| `npm run ota -- --obligatoria` | se aplica sola, sin tarjeta |
+| `npm run ota -- --forzar` | ignora la guardia de "cambio nativo" (ver abajo) |
+
+El script **se niega a publicar** si detecta cambios en `package.json`,
+`capacitor.config.json`, `scripts/android-fix.js` o `patches/` → eso es el
+camino B.
+
+Guía de montaje y detalle interno: **[docs/actualizaciones.md](docs/actualizaciones.md)**.
+
+### ▶ Camino B — APK a mano  ·  solo para cambios nativos
+
+Necesario cuando tocas:
+
+- un **plugin de Capacitor** (instalar/actualizar/quitar → cambia `package.json`),
+- `capacitor.config.json`, permisos de Android, `scripts/android-fix.js`, `patches/`,
+- icono, splash, versión nativa, Capacitor/SDK.
+
+```bash
+npm run release        # sube versionCode/Name, sync, compila ChorApp-<v>.apk
+```
+
+Pasas el `.apk` al móvil y lo instalas encima (ver "Generar el APK firmado").
+Ese APK lleva `src/data/version.json` con el bundle actual, así que **después
+de un camino B, el primer `npm run ota` sigue numerando desde ahí** sin saltos.
+
+### Reglas rápidas
+
+- ¿Editaste solo `.html` / `.css` / `.js` / textos dentro de `src/`? → **OTA**.
+- ¿`npm install` de algo, o tocaste config/permisos? → **APK** (y ya de paso
+  las siguientes OTAs cuentan desde ese APK).
+- El número de **bundle** (`src/data/version.json`) es interno y solo sube por
+  `npm run ota`. El **versionName / versionCode** de Android solo sube por
+  `npm run release`. Son cosas distintas y no pasa nada porque vayan
+  descoordinados.
+- Si una OTA sale mal: el panel del hijo tiene *"Volver a la versión anterior"*,
+  y Capgo revierte solo si la app no arranca tras aplicarla.
 
 ---
 
@@ -172,13 +237,14 @@ npx capacitor-assets generate --android \
 
 ---
 
-## Publicar cambios de la web en Android
+## Publicar cambios en el móvil
 
-```bash
-npm run sync        # build + cap sync
-```
+Ver **"Publicar una versión nueva"** al principio de este archivo: camino A
+(OTA por wifi, `npm run ota`) para cambios de `src/`, camino B
+(`npm run release` + APK) para cambios nativos.
 
-Después, recompilar el APK (paso 3 de "Generar el APK firmado").
+`npm run sync` (build + `cap sync`) solo hace falta suelto si vas a abrir
+Android Studio a mano; los dos comandos de arriba ya lo llaman.
 
 ---
 

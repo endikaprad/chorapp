@@ -246,6 +246,21 @@ Node.js, Capacitor CLI (`npx cap`), Android Studio + SDK, JDK 21. `ANDROID_HOME`
 - Cargar el repertorio real del coro.
 - Guía breve de mantenimiento para añadir canciones en el futuro.
 
+### Fase 11 — Actualizaciones por wifi (OTA) ✅
+- `@capgo/capacitor-updater` en modo self-hosted (sin cuenta Capgo): el zip del
+  nuevo `www/` se aloja en **Cloudflare R2** y la app lo aplica sola.
+- `src/js/ota.js` (`window.OTA`): en cada arranque hace `notifyAppReady()`, lee
+  `/updates/latest` de la RTDB (misma de `control.json`) y, si el `bundle` es
+  mayor que el instalado, descarga y muestra una tarjeta (`.ota-banner`) o la
+  aplica sola si es `obligatoria`. `src/data/version.json` = bundle de fábrica.
+- `scripts/ota.js` (`npm run ota`): guardia de cambios nativos → build → zip →
+  `wrangler r2 object put` → `POST /ota` al Worker. Config en
+  `scripts/ota.local.json` (gitignore).
+- Worker: ruta `POST /ota` escribe `/updates/latest` (+ `/updates/anterior`) y
+  manda push a Maite. Panel: sección para ajustar nota/obligatoria y revertir.
+- Guía: **`docs/actualizaciones.md`**. Solo para cambios de `www/`; los cambios
+  nativos siguen necesitando `npm run release` + APK a mano.
+
 ---
 
 ## Entrega esperada

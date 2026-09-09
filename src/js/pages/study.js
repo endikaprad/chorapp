@@ -1200,6 +1200,10 @@ window.Pagina_study = (function () {
 
     // "Traducir sola": solo si hay letra original en texto y aún no hay traducción.
     var puedeTraducir = !!(window.Traductor && vistas.orig.texto && !vistas.trad.texto);
+    // "Cómo se pronuncia": si hay letra original en texto y aún no hay fonética
+    // (ni escrita ni en archivo). La genera la IA vía el Worker.
+    var puedeFonetica = !!(window.IA && vistas.orig.texto &&
+      !vistas.fon.texto && !vistas.fon.archivo);
 
     if (!disponibles.length) {
       vacioConAnadir(vacio, 'letra', 'Aún no hay letra.');
@@ -1208,6 +1212,7 @@ window.Pagina_study = (function () {
 
     vacio.hidden = true;
     montarVistasLetra(vistas, disponibles, { modos: modos, pre: pre, doc: doc, ambasCaja: ambasCaja });
+    if (puedeFonetica && accion) montarBotonFonetica(accion);
     if (puedeTraducir && accion) montarBotonTraducir(accion);
   }
 
@@ -1298,15 +1303,48 @@ window.Pagina_study = (function () {
     });
   }
 
+  // Botón "Generar cómo se pronuncia" (bajo el visor). La IA (vía el Worker)
+  // escribe la transcripción para cantar, se guarda en la canción y repinta.
+  function montarBotonFonetica(accion) {
+    accion.hidden = false;
+    accion.insertAdjacentHTML('beforeend',
+      '<button type="button" class="visor-letra__traducir" data-btn-fonetica>' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>' +
+        '<span>Generar cómo se pronuncia</span>' +
+      '</button>');
+    var btn = accion.querySelector('[data-btn-fonetica]');
+    var etq = btn.querySelector('span');
+    btn.addEventListener('click', function () {
+      var texto = (cancion.letraTexto || '').trim();
+      if (!texto) return;
+      var idioma = window.Canciones.nombreIdioma(cancion.idioma || '');
+      btn.disabled = true;
+      btn.classList.add('is-cargando');
+      etq.textContent = 'Generando…';
+      window.IA.fonetica(texto, { idioma: idioma }).then(function (res) {
+        window.Canciones.actualizar(cancion.id, { letraFonetica: res });
+        window.Almacen.guardar('estudio:letraModo', 'fon');
+        refrescar();
+        pintarLetra();
+        if (window.UI) window.UI.aviso('Ya tienes cómo se pronuncia. Puedes retocarla a mano en ✎ Editar.', { tipo: 'ok' });
+      }).catch(function () {
+        btn.disabled = false;
+        btn.classList.remove('is-cargando');
+        etq.textContent = 'Generar cómo se pronuncia';
+        if (window.UI) window.UI.aviso('No se ha podido generar ahora mismo. Prueba dentro de un rato.', { tipo: 'error' });
+      });
+    });
+  }
+
   // Botón "Traducir la letra al español" (bajo el visor). Traduce con
   // window.Traductor, guarda la traducción en la canción y repinta.
   function montarBotonTraducir(accion) {
     accion.hidden = false;
-    accion.innerHTML =
+    accion.insertAdjacentHTML('beforeend',
       '<button type="button" class="visor-letra__traducir" data-btn-traducir>' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20"/></svg>' +
         '<span>Traducir la letra al español</span>' +
-      '</button>';
+      '</button>');
     var btn = accion.querySelector('[data-btn-traducir]');
     var etq = btn.querySelector('span');
     btn.addEventListener('click', function () {

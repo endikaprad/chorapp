@@ -218,6 +218,11 @@ window.Pagina_home = (function () {
     elDet.textContent = partes.join(' · ');
 
     btn.classList.toggle('cuenta-concierto--hoy', c.dias === 0);
+
+    // A menos de un día para el concierto: los bordes de la tarjeta laten.
+    var inminente = c.dias === 0 ||
+      (momento && momento - Date.now() > 0 && momento - Date.now() < 86400000);
+    btn.classList.toggle('cuenta-concierto--inminente', !!inminente);
     btn.addEventListener('click', function () {
       window.App.ir('conciertos');
     });
