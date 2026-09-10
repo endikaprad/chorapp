@@ -49,7 +49,8 @@ export default {
 
     // --- Ayuda de IA para las letras: ruta POST /ia ---
     // La app (APK y navegador) llama aquí para generar "cómo se pronuncia"
-    // una letra o su traducción. El prompt se arma en el servidor; el móvil
+    // una letra, su traducción o el comentario de "la profe" tras el test de
+    // memoria (tarea: 'fonetica' | 'traduccion' | 'comentario'). El prompt se arma en el servidor; el móvil
     // solo manda { tarea, texto, idioma }. Usa Gemini Flash (nivel gratuito
     // de Google AI Studio) y cachea el resultado por texto para no gastar
     // cuota si Maite vuelve a pulsar el botón. Ver worker/README.md.
@@ -275,6 +276,20 @@ function promptIA(tarea, texto, idioma) {
     ? `en ${idioma}`
     : 'en su idioma original (detéctalo tú)';
 
+  if (tarea === 'comentario') {
+    return (
+      `Eres la profe de canto de un coro, cálida y cercana. ` +
+      `Una alumna acaba de jugar a memorizar la letra de una canción. ` +
+      `Abajo van los datos del intento (canción, versos que acertó y versos que falló).\n\n` +
+      `Escríbele SOLO a ella, tuteándola, exactamente 2 frases (máximo 35 palabras en total):\n` +
+      `1) Reconoce con naturalidad algo que ha hecho bien.\n` +
+      `2) Si falló algún verso, dile en qué fijarse la próxima vez y cita entre comillas 2 o 3 ` +
+      `palabras de uno de los versos fallados. Si no falló ninguno, solo felicítala.\n\n` +
+      `Prohibido: repetir los datos de abajo, dar números o porcentajes, hacer listas, ` +
+      `usar emojis o despedidas. Devuelve únicamente esas 2 frases.\n\n` +
+      `--- DATOS DEL INTENTO ---\n${texto}`
+    );
+  }
   if (tarea === 'traduccion') {
     return (
       `Traduce al español esta letra de una canción ${deIdioma}. ` +
@@ -313,7 +328,8 @@ async function ia(request, cors, env) {
 
   let cuerpo;
   try { cuerpo = await request.json(); } catch (e) { cuerpo = {}; }
-  const tarea = cuerpo.tarea === 'traduccion' ? 'traduccion' : 'fonetica';
+  const tarea = (cuerpo.tarea === 'traduccion' || cuerpo.tarea === 'comentario')
+    ? cuerpo.tarea : 'fonetica';
   const idioma = String(cuerpo.idioma || '').trim().slice(0, 40);
   let texto = String(cuerpo.texto || '').replace(/\r\n?/g, '\n').trim();
   if (!texto) return json({ error: 'falta "texto"' }, 400, cors);
@@ -335,26 +351,54 @@ async function ia(request, cors, env) {
   } catch (e) { /* sin cache: seguimos */ }
 
   try {
-    const cuerpoGemini = JSON.stringify({
-      contents: [{ parts: [{ text: promptIA(tarea, texto, idioma) }] }],
-      generationConfig: { temperature: 0.2 },
-    });
+    const prompt = promptIA(tarea, texto, idioma);
     const urlGemini =
       'https://generativelanguage.googleapis.com/v1beta/models/' +
       IA_MODELO + ':generateContent?key=' + encodeURIComponent(env.GEMINI_API_KEY);
 
+    // Para el comentario de "la profe" pedimos poco "pensar" y salida corta,
+    // para que conteste en 1-3 s. Si el modelo no acepta alguno de esos
+    // ajustes (cambian de nombre entre versiones de Gemini), se reintenta
+    // con la config mínima en vez de fallar.
+    const configs =
+      tarea === 'comentario'
+        ? [
+            // maxOutputTokens alto: en Gemini 3 los tokens de "pensar" también
+            // cuentan aquí, y con el tope bajo el comentario salía cortado a
+            // media frase. El prompt ya lo limita a 2 frases / ~35 palabras.
+            { temperature: 0.6, maxOutputTokens: 2000, thinkingConfig: { thinkingLevel: 'low' } },
+            { temperature: 0.6, maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } },
+            { temperature: 0.6, maxOutputTokens: 600 },
+            { temperature: 0.6 },
+          ]
+        : [{ temperature: 0.2 }];
+
     // Reintenta ante 429/503 (saturación o cuota momentánea): 3 intentos con
-    // espera creciente. Los 4xx "de verdad" (400, 401…) no se reintentan.
+    // espera creciente. Los 4xx "de verdad" (401…) no se reintentan; el 400
+    // "invalid argument" sí, pero bajando la config (ver `configs`).
     let r, data;
-    for (let intento = 0; intento < 3; intento++) {
+    const maxIntentos = tarea === 'comentario' ? 1 : 3;
+    let ci = 0;
+    for (let intento = 0; intento < maxIntentos; ) {
       if (intento > 0) await new Promise((res) => setTimeout(res, intento * 2500));
       r = await fetch(urlGemini, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: cuerpoGemini,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: configs[ci],
+        }),
       });
       data = await r.json();
-      if (r.ok || (r.status !== 429 && r.status !== 503)) break;
+      if (r.ok) break;
+      // 400 por un argumento no soportado: probamos con menos ajustes, sin gastar intento.
+      const msg = (data && data.error && data.error.message) || '';
+      if (r.status === 400 && /invalid argument/i.test(msg) && ci < configs.length - 1) {
+        ci++;
+        continue;
+      }
+      if (r.status !== 429 && r.status !== 503) break;
+      intento++;
     }
     if (!r.ok) {
       const detalle = (data && data.error && data.error.message) || ('HTTP ' + r.status);

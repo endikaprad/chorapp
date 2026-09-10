@@ -125,9 +125,10 @@ npm run release
 Pasa ese APK al móvil de Maite como siempre. **A partir de este, las
 actualizaciones normales van por wifi.**
 
-> Este APK lleva `src/data/version.json` con `bundle: 1`. Cada `npm run ota`
-> sube ese número y lo commitea, así los APK que generes después nunca se
-> creerán más viejos que la última OTA.
+> `src/data/version.json` `{ bundle, nombre }` es la única fuente de versión.
+> `bundle` (= `versionCode` Android) sube +1 en cada `npm run ota` y cada
+> `npm run release`. `nombre` visible: `ota` → 3.er número (1.18 → 1.18.1),
+> `release` → 2.º número (1.18.x → 1.19). Commitéalo siempre.
 
 ---
 
@@ -199,7 +200,7 @@ arrancar tras aplicar uno nuevo (`notifyAppReady`).
 | El Worker responde 401 | `secret` de `ota.local.json` ≠ `PANEL_SECRET` del Worker. |
 | El Worker responde 500 `SERVICE_ACCOUNT` | Redespliega el Worker (paso 3). |
 | La app no ve la actualización | Reglas de Firebase (paso 4): `/updates` sin `.read: true`. |
-| La app descarga pero no aplica | Mira el logcat del móvil; suele ser el zip mal formado (el `index.html` debe estar en la raíz del zip — `Compress-Archive` lo hace bien). |
+| `Download failed with status: error` en logcat | Zip con separadores `\` (bug de `Compress-Archive` y de la API .NET `ZipFile`). El script usa `C:\Windows\System32\tar.exe` justo para evitarlo; si lo tocas, mantén ese `tar`. |
 | `npm run ota` dice "cambios nativos" | Tienes cambios en `package.json`/`capacitor.config.json`. Si van en el zip web y ya están en un APK instalado: `--forzar`. Si no: `npm run release`. |
 
 Logs del Worker en vivo: `cd worker && npx wrangler tail`.

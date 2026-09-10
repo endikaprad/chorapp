@@ -141,6 +141,8 @@ window.WrappedAudio = (function () {
         if (saltado) return;
         saltado = true;
         var seek = r.seek;
+        // Sin fin de marca: a la mitad del audio (no un valor fijo a ojo).
+        if (r.mitad && isFinite(clip.duration) && clip.duration > 20) seek = clip.duration * 0.5;
         if (isFinite(clip.duration) && clip.duration > 15) seek = Math.min(seek, clip.duration - 8);
         try { clip.currentTime = Math.max(0, seek || 0); } catch (e) {}
       }
@@ -177,12 +179,13 @@ window.WrappedAudio = (function () {
 
     var m = ref.marca || {};
     var ini = m.segundo || 0;
-    var seek = (m.finSegundo && m.finSegundo > ini)
-      ? ini + (m.finSegundo - ini) * 0.4
-      : ini + 35;
+    var conFin = m.finSegundo && m.finSegundo > ini;
+    // Con fin de marca: la mitad del fragmento. Sin fin: `mitad` -> alPunto()
+    // lo lleva a la mitad del audio cuando sepa la duración.
+    var seek = conFin ? ini + (m.finSegundo - ini) * 0.5 : ini;
 
     return window.Archivos.url(ref.sesion.id + ':audio').then(function (u) {
-      return u ? { url: u, seek: seek } : null;
+      return u ? { url: u, seek: seek, mitad: !conFin } : null;
     }).catch(function () { return null; });
   }
 

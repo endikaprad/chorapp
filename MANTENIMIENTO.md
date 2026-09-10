@@ -28,8 +28,8 @@ Opciones de `npm run ota`:
 
 | Comando | Efecto |
 |---|---|
-| `npm run ota` | sube el nº de bundle (+1), mantiene el nombre visible |
-| `npm run ota 1.18` | además fija el nombre visible a `1.18` |
+| `npm run ota` | sube la versión de parche (1.18 → 1.18.1) y el bundle interno |
+| `npm run ota 1.20` | fija el nombre visible a `1.20` a mano |
 | `npm run ota -- --nota "Arreglado el visor de partituras"` | texto que ve Maite en la tarjeta |
 | `npm run ota -- --obligatoria` | se aplica sola, sin tarjeta |
 | `npm run ota -- --forzar` | ignora la guardia de "cambio nativo" (ver abajo) |
@@ -53,18 +53,26 @@ npm run release        # sube versionCode/Name, sync, compila ChorApp-<v>.apk
 ```
 
 Pasas el `.apk` al móvil y lo instalas encima (ver "Generar el APK firmado").
-Ese APK lleva `src/data/version.json` con el bundle actual, así que **después
-de un camino B, el primer `npm run ota` sigue numerando desde ahí** sin saltos.
+`npm run release` sube la versión menor (1.18.4 → **1.19**) y la escribe en
+Gradle; el `versionCode` de Android es el mismo contador `bundle`.
+
+### Versiones
+
+`src/data/version.json` `{ bundle, nombre }` es la **única fuente**:
+
+- **`bundle`** — contador interno, `+1` en *cada* `npm run ota` **y** cada
+  `npm run release`. Es también el `versionCode` de Android. Nunca baja.
+- **`nombre`** — la versión visible. `npm run ota` sube el 3.er número
+  (`1.18` → `1.18.1` → `1.18.2`); `npm run release` sube el 2.º y limpia el
+  parche (`1.18.2` → `1.19`). `npm run ota 1.20` lo fija a mano.
+
+Así, mirando la versión sabes si hiciste falta reinstalar: `1.19` fue un APK,
+`1.19.x` fueron OTAs sobre él. **Commitea siempre `version.json`.**
 
 ### Reglas rápidas
 
 - ¿Editaste solo `.html` / `.css` / `.js` / textos dentro de `src/`? → **OTA**.
-- ¿`npm install` de algo, o tocaste config/permisos? → **APK** (y ya de paso
-  las siguientes OTAs cuentan desde ese APK).
-- El número de **bundle** (`src/data/version.json`) es interno y solo sube por
-  `npm run ota`. El **versionName / versionCode** de Android solo sube por
-  `npm run release`. Son cosas distintas y no pasa nada porque vayan
-  descoordinados.
+- ¿`npm install` de algo, o tocaste config/permisos/icono? → **APK**.
 - Si una OTA sale mal: el panel del hijo tiene *"Volver a la versión anterior"*,
   y Capgo revierte solo si la app no arranca tras aplicarla.
 

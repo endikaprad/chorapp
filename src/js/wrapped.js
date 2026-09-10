@@ -152,28 +152,42 @@ window.Wrapped = (function () {
 
     if (d.diaSemana) out.push(slideDia(d.diaSemana, false));
 
-    if (d.cancionTop) {
-      var conJuego = hayQuiz(d.topEstudiadas, d.cancionTop);
+    var ganMes = ganadoraDe(d.topJuego, d.cancionTop);
+    if (ganMes) {
+      var conJuego = hayQuiz(d.topJuego, d.cancionTop);
+      var vecesMes = d.cancionTop ? d.cancionTop.veces : buscaVeces(d.topJuego, ganMes);
       if (conJuego) {
-        out.push(slideQuiz('est-mes', 'Un juego', '¿Cuál crees que estudiaste más este mes?',
-          quizOpciones(d.topEstudiadas, d.cancionTop.titulo)));
+        out.push(slideTeaser({
+          eyebrow: 'Un juego', clase: 'w-slide--pregunta',
+          texto: '¿Cuál crees que estudiaste más este mes?',
+          sub: 'Piénsalo. En el siguiente slide lo eliges.',
+        }));
+        out.push(slideQuiz('est-mes', 'Adivina', '¿Cuál estudiaste más este mes?',
+          quizOpciones(d.topJuego, ganMes)));
       }
       out.push({
-        clase: 'w-slide--dato w-slide--cancion', cancion: d.cancionTop.titulo,
+        clase: 'w-slide--dato w-slide--cancion', cancion: ganMes,
         revela: conJuego ? 'est-mes' : null,
         html:
           (conJuego ? '<p class="w-reaccion" data-reaccion></p>' : '') +
           '<p class="w-eyebrow">La que no te dejaba en paz</p>' +
-          '<h3 class="w-cancion">' + esc(d.cancionTop.titulo) + '</h3>' +
-          '<p class="w-frase">La abriste <strong>' + d.cancionTop.veces +
+          '<h3 class="w-cancion">' + esc(ganMes) + '</h3>' +
+          equalizer() +
+          '<p class="w-frase">La abriste <strong>' + vecesMes +
           ' días</strong> distintos. Más que ninguna otra.</p>' +
           '<p class="w-nota">O te encanta, o te tenía frita. Tú sabrás.</p>'
       });
     }
 
+    var ordenMes = slideOrden('orden-mes', d.topEscuchadas,
+      '¿En qué orden crees que sonaron?', 'Ponlas de más a menos veces al play.');
+    if (ordenMes) { out.push(ordenMes.teaser); out.push(ordenMes.slide); }
+
     if (d.topEscuchadas && d.topEscuchadas.length >= 2) {
       out.push(slideTops('Las que más sonaron', d.topEscuchadas, 'veces al play',
-        'Tus favoritas del mes, por número de veces que le diste al play.'));
+        ordenMes ? 'El orden real. A ver qué tal el ojo.' :
+        'Tus favoritas del mes, por número de veces que le diste al play.',
+        ordenMes ? 'orden-mes' : null));
     }
 
     if (d.escuchas >= 3) {
@@ -206,6 +220,9 @@ window.Wrapped = (function () {
       });
     }
 
+    var sensaMes = slideSensaciones(d.sensaciones, false);
+    if (sensaMes) out.push(sensaMes);
+
     if (d.aprendidas && d.aprendidas.length) {
       out.push(slideAprendidas(d.aprendidas, 'Canción aprendida', 'Canciones aprendidas',
         'De pendiente a que te la sabes. Eso no lo borra nadie.'));
@@ -231,11 +248,26 @@ window.Wrapped = (function () {
 
   /* ---------- slide de presentación (sin números, para dar aire) ---------- */
   function slideTeaser(o) {
-    return { clase: 'w-slide--teaser', html:
+    return { clase: 'w-slide--teaser ' + (o.clase || ''), html:
       (o.eyebrow ? '<p class="w-eyebrow">' + esc(o.eyebrow) + '</p>' : '') +
       '<p class="w-teaser">' + esc(o.texto) + '</p>' +
       (o.sub ? '<p class="w-nota">' + esc(o.sub) + '</p>' : '')
     };
+  }
+
+  // Barras de ecualizador (puro CSS) para los slides de canción.
+  function equalizer() {
+    var b = '';
+    for (var i = 0; i < 7; i++) b += '<span></span>';
+    return '<div class="w-eq" aria-hidden="true">' + b + '</div>';
+  }
+
+  // Veces/días de un título dentro de una lista [{titulo, veces}].
+  function buscaVeces(lista, titulo) {
+    for (var i = 0; i < (lista || []).length; i++) {
+      if (lista[i].titulo === titulo) return lista[i].veces;
+    }
+    return 0;
   }
 
   /* ---------- slide de cierre + foto resumen para compartir ---------- */
@@ -313,26 +345,29 @@ window.Wrapped = (function () {
 
     if (d.diaSemana) out.push(slideDia(d.diaSemana, true));
 
-    var juegoAnual = hayQuiz(d.topEstudiadas, d.cancionTop);
+    var ganAno = ganadoraDe(d.topJuego, d.cancionTop);
+    var juegoAnual = hayQuiz(d.topJuego, d.cancionTop);
     if (juegoAnual) {
       out.push(slideTeaser({
-        eyebrow: 'Antes de nada',
+        eyebrow: 'Antes de nada', clase: 'w-slide--pregunta',
         texto: 'De todo el año, ¿cuál dirías que fue tu canción?',
         sub: 'La que abriste más días. Piénsalo y pasa de slide.',
       }));
-      out.push(slideQuiz('est-ano', 'Un juego', '¿Cuál fue la canción de tu año?',
-        quizOpciones(d.topEstudiadas, d.cancionTop.titulo)));
+      out.push(slideQuiz('est-ano', 'Adivina', '¿Cuál fue la canción de tu año?',
+        quizOpciones(d.topJuego, ganAno)));
     }
 
-    if (d.cancionTop) {
+    if (ganAno) {
+      var diasAno = d.cancionTop ? d.cancionTop.dias : buscaVeces(d.topJuego, ganAno);
       out.push({
-        clase: 'w-slide--dato w-slide--cancion', cancion: d.cancionTop.titulo,
+        clase: 'w-slide--dato w-slide--cancion', cancion: ganAno,
         revela: juegoAnual ? 'est-ano' : null,
         html:
           (juegoAnual ? '<p class="w-reaccion" data-reaccion></p>' : '') +
           '<p class="w-eyebrow">La canción de tu año</p>' +
-          '<h3 class="w-cancion">' + esc(d.cancionTop.titulo) + '</h3>' +
-          '<p class="w-frase"><strong>' + d.cancionTop.dias + ' días</strong> con ella. Ninguna otra se le acercó.</p>' +
+          '<h3 class="w-cancion">' + esc(ganAno) + '</h3>' +
+          equalizer() +
+          '<p class="w-frase"><strong>' + diasAno + ' días</strong> con ella. Ninguna otra se le acercó.</p>' +
           '<p class="w-nota">La escucharás dentro de años y te acordarás de este año.</p>'
       });
     }
@@ -342,10 +377,21 @@ window.Wrapped = (function () {
         'Las que más volviste a abrir, un día tras otro.'));
     }
 
+    var ordenAno = slideOrden('orden-ano', d.topEscuchadas,
+      '¿En qué orden sonaron tus tres favoritas?', 'De más a menos veces al play, en todo el año.');
+    if (ordenAno) { out.push(ordenAno.teaser); out.push(ordenAno.slide); }
+
     if (d.topEscuchadas && d.topEscuchadas.length >= 2) {
       out.push(slideTops('Las que más sonaron', d.topEscuchadas.slice(0, 5), 'veces al play',
-        'Las que no te cansabas de escuchar.'));
+        ordenAno ? 'El orden de verdad. ¿Le diste?' : 'Las que no te cansabas de escuchar.',
+        ordenAno ? 'orden-ano' : null));
     }
+
+    var vfAno = slideVerdad('vf-ano', d);
+    if (vfAno) out.push(vfAno);
+
+    var sensaAno = slideSensaciones(d.sensaciones, true);
+    if (sensaAno) out.push(sensaAno);
 
     if (d.aprendidas && d.aprendidas.length) {
       out.push(slideAprendidas(d.aprendidas, 'Canción aprendida este año', 'Canciones aprendidas este año',
@@ -433,7 +479,7 @@ window.Wrapped = (function () {
   }
 
   // Slide de "top" (ranking de canciones). items = [{titulo, veces}].
-  function slideTops(eyebrow, items, unidad, nota) {
+  function slideTops(eyebrow, items, unidad, nota, revela) {
     var filas = items.map(function (it, i) {
       return '<li><span class="w-tops__pos">' + (i + 1) + '</span>' +
         '<span class="w-tops__tit">' + esc(it.titulo) + '</span>' +
@@ -442,7 +488,9 @@ window.Wrapped = (function () {
     return {
       clase: 'w-slide--dato w-slide--tops',
       cancion: items[0] && items[0].titulo,
+      revela: revela || null,
       html:
+        (revela ? '<p class="w-reaccion" data-reaccion></p>' : '') +
         '<p class="w-eyebrow">' + esc(eyebrow) + '</p>' +
         '<ol class="w-tops">' + filas + '</ol>' +
         (unidad ? '<p class="w-tops__pie">' + esc(unidad) + '</p>' : '') +
@@ -450,19 +498,120 @@ window.Wrapped = (function () {
     };
   }
 
-  /* ---------- Mini-juego: adivina ---------- */
-  // Baraja las 3 primeras de `top` y localiza la que coincide con `correctaTitulo`.
-  function quizOpciones(top, correctaTitulo) {
-    var ops = top.slice(0, 3).map(function (x) { return x.titulo; });
-    for (var i = ops.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var t = ops[i]; ops[i] = ops[j]; ops[j] = t;
+  /* ---------- Mini-juego: ¿verdad o mentira? (solo en el anual) ----------
+     Solo con datos que NO tienen su propio slide en el anual (escuchas al
+     play y trozos difíciles): no tiene gracia preguntar por algo que la
+     app ya le ha enseñado. Cada frase es "más de X": la mitad de las veces
+     X está por debajo del valor real (verdad), la otra mitad por encima. */
+  function afirmaciones(d) {
+    var lista = [];
+
+    function adivina(valor, plantilla, remate) {
+      valor = Math.round(valor || 0);
+      if (valor < 6) return;
+      var verdad = Math.random() < 0.5;
+      var x = verdad
+        ? Math.max(2, Math.round(valor * (0.45 + Math.random() * 0.2)))
+        : Math.round(valor * (1.35 + Math.random() * 0.45)) + 1;
+      var real = remate.replace('{v}', valor);
+      lista.push({
+        txt: plantilla.replace('{x}', x),
+        verdad: verdad,
+        ok: (verdad ? '¡Sí! ' : 'Pues no. ') + real,
+        mal: (verdad ? 'Era verdad. ' : 'Era mentira. ') + real,
+      });
     }
+
+    adivina(d.escuchas, 'Le diste al play más de {x} veces este año.', 'Fueron {v}.');
+    adivina(d.trozos, 'Marcaste más de {x} trozos difíciles este año.', 'Marcaste {v}.');
+
+    // Provocación: si aprendió algo, negarlo (la revelación lo celebra).
+    if (d.aprendidas && d.aprendidas.length >= 2) {
+      lista.push({
+        txt: 'No te aprendiste ni una canción entera este año.',
+        verdad: false,
+        ok: 'Mentira, y bien clara: ' + d.aprendidas.length + ' aprendidas.',
+        mal: 'Era mentira: ' + d.aprendidas.length + ' aprendidas.',
+      });
+    }
+    return lista;
+  }
+
+  function slideVerdad(id, d) {
+    var lista = afirmaciones(d);
+    if (!lista.length) return null;
+    var a = elegir(lista);
+    return {
+      clase: 'w-slide--quiz w-slide--vf',
+      inter: { id: id, correcta: a.verdad ? 'v' : 'm', ok: a.ok, mal: a.mal },
+      html:
+        '<p class="w-eyebrow">¿Verdad o mentira?</p>' +
+        '<h3 class="w-quiz__preg">' + esc(a.txt) + '</h3>' +
+        '<div class="w-quiz__ops w-vf__ops">' +
+          '<button type="button" class="w-quiz__op w-vf__op" data-vf="v">Verdad</button>' +
+          '<button type="button" class="w-quiz__op w-vf__op" data-vf="m">Mentira</button>' +
+        '</div>' +
+        '<p class="w-quiz__pista" data-quiz-pista>Toca tu respuesta</p>'
+    };
+  }
+
+  /* ---------- Mini-juego: ordena tu top ----------
+     3 canciones desordenadas; Maite las toca en el orden que cree. */
+  function slideOrden(id, items, pregunta, sub) {
+    if (!items || items.length < 3) return null;
+    var real = items.slice(0, 3).map(function (x) { return x.titulo; });
+    var mezcla = barajar(real.slice());
+    if (mezcla.join('|') === real.join('|')) mezcla.push(mezcla.shift());
+    var botones = mezcla.map(function (t) {
+      return '<button type="button" class="w-orden__op" data-orden="' + esc(t) + '">' +
+        '<span class="w-orden__pos" aria-hidden="true"></span>' +
+        '<span class="w-orden__tit">' + esc(t) + '</span></button>';
+    }).join('');
+    return {
+      teaser: slideTeaser({ eyebrow: 'Otro juego', clase: 'w-slide--pregunta',
+        texto: pregunta, sub: 'En el siguiente slide las ordenas tú.' }),
+      slide: {
+        clase: 'w-slide--quiz w-slide--orden',
+        inter: { id: id, orden: real },
+        html:
+          '<p class="w-eyebrow">Ordena tu top</p>' +
+          '<h3 class="w-quiz__preg">' + esc(pregunta) + '</h3>' +
+          '<div class="w-orden__ops">' + botones + '</div>' +
+          '<p class="w-quiz__pista" data-quiz-pista>' + esc(sub) + '</p>'
+      }
+    };
+  }
+
+  /* ---------- Mini-juego: adivina la canción ---------- */
+  function barajar(a) {
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  // Coge 3 títulos (incluida siempre la correcta), los baraja y devuelve el
+  // índice de la correcta.
+  function quizOpciones(top, correctaTitulo) {
+    var otras = top.map(function (x) { return x.titulo; })
+      .filter(function (t) { return t !== correctaTitulo; });
+    var ops = barajar([correctaTitulo].concat(otras.slice(0, 2)));
+    if (ops.length < 3) ops = barajar(top.slice(0, 3).map(function (x) { return x.titulo; }));
     return { opciones: ops, correcta: ops.indexOf(correctaTitulo) };
   }
-  // ¿Hay material para un quiz? (top-3 real + una ganadora clara)
-  function hayQuiz(top, ganadora) {
-    return !!(ganadora && top && top.length >= 3 && top[0].titulo === ganadora.titulo);
+
+  // Título de la canción "ganadora" (la más estudiada) a partir de un top y,
+  // si existe, el cancionTop de los datos. Devuelve null si no hay una clara.
+  function ganadoraDe(top, cancionTop) {
+    if (cancionTop && cancionTop.titulo) return cancionTop.titulo;
+    if (top && top.length >= 2 && top[0].veces > top[1].veces) return top[0].titulo;
+    return null;
+  }
+  // ¿Hay material para el juego de adivinar? (3+ canciones y una ganadora clara)
+  function hayQuiz(top, cancionTop) {
+    if (!top || top.length < 3) return false;
+    return !!ganadoraDe(top, cancionTop);
   }
 
   function slideQuiz(id, eyebrow, pregunta, q) {
@@ -481,10 +630,15 @@ window.Wrapped = (function () {
   }
 
   // Frase de reacción según lo que respondió Maite en el quiz `id`.
+  // El "bloque interactivo" de un slide (quiz de adivinar, o inter de vf/orden).
+  function interDe(mt) { return (mt && (mt.quiz || mt.inter)) || null; }
+  function esperando(mt) { var q = interDe(mt); return !!(q && !respuestas[q.id]); }
+
   function reaccionDe(id) {
     var r = respuestas[id];
     if (!r) return null;
     if (r.skip) return { txt: 'Te lo saltaste, ¿eh?', ok: false };
+    if (r.reaccion) return r.reaccion;
     if (r.acierto) {
       return { txt: elegir(['¡Lo sabías! 🎯', '¡Clavado! La conocías.', 'Acertaste sin pestañear.']), ok: true };
     }
@@ -502,6 +656,37 @@ window.Wrapped = (function () {
       '<p class="w-nota">' + (anual
         ? 'Cada semana tenía su ritual. El tuyo empezaba ' + esc(dia.nombre) + '.'
         : 'La rutina te funciona. No la sueltes.') + '</p>'
+    };
+  }
+
+  /* ---------- Diario de sensaciones (emoji tras el ensayo) ---------- */
+  var NOTA_SENSA = {
+    salio:     'Cuando sale, se nota hasta en el resumen. Bien, Ama.',
+    agusto:    'Salir a gusto un día tras otro. Eso es lo que engancha.',
+    cansada:   'Cansada casi siempre, y aun así ahí seguías. Con dos.',
+    frustrada: 'Meses así los tiene cualquiera. Lo que cuenta es que no lo dejaste.',
+  };
+  function slideSensaciones(s, anual) {
+    if (!s || !s.top || s.n < 3 || !window.Sensaciones) return null;
+    var O = window.Sensaciones.opcion;
+    var top = O(s.top.id);
+    if (!top) return null;
+    var fila = s.orden.map(function (x) {
+      var o = O(x.id);
+      if (!o) return '';
+      return '<span class="w-sensa__it' + (x.id === s.top.id ? ' is-top' : '') + '">' +
+        '<span class="w-sensa__emoji">' + o.emoji + '</span>' +
+        '<span class="w-sensa__n">' + x.n + '</span></span>';
+    }).join('');
+    return {
+      clase: 'w-slide--dato w-slide--sensa',
+      html:
+        '<p class="w-eyebrow">Cómo te sentiste al salir</p>' +
+        '<div class="w-sensa__grande" aria-hidden="true">' + top.emoji + '</div>' +
+        '<p class="w-frase">La mayoría de ' + (anual ? 'los días del año' : 'los días') +
+        ' saliste <strong>' + esc(top.etq.toLowerCase()) + '</strong>.</p>' +
+        '<div class="w-sensa">' + fila + '</div>' +
+        '<p class="w-nota">' + esc(NOTA_SENSA[s.top.id] || 'Lo apuntaste tú, toque a toque.') + '</p>'
     };
   }
 
@@ -541,6 +726,7 @@ window.Wrapped = (function () {
       return {
         cancion: s.cancion || null,
         quiz: s.quiz || null,
+        inter: s.inter || null,
         revela: s.revela || null,
         foto: s.foto || null,
         cierre: !!s.cierre,
@@ -567,6 +753,10 @@ window.Wrapped = (function () {
         '<span class="w-blob w-blob--1"></span>' +
         '<span class="w-blob w-blob--2"></span>' +
         '<span class="w-blob w-blob--3"></span>' +
+        '<div class="w-notas">' +
+          '<span>♪</span><span>♫</span><span>♩</span>' +
+          '<span>♬</span><span>♪</span><span>♩</span>' +
+        '</div>' +
       '</div>' +
       '<div class="w-top">' +
         '<button type="button" class="w-mute' + (mudo ? ' is-mute' : '') + '" data-mute aria-label="Sonido">' +
@@ -662,7 +852,7 @@ window.Wrapped = (function () {
 
     // Modo quiz / cierre: el toque no salta de slide (hay que poder tocar
     // los botones de dentro).
-    var enQuiz = !!(mt.quiz && !respuestas[mt.quiz.id]);
+    var enQuiz = esperando(mt);
     raiz.classList.toggle('w-quiz-activo', enQuiz);
     raiz.classList.toggle('w-cierre-activo', !!mt.cierre);
 
@@ -760,7 +950,7 @@ window.Wrapped = (function () {
     pararTimer();
     var b = raiz && raiz.querySelector('[data-barra="' + idx + '"]');
     var dur = (meta[idx] && meta[idx].dur) || DUR_SLIDE;
-    var quizPendiente = meta[idx] && meta[idx].quiz && !respuestas[meta[idx].quiz.id];
+    var quizPendiente = esperando(meta[idx]);
     var enCierre = meta[idx] && meta[idx].cierre;
     if (reducido() || quizPendiente || enCierre) {
       if (b) b.style.transform = quizPendiente ? 'scaleX(0)' : 'scaleX(1)';
@@ -804,15 +994,32 @@ window.Wrapped = (function () {
 
   function siguiente() {
     // Si sale de un quiz sin responder, cuenta como "te lo saltaste".
-    var mq = meta[idx] && meta[idx].quiz;
+    var mq = interDe(meta[idx]);
     if (mq && !respuestas[mq.id]) respuestas[mq.id] = { elegida: -1, acierto: false, skip: true };
     if (idx >= slides.length - 1) { cerrar(); return; }
     mostrar(idx + 1);
   }
 
+  // Remate común de cualquier mini-juego: vibra, suelta la barra y salta a la
+  // revelación pasado un momento.
+  function finInteractivo(acierto, textoPista, q) {
+    var pista = slides[idx].querySelector('[data-quiz-pista]');
+    if (pista) pista.textContent = textoPista;
+    try { if (window.Vibra) (acierto ? window.Vibra.acierto : window.Vibra.fallo)(); } catch (e) {}
+    raiz.classList.remove('w-quiz-activo');
+    var b = raiz.querySelector('[data-barra="' + idx + '"]');
+    if (b && !reducido()) {
+      b.style.transition = 'transform 1600ms linear';
+      b.style.transform = 'scaleX(1)';
+    }
+    setTimeout(function () {
+      if (interDe(meta[idx]) === q) siguiente();
+    }, 1700);
+  }
+
   function responderQuiz(boton) {
     var q = meta[idx] && meta[idx].quiz;
-    if (!q) return;
+    if (!q || boton.getAttribute('data-op') == null) return;
     var prev = respuestas[q.id];
     if (prev && !prev.skip) return;   // ya contestó de verdad; un "skip" sí se puede rectificar
     var elegida = +boton.getAttribute('data-op');
@@ -825,21 +1032,68 @@ window.Wrapped = (function () {
       if (i === q.correcta) b.classList.add('is-bien');
       else if (i === elegida) b.classList.add('is-mal');
     });
-    var pista = slides[idx].querySelector('[data-quiz-pista]');
-    if (pista) pista.textContent = acierto ? '¡Bien!' : 'Casi…';
+    finInteractivo(acierto, acierto ? '¡Bien!' : 'Casi…', q);
+  }
 
-    // Un golpe de vibración: distinto si acierta o si falla.
-    try { if (window.Vibra) (acierto ? window.Vibra.acierto : window.Vibra.fallo)(); } catch (e) {}
+  function responderVerdad(boton) {
+    var q = meta[idx] && meta[idx].inter;
+    if (!q || !q.correcta) return;
+    var prev = respuestas[q.id];
+    if (prev && !prev.skip) return;
+    var elegida = boton.getAttribute('data-vf');
+    var acierto = elegida === q.correcta;
+    var reaccion = { txt: acierto ? q.ok : q.mal, ok: acierto };
+    respuestas[q.id] = { elegida: elegida, acierto: acierto, reaccion: reaccion };
 
-    raiz.classList.remove('w-quiz-activo');
-    var b = raiz.querySelector('[data-barra="' + idx + '"]');
-    if (b && !reducido()) {
-      b.style.transition = 'transform 1400ms linear';
-      b.style.transform = 'scaleX(1)';
-    }
-    setTimeout(function () {
-      if (meta[idx] && meta[idx].quiz === q) siguiente();   // seguimos en el quiz: avanza a la revelación
-    }, 1500);
+    Array.prototype.forEach.call(slides[idx].querySelectorAll('.w-vf__op'), function (b) {
+      b.disabled = true;
+      var v = b.getAttribute('data-vf');
+      if (v === q.correcta) b.classList.add('is-bien');
+      else if (v === elegida) b.classList.add('is-mal');
+    });
+    var frase = slides[idx].querySelector('.w-quiz__preg');
+    if (frase) frase.insertAdjacentHTML('afterend',
+      '<p class="w-vf__ver">' + esc(reaccion.txt) + '</p>');
+    finInteractivo(acierto, acierto ? '¡Ojo clínico!' : 'Uy…', q);
+  }
+
+  function responderOrden(boton) {
+    var q = meta[idx] && meta[idx].inter;
+    if (!q || !q.orden) return;
+    if (respuestas[q.id]) return;
+    if (boton.classList.contains('is-puesta')) return;
+
+    var cont = slides[idx].querySelector('.w-orden__ops');
+    var puestas = cont.querySelectorAll('.w-orden__op.is-puesta').length;
+    boton.classList.add('is-puesta');
+    boton.querySelector('.w-orden__pos').textContent = puestas + 1;
+    boton.setAttribute('data-elegido', puestas + 1);
+    try { if (window.Vibra) window.Vibra.toque(); } catch (e) {}
+
+    if (puestas + 1 < q.orden.length) return;   // aún faltan
+
+    // Ya están las 3: comparar con el orden real.
+    var elegido = [];
+    Array.prototype.forEach.call(cont.querySelectorAll('.w-orden__op'), function (b) {
+      elegido[+b.getAttribute('data-elegido') - 1] = b.getAttribute('data-orden');
+    });
+    var aciertos = 0;
+    Array.prototype.forEach.call(cont.querySelectorAll('.w-orden__op'), function (b) {
+      b.disabled = true;
+      var t = b.getAttribute('data-orden');
+      var real = q.orden.indexOf(t) + 1;
+      var mio = +b.getAttribute('data-elegido');
+      if (real === mio) { b.classList.add('is-bien'); aciertos++; }
+      else b.classList.add('is-mal');
+      b.querySelector('.w-orden__pos').textContent = real;
+    });
+    var todo = aciertos === q.orden.length;
+    var reaccion = { ok: todo,
+      txt: todo ? '¡Las tres clavadas! 🎯'
+        : aciertos === 0 ? 'Del revés entero, Ama.'
+        : aciertos + ' de ' + q.orden.length + '. Casi.' };
+    respuestas[q.id] = { acierto: todo, aciertos: aciertos, reaccion: reaccion };
+    finInteractivo(todo, todo ? '¡Perfecto!' : aciertos + '/' + q.orden.length, q);
   }
   function anterior() {
     if (idx <= 0) { arrancarTimer(); return; }
@@ -855,6 +1109,10 @@ window.Wrapped = (function () {
       b.classList.toggle('is-mute', mudo);
       return;
     }
+    var vf = e.target.closest('[data-vf]');
+    if (vf) { responderVerdad(vf); return; }
+    var ord = e.target.closest('[data-orden]');
+    if (ord) { responderOrden(ord); return; }
     var op = e.target.closest('.w-quiz__op');
     if (op) { responderQuiz(op); return; }
     if (e.target.closest('[data-descargar]')) { accionPoster(false); return; }
@@ -873,6 +1131,7 @@ window.Wrapped = (function () {
     if (window.WrappedAudio) window.WrappedAudio.desbloquear();
     if (e.target.closest('.w-paso') || e.target.closest('.w-x') ||
         e.target.closest('.w-mute') || e.target.closest('.w-quiz__op') ||
+        e.target.closest('.w-orden__op') ||
         e.target.closest('.w-cierre__botones') || e.target.closest('.w-cerrar-link') ||
         e.target.closest('.w-poster')) return;
     holdT = setTimeout(pausar, 220);

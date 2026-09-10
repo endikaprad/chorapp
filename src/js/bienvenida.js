@@ -18,7 +18,7 @@ window.Bienvenida = (function () {
   'use strict';
 
   var CLAVE = 'bienvenida';   // Almacen: { v, fecha } cuando ya se ha visto
-  var VERSION = 10;
+  var VERSION = 11;
 
   /* La instrumental "Inner Light" suena de fondo.
      ACTO 1 (la historia) va sincronizado con la música: cada sector
@@ -382,6 +382,35 @@ window.Bienvenida = (function () {
     '</div>';
   }
 
+  // Sector "De memoria": una hoja de letra con tres versos; en algunas
+  // palabras hay un hueco y, uno a uno, la palabra correcta CAE en su
+  // sitio (sube desde abajo, se desenfoca a nítido, suelta una chispa y
+  // la línea del hueco se enciende). Al final aparece la nota "9 / 10".
+  // Todo en bucle. Solo transform / opacity / blur.
+  function memoIlustra() {
+    // [texto antes, palabra oculta, texto después] por verso.
+    var versos = [
+      ['Ave ', 'verum', ' corpus natum'],
+      ['ex ', 'Maria', ' Virgine'],
+      ['vere passum ', 'immolatum', '']
+    ];
+    var g = 0;
+    var filas = versos.map(function (v) {
+      var hueco =
+        '<span class="bv-memo__hueco" style="--g:' + (g++) + '">' +
+          '<i>' + v[1] + '</i></span>';
+      return '<span class="bv-memo__verso">' + v[0] + hueco + v[2] + '</span>';
+    }).join('');
+    return '<div class="bv-memo" aria-hidden="true">' +
+      '<div class="bv-memo__hoja">' + filas + '</div>' +
+      '<span class="bv-memo__nota">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" ' +
+          'stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l6 6 10-13"/></svg>' +
+        '<span><b>9</b>&thinsp;/&thinsp;10 versos de memoria</span>' +
+      '</span>' +
+    '</div>';
+  }
+
   // Sector Pantalla de bloqueo: la notificación del reproductor con sus
   // cinco botones (velocidad, −5 s, play/pausa, +5 s, repetir) reaccionando
   // uno a uno, en bucle. Igual que la ve Ama al bajar las notificaciones.
@@ -592,6 +621,21 @@ window.Bienvenida = (function () {
           '</div>'
       },
 
+      // 6c — De memoria: el juego que le hace aprenderse la letra
+      {
+        dur: 11,
+        bg: 'radial-gradient(120% 85% at 22% 6%, #1E7A4E 0%, #2A2CC0 52%, #16086B 100%)',
+        clase: 'bv-s--memo',
+        html:
+          '<div class="bv-decor bv-decor--memo">' + memoIlustra() + '</div>' +
+          '<div class="bv-in">' +
+            '<p class="bv-eyebrow">De memoria</p>' +
+            '<h3 class="bv-h3">Sin mirar la letra</h3>' +
+            '<p class="bv-sub">Un juego tapa versos al azar y tú los completas. Te pone nota, ' +
+              'guarda tu mejor marca y, canción a canción, te la acabas sabiendo entera.</p>' +
+          '</div>'
+      },
+
       // 7 — Control desde la pantalla de bloqueo / notificaciones
       {
         dur: 11,
@@ -635,7 +679,7 @@ window.Bienvenida = (function () {
             '<p class="bv-eyebrow">Logros</p>' +
             '<h3 class="bv-h3">Medallas por currártelo</h3>' +
             '<p class="bv-sub">Por cada racha y cada meta, una medalla. Colecciónalas: ' +
-              'es lo más cerca que vas a estar de un premio cantando.</p>' +
+              'es lo más cerca que vas a estar de un premio cantando ;)</p>' +
           '</div>'
       },
 
@@ -1197,9 +1241,9 @@ window.Bienvenida = (function () {
         document.body.classList.add('bv-aterriza');
         window.setTimeout(function () {
           document.body.classList.remove('bv-aterriza');
-        }, 800);
+        }, 1600);
       }
-      setTimeout(quita, reducido() ? 300 : 900);
+      setTimeout(quita, reducido() ? 300 : 1700);
     }
   }
 

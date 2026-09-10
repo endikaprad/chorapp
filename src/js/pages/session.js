@@ -16,6 +16,7 @@ window.Pagina_session = (function () {
 
   var cont, sesion, obs, vistaSub;
   var tiempoActual = 0, duracionAudio = 0;
+  var sono = false;   // el audio del ensayo ha sonado en esta visita
   var hoja, form, marcaEditando = null;
   var inicioSel = 0, finSel = null;         // tiempos elegidos en la hoja
   var archivosPendientes = {};              // { letra: File|'quitar', ... }
@@ -52,6 +53,7 @@ window.Pagina_session = (function () {
     pintarCabecera();
     montarAudio();
     pintarMarcas();
+    montarSensacion();
 
     q('[data-editar]').addEventListener('click', function () {
       window.Pagina_sessions.editar(sesion.id);
@@ -125,6 +127,12 @@ window.Pagina_session = (function () {
   }
 
   function destruir() {
+    // Al salir del ensayo, si ha sonado algo, un toque de emoji para el diario
+    // de sensaciones (solo si hoy no se ha tocado ni preguntado ya).
+    if (sono && window.Sensaciones) {
+      try { window.Sensaciones.preguntarTrasSesion(); } catch (e) {}
+    }
+    sono = false;
     if (obs) { obs.disconnect(); obs = null; }
     if (vistaSub) { vistaSub(); vistaSub = null; }
     if (window.CancionActiva) window.CancionActiva.fijarVistaAbierta(false);
@@ -211,6 +219,7 @@ window.Pagina_session = (function () {
       hrIcPause.toggleAttribute('hidden', !s.reproduciendo);
       hrPlay.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
       tiempoActual = s.actual || 0;
+      if (s.reproduciendo) sono = true;
       if (hoja && !hoja.hidden) {
         Array.prototype.forEach.call(hoja.querySelectorAll('[data-pos-live]'), function (el) {
           el.textContent = fmtTiempo(tiempoActual);
@@ -605,6 +614,40 @@ window.Pagina_session = (function () {
     var cerrar = function () { hoja.hidden = true; hoja.removeEventListener('transitionend', cerrar); };
     hoja.addEventListener('transitionend', cerrar);
     setTimeout(cerrar, 260);
+  }
+
+  /* ---------- Diario de sensaciones ----------
+     Un botón al pie para dejar cómo te has sentido en el ensayo. Si ya
+     hay una de hoy, la enseña y deja cambiarla. */
+
+  function montarSensacion() {
+    var btn = q('[data-sensa]');
+    if (!btn || !window.Sensaciones) return;
+
+    function pintar() {
+      var ya = window.Sensaciones.deHoy();
+      var emoji = btn.querySelector('[data-sensa-emoji]');
+      var tit = btn.querySelector('[data-sensa-tit]');
+      var sub = btn.querySelector('[data-sensa-sub]');
+      if (ya) {
+        var o = window.Sensaciones.opcion(ya.emo);
+        emoji.textContent = o ? o.emoji : '🎭';
+        tit.textContent = 'Hoy: ' + (o ? o.etq.toLowerCase() : '—');
+        sub.textContent = 'Toca para cambiarlo';
+        btn.classList.add('is-hecha');
+      } else {
+        emoji.textContent = '🎭';
+        tit.textContent = '¿Qué tal el ensayo?';
+        sub.textContent = 'Un toque y se guarda en tu resumen';
+        btn.classList.remove('is-hecha');
+      }
+    }
+
+    btn.addEventListener('click', function () {
+      window.Sensaciones.abrirHoja({ motivo: 'manual', onListo: pintar });
+    });
+    pintar();
+    btn.hidden = false;
   }
 
   /* ---------- Utilidades ---------- */

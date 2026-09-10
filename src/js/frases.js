@@ -245,9 +245,13 @@ window.Frases = (function () {
 
     // --- Concierto de Bihotsak ---
     // (este año cae el mismo día que tu cumpleaños)
+    // Este año: cumpleaños + concierto + el solo que le han propuesto.
+    // Hoy no toca pulla: hoy toca empujarla a subir sin miedo.
     '2026-09-12':
-      'Feliz cumpleaños, Ama. 55 y encima con concierto de Bihotsak hoy. ' +
-      'Suerte ahí arriba.',
+      'Feliz cumpleaños, Ama. 55 tacos y hoy, encima, concierto de Bihotsak. ' +
+      'Y sé lo del solo. Súbete y cántalo sin miedo: si te lo han pedido a ti ' +
+      'es porque lo haces bien, por mucho que aquí siempre diga lo contrario. ' +
+      'El escenario es tuyo. Un par de huevos y para alante. Te vamos a estar oyendo.',
   };
 
   /* ---------- Texto para la NOTIFICACIÓN de cada fecha ----------
@@ -283,7 +287,7 @@ window.Frases = (function () {
     '09-12': function (d) {
       return 'Feliz cumpleaños, Ama. ' + (d.getFullYear() - 1971) + ' tacos. Que sea genial.';
     },
-    '2026-09-12': 'Feliz cumpleaños, Ama. Hoy concierto con Bihotsak: a por todas.',
+    '2026-09-12': 'Feliz cumpleaños, Ama. Hoy concierto y hoy tu solo. Súbete sin miedo: te lo han pedido porque lo haces bien. A por todas.',
   };
 
   /* ---------- Días de concierto ----------
@@ -368,6 +372,33 @@ window.Frases = (function () {
   }
   function avisoPostConcierto() {
     return AVISOS_POSTCONCIERTO[Math.floor(Math.random() * AVISOS_POSTCONCIERTO.length)];
+  }
+
+  /* ---------- Días con la notificación pospuesta ----------
+     Días en los que Maite no va a tener el móvil con la app por la mañana
+     (p. ej. trabajando). Toda notificación nuestra de ese día que caiga
+     ANTES de la hora indicada se retrasa hasta esa hora; las de después
+     se quedan igual.
+       '2026-09-12' -> cumpleaños + concierto + su solo: trabaja por la
+                       mañana, así que todos los avisos a las 17:30. */
+  var POSPONER = {
+    '2026-09-12': { h: 17, m: 30 }
+  };
+
+  function ymdLocal(d) {
+    return d.getFullYear() + '-' +
+           String(d.getMonth() + 1).padStart(2, '0') + '-' +
+           String(d.getDate()).padStart(2, '0');
+  }
+
+  // Devuelve la fecha/hora efectiva de un aviso aplicando POSPONER.
+  function posponer(at) {
+    var r = POSPONER[ymdLocal(at)];
+    if (!r) return at;
+    if (at.getHours() < r.h || (at.getHours() === r.h && at.getMinutes() < r.m)) {
+      return new Date(at.getFullYear(), at.getMonth(), at.getDate(), r.h, r.m, 0, 0);
+    }
+    return at;
   }
 
   /* ---------- Utilidades de fecha ---------- */
@@ -615,7 +646,7 @@ window.Frases = (function () {
       var d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + i);
       if (!especialDeHoy(d)) continue;
       var h = HORA_AVISO[categoriaFecha(d)] || 11;
-      var at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, 0, 0, 0);
+      var at = posponer(new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, 0, 0, 0));
       if (at.getTime() <= Date.now()) continue; // antes de esa hora aún vale; ya pasada: fuera
       salida.push({
         id: d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(),
@@ -629,6 +660,7 @@ window.Frases = (function () {
     if (window.Conciertos && window.Conciertos.proximos) {
       try {
         window.Conciertos.proximos(dias, hoy).forEach(function (c) {
+          if (c.fecha) c.fecha = posponer(c.fecha);
           if (c.fecha && c.fecha.getTime() > Date.now()) salida.push(c);
         });
       } catch (e) {}

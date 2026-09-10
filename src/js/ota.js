@@ -7,11 +7,11 @@
      2. consulta /updates/latest en la misma base de datos que
         usan control-remoto.js y push.js (data/control.json).
      3. si hay un "bundle" (número entero) mayor que el instalado:
-          - normal: muestra una tarjeta cálida ("Hay novedades 🎶").
-            La descarga (con barra) ocurre al pulsar "Actualizar".
-          - obligatoria: descarga y aplica sin preguntar.
-     4. al aplicar, Capgo cambia la carpeta que sirve el WebView y
-        recarga. La próxima apertura ya arranca con lo nuevo.
+          - normal: muestra una tarjeta ("Hay una versión nueva de ChorApp").
+          - obligatoria: entra directo a la pantalla de actualización.
+     4. al pulsar "Actualizar" (o si es obligatoria) se abre una capa a
+        pantalla completa con el fondo difuminado y un anillo de progreso;
+        al terminar, Capgo cambia la carpeta que sirve el WebView y recarga.
 
    Qué se actualiza así: TODO lo de www/ (HTML, CSS, JS, audios,
    PDF.js…). Lo que NO: plugins nativos, capacitor.config, permisos
@@ -23,15 +23,15 @@
    recién compilado nunca se cree más viejo que la última OTA.
 
    Solo actúa en el APK y solo si está el plugin @capgo/capacitor-updater
-   (Fase 11). En el navegador (npm run dev) no hace nada; para probar la
-   tarjeta desde la consola: window.OTA.simularBanner().
+   (Fase 11). En el navegador (npm run dev) no hace nada; para probar:
+   window.OTA.simularBanner()  /  window.OTA.simularActu().
    ============================================================ */
 
 window.OTA = (function () {
   'use strict';
 
   var K_APLICADO = 'ota:aplicado';   // nº de bundle que ya se aplicó por OTA
-  var K_POSPUESTO = 'ota:pospuesto';  // nº de bundle para el que Maite pulsó "Luego"
+  var K_POSPUESTO = 'ota:pospuesto';  // nº de bundle para el que Maite pulsó "Ahora no"
 
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var bannerEnPantalla = false;
@@ -109,7 +109,7 @@ window.OTA = (function () {
           if (!remoto || remoto <= instalado) return;
           if (!/^https:\/\/.+\.zip($|\?)/i.test(String(info.url || ''))) return;
 
-          if (info.obligatoria) return descargarYAplicar(info, null);
+          if (info.obligatoria) return iniciarActualizacion(info, true);
           if (num(leer(K_POSPUESTO)) === remoto) return; // ya dijo "ahora no"
           mostrarBanner(info);
         })
@@ -118,23 +118,22 @@ window.OTA = (function () {
   }
 
   /* --------------------------------------------------------
-     Descarga + aplicación
+     Descarga + aplicación (lógica)
      -------------------------------------------------------- */
 
-  // onProgreso(pct|null): pct 0-100 durante la descarga; null al aplicar.
+  // onProgreso(pct): 0-100 mientras descarga · 'aplicando' · 'error'
   function descargarYAplicar(info, onProgreso) {
     var CU = plugin();
     if (!CU || aplicando) return;
     aplicando = true;
 
     var quitarLis = null;
-    if (onProgreso && CU.addListener) {
+    if (CU.addListener) {
       var p = CU.addListener('download', function (st) {
-        if (st && typeof st.percent === 'number') onProgreso(Math.round(st.percent));
+        if (st && typeof st.percent === 'number') onProgreso(Math.max(0, Math.min(100, Math.round(st.percent))));
       });
-      quitarLis = function () { try { (p.remove ? p : p.then(function (h) { return h; })).remove(); } catch (e) {} };
-      // addListener puede devolver promesa o handle según versión.
       if (p && p.then) p.then(function (h) { quitarLis = function () { try { h.remove(); } catch (e) {} }; });
+      else quitarLis = function () { try { p.remove(); } catch (e) {} };
     }
 
     var opts = { url: info.url, version: String(num(info.bundle)) };
@@ -144,22 +143,22 @@ window.OTA = (function () {
       .then(function (b) {
         if (quitarLis) quitarLis();
         if (!b || !b.id) throw new Error('descarga sin id');
-        if (onProgreso) onProgreso(null); // "aplicando…"
+        onProgreso('aplicando');
         guardar(K_APLICADO, num(info.bundle));
         borrar(K_POSPUESTO);
-        return CU.set({ id: b.id }); // recarga el WebView
+        return CU.set({ id: b.id }); // recarga el WebView con lo nuevo
       })
       .catch(function (e) {
         if (quitarLis) quitarLis();
         aplicando = false;
         borrar(K_APLICADO);
         if (window.console) console.warn('OTA: fallo al actualizar', e);
-        if (onProgreso) onProgreso('error');
+        onProgreso('error');
       });
   }
 
   /* --------------------------------------------------------
-     Tarjeta de aviso
+     Tarjeta de aviso (abajo, discreta)
      -------------------------------------------------------- */
 
   function mostrarBanner(info) {
@@ -180,7 +179,7 @@ window.OTA = (function () {
             '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>' +
         '</span>' +
         '<div class="ota-banner__txt">' +
-          '<p class="ota-banner__titulo">Hay novedades en ChorApp <span aria-hidden="true">🎶</span></p>' +
+          '<p class="ota-banner__titulo">Hay una versión nueva de ChorApp</p>' +
           '<p class="ota-banner__nota"></p>' +
         '</div>' +
         '<div class="ota-banner__acciones">' +
@@ -189,11 +188,8 @@ window.OTA = (function () {
         '</div>' +
       '</div>';
 
-    var elNota = capa.querySelector('.ota-banner__nota');
-    elNota.textContent = nota || 'Toca para ponerte al día. Tarda unos segundos.';
-
-    var btnOk = capa.querySelector('[data-ota-ok]');
-    var btnLuego = capa.querySelector('[data-ota-luego]');
+    capa.querySelector('.ota-banner__nota').textContent =
+      nota || 'Toca para ponerte al día. Tarda unos segundos.';
 
     function cerrar() {
       capa.classList.remove('is-visible');
@@ -206,24 +202,11 @@ window.OTA = (function () {
       }
     }
 
-    btnOk.addEventListener('click', function () {
-      btnLuego.disabled = true;
-      btnOk.disabled = true;
-      btnOk.textContent = 'Descargando…';
-      descargarYAplicar(info, function (pct) {
-        if (pct === 'error') {
-          btnOk.disabled = false;
-          btnLuego.disabled = false;
-          btnOk.textContent = 'Reintentar';
-          elNota.textContent = 'No se pudo descargar. Comprueba el wifi e inténtalo otra vez.';
-        } else if (pct === null) {
-          btnOk.textContent = 'Aplicando…';
-        } else {
-          btnOk.textContent = 'Descargando ' + pct + '%';
-        }
-      });
+    capa.querySelector('[data-ota-ok]').addEventListener('click', function () {
+      cerrar();
+      iniciarActualizacion(info, false);
     });
-    btnLuego.addEventListener('click', function () {
+    capa.querySelector('[data-ota-luego]').addEventListener('click', function () {
       guardar(K_POSPUESTO, num(info.bundle));
       cerrar();
     });
@@ -233,10 +216,143 @@ window.OTA = (function () {
     capa.classList.add('is-visible');
   }
 
-  /* ---------- Ayudas para probar desde la consola del WebView ---------- */
+  /* --------------------------------------------------------
+     Capa de actualización — pantalla completa, fondo difuminado,
+     anillo de progreso.
+     -------------------------------------------------------- */
+
+  var CIRC = 213.6; // 2·π·34 (r del anillo en el SVG de abajo)
+
+  function iniciarActualizacion(info, obligatoria) {
+    if (document.querySelector('.ota-actu')) return;
+
+    var capa = document.createElement('div');
+    capa.className = 'ota-actu';
+    capa.setAttribute('role', 'dialog');
+    capa.setAttribute('aria-modal', 'true');
+    capa.setAttribute('aria-label', 'Actualizando ChorApp');
+    capa.innerHTML =
+      '<div class="ota-actu__fondo"></div>' +
+      '<div class="ota-actu__caja">' +
+        '<div class="ota-actu__anillo" data-anillo>' +
+          '<svg viewBox="0 0 80 80" aria-hidden="true">' +
+            '<circle class="ota-actu__pista" cx="40" cy="40" r="34"/>' +
+            '<circle class="ota-actu__arco" cx="40" cy="40" r="34" data-arco ' +
+              'stroke-dasharray="' + CIRC + '" stroke-dashoffset="' + CIRC + '"/>' +
+          '</svg>' +
+          '<span class="ota-actu__pct" data-pct></span>' +
+        '</div>' +
+        '<p class="ota-actu__titulo" data-titulo>Actualizando ChorApp</p>' +
+        '<p class="ota-actu__sub" data-sub>Descargando la versión nueva…</p>' +
+        '<div class="ota-actu__acciones" data-acciones hidden>' +
+          '<button type="button" class="btn btn--primario" data-reintentar>Reintentar</button>' +
+          '<button type="button" class="ota-actu__cerrar" data-cerrar>Ahora no</button>' +
+        '</div>' +
+      '</div>';
+
+    var anillo = capa.querySelector('[data-anillo]');
+    var arco = capa.querySelector('[data-arco]');
+    var elPct = capa.querySelector('[data-pct]');
+    var elTitulo = capa.querySelector('[data-titulo]');
+    var elSub = capa.querySelector('[data-sub]');
+    var acciones = capa.querySelector('[data-acciones]');
+
+    function pintar(estado) {
+      if (estado === 'error') {
+        anillo.classList.remove('is-indet');
+        anillo.classList.add('is-error');
+        arco.setAttribute('stroke-dashoffset', 0);
+        elPct.textContent = '!';
+        elTitulo.textContent = 'No se pudo actualizar';
+        elSub.textContent = 'Revisa la conexión wifi e inténtalo otra vez.';
+        acciones.hidden = false;
+        return;
+      }
+      if (estado === 'aplicando') {
+        anillo.classList.add('is-indet');
+        elPct.textContent = '';
+        elTitulo.textContent = 'Casi está';
+        elSub.textContent = 'Aplicando la actualización…';
+        return;
+      }
+      // número 0-100
+      anillo.classList.remove('is-indet');
+      var pct = estado || 0;
+      arco.setAttribute('stroke-dashoffset', CIRC * (1 - pct / 100));
+      elPct.textContent = pct + '%';
+      elSub.textContent = 'Descargando la versión nueva…';
+    }
+
+    capa.querySelector('[data-reintentar]').addEventListener('click', function () {
+      acciones.hidden = true;
+      anillo.classList.remove('is-error');
+      pintar(0);
+      descargarYAplicar(info, pintar);
+    });
+    capa.querySelector('[data-cerrar]').addEventListener('click', function () {
+      if (!obligatoria) {
+        guardar(K_POSPUESTO, num(info.bundle));
+        cerrarActu(capa);
+      }
+    });
+    // Si es obligatoria, no se puede cerrar: ocultamos "Ahora no".
+    if (obligatoria) capa.querySelector('[data-cerrar]').hidden = true;
+
+    document.body.appendChild(capa);
+    document.body.classList.add('con-ota-actu');
+    void capa.offsetWidth;
+    capa.classList.add('is-visible');
+
+    pintar(0);
+    descargarYAplicar(info, pintar);
+  }
+
+  function cerrarActu(capa) {
+    aplicando = false;
+    document.body.classList.remove('con-ota-actu');
+    capa.classList.remove('is-visible');
+    var quita = function () { if (capa.parentNode) capa.parentNode.removeChild(capa); };
+    if (reduce) quita();
+    else {
+      capa.addEventListener('transitionend', quita, { once: true });
+      setTimeout(quita, 400);
+    }
+  }
+
+  /* ---------- Ayudas para probar (consola del WebView o navegador) ---------- */
   function simularBanner() {
+    bannerEnPantalla = false;
     mostrarBanner({ bundle: 9999, nombre: 'prueba', url: 'https://x/y.zip',
       nota: 'Ejemplo de aviso de actualización.' });
+  }
+  // Anima la capa de actualización sin descargar nada (solo para ver el diseño).
+  function simularActu() {
+    if (document.querySelector('.ota-actu')) return;
+    var real = plugin();
+    // Monkey-patch temporal: fingimos una descarga con progreso.
+    var falso = {
+      addListener: function (_e, cb) {
+        var pct = 0;
+        var t = setInterval(function () {
+          pct += 7; cb({ percent: pct });
+          if (pct >= 100) { clearInterval(t); }
+        }, 220);
+        return Promise.resolve({ remove: function () { clearInterval(t); } });
+      },
+      download: function () {
+        return new Promise(function (res) { setTimeout(function () { res({ id: 'x' }); }, 3600); });
+      },
+      set: function () { return new Promise(function () {}); } // no recarga en la demo
+    };
+    window.Capacitor = window.Capacitor || {};
+    window.Capacitor.Plugins = window.Capacitor.Plugins || {};
+    window.Capacitor.Plugins.CapacitorUpdater = falso;
+    aplicando = false;
+    iniciarActualizacion({ bundle: 9999, url: 'https://x/y.zip' }, false);
+    setTimeout(function () {
+      if (real) window.Capacitor.Plugins.CapacitorUpdater = real;
+      else delete window.Capacitor.Plugins.CapacitorUpdater;
+    }, 8000);
   }
   function estado() {
     return {
@@ -247,5 +363,8 @@ window.OTA = (function () {
     };
   }
 
-  return { iniciar: iniciar, comprobar: comprobar, simularBanner: simularBanner, estado: estado };
+  return {
+    iniciar: iniciar, comprobar: comprobar,
+    simularBanner: simularBanner, simularActu: simularActu, estado: estado
+  };
 })();

@@ -1143,6 +1143,18 @@ window.Pagina_practice = (function () {
   function cuerpoResumen(r) {
     var bloques = [];
 
+    if (r.sensacion) {
+      bloques.push(
+        '<section class="resumen__bloque resumen__sensa">' +
+          '<span class="resumen__sensa-emoji" aria-hidden="true">' + r.sensacion.emoji + '</span>' +
+          '<span class="resumen__sensa-txt">' +
+            '<span class="resumen__sensa-cab">Cómo te sentiste</span>' +
+            '<span class="resumen__sensa-etq">' + escapar(r.sensacion.etq) + '</span>' +
+          '</span>' +
+        '</section>'
+      );
+    }
+
     if (r.estudiado.length) {
       bloques.push(bloque('nota', 'Lo que estudiaste', r.estudiado.map(function (e) {
         var extra = e.veces > 1 ? ' · ' + e.veces + ' veces' : '';
@@ -1185,6 +1197,16 @@ window.Pagina_practice = (function () {
         r.grabaciones.length === 1 ? 'Te grabaste cantando' : 'Te grabaste cantando ' + r.grabaciones.length + ' veces',
         r.grabaciones.map(function (g) {
           return item(g.titulo + (g.dur ? ' · ' + fmtDur(g.dur) : ''));
+        })));
+    }
+
+    if (r.memoria && r.memoria.length) {
+      var ETQ_DIF_MM = { facil: 'fácil', medio: 'medio', dificil: 'difícil', extremo: 'todos' };
+      bloques.push(bloque('memoria',
+        r.memoria.length === 1 ? 'Probaste la letra de memoria' : 'Probaste la letra de memoria (' + r.memoria.length + ')',
+        r.memoria.map(function (m) {
+          var d = ETQ_DIF_MM[m.dif] ? ' · ' + ETQ_DIF_MM[m.dif] : '';
+          return item('«' + m.titulo + '» · ' + m.aciertos + ' de ' + m.total + ' versos' + d);
         })));
     }
 
@@ -1279,6 +1301,7 @@ window.Pagina_practice = (function () {
     constancia: '<path d="M4 13h3l2-6 3 15 3-19 2.5 13 1.5-3H20"/>',
     play: '<path d="M8 5.5a1 1 0 0 1 1.53-.85l9 6.5a1 1 0 0 1 0 1.7l-9 6.5A1 1 0 0 1 8 18.5z"/>',
     micro: '<rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21M8.5 21h7"/>',
+    memoria: '<path d="M12 3a7 7 0 0 0-4 12.7V19h8v-3.3A7 7 0 0 0 12 3Z"/><path d="M9 22h6"/>',
   };
   function iconoDato(clave) {
     var p = ICONOS_DATO[clave] || ICONOS_DATO.nota;

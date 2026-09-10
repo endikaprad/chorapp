@@ -1212,6 +1212,13 @@ window.Pagina_study = (function () {
 
     vacio.hidden = true;
     montarVistasLetra(vistas, disponibles, { modos: modos, pre: pre, doc: doc, ambasCaja: ambasCaja });
+    // Practicar de memoria: con que haya alguna vista de la letra en texto
+    // ya se puede jugar a taparse versos. Qué se practica se decide al pulsar,
+    // según la vista que Maite tenga elegida (Original / Cómo suena / Traducción).
+    if (accion && window.MemoLetra &&
+        (vistas.orig.texto || vistas.fon.texto || vistas.trad.texto)) {
+      montarBotonMemoria(accion);
+    }
     if (puedeFonetica && accion) montarBotonFonetica(accion);
     if (puedeTraducir && accion) montarBotonTraducir(accion);
   }
@@ -1300,6 +1307,48 @@ window.Pagina_study = (function () {
       } else {
         blob.text().then(function (t) { pre.textContent = t; pre.hidden = false; });
       }
+    });
+  }
+
+  // Botón "Practicar de memoria" (bajo el visor). Abre el juego de taparse
+  // versos al azar (window.MemoLetra). Se practica la MISMA vista de la letra
+  // que Maite tiene elegida en el conmutador: si está en "Cómo suena", memoriza
+  // la fonética; si está en "Original", la letra; etc. Se resuelve al pulsar,
+  // no al montar, porque el conmutador cambia sin repintar esta sección.
+  function montarBotonMemoria(accion) {
+    accion.hidden = false;
+    accion.insertAdjacentHTML('beforeend',
+      '<button type="button" class="visor-letra__traducir visor-letra__memoria" data-btn-memoria>' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a7 7 0 0 0-4 12.7V19h8v-3.3A7 7 0 0 0 12 3Z"/><path d="M9 22h6"/></svg>' +
+        '<span>Practicar de memoria</span>' +
+      '</button>');
+    accion.querySelector('[data-btn-memoria]').addEventListener('click', function () {
+      if (!cancion) return;
+      var CAMPO = { orig: 'letraTexto', fon: 'letraFonetica', trad: 'letraTraduccion' };
+      var activo = q('[data-letra-modos] button.is-activo');
+      var modo = activo ? activo.getAttribute('data-modo') : null;
+
+      var texto = '', fuente = 'orig';
+      if (modo && CAMPO[modo] && (cancion[CAMPO[modo]] || '').trim()) {
+        texto = cancion[CAMPO[modo]].trim();
+        fuente = modo;
+      } else {
+        // "Todo junto", o una vista que solo existe como PDF/imagen: caemos
+        // a la fonética (lo que se canta) y, si no, a la letra original.
+        if ((cancion.letraFonetica || '').trim()) { texto = cancion.letraFonetica.trim(); fuente = 'fon'; }
+        else if ((cancion.letraTexto || '').trim()) { texto = cancion.letraTexto.trim(); fuente = 'orig'; }
+        else if ((cancion.letraTraduccion || '').trim()) { texto = cancion.letraTraduccion.trim(); fuente = 'trad'; }
+      }
+      if (!texto) return;
+
+      window.MemoLetra.abrir({
+        titulo: marca.titulo,
+        texto: texto,
+        cancionId: cancion.id,
+        sesionId: sesion ? sesion.id : null,
+        marcaId: marca ? marca.id : null,
+        fuente: fuente,
+      });
     });
   }
 

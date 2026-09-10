@@ -14,7 +14,7 @@
   //   titulo  : texto de la cabecera
   //   raiz    : true si es una pestaña del bottom nav (sin botón atrás)
   var PANTALLAS = {
-    inicio:      { archivo: 'home',       titulo: 'Kaixo, Ama <span class="emoji" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>', raiz: true },
+    inicio:      { archivo: 'home',       titulo: 'Kaixo, Ama <span class="marca-logo" aria-hidden="true"><svg viewBox="0 0 512 512" fill="none"><g class="marca-logo__trazo" stroke="currentColor" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"><path class="marca-logo__p" d="M256 168C232 112 178 92 138 118C92 148 88 214 128 262L256 398L300 354"/><path class="marca-logo__p" d="M256 168C280 112 334 92 374 118C420 148 424 214 384 262L330 316"/><path class="marca-logo__p marca-logo__p--rizo" d="M300 354C344 330 356 388 322 408C292 426 262 402 274 366C282 344 312 340 322 362"/></g><circle class="marca-logo__punto" cx="410" cy="150" r="21" fill="currentColor"/><circle class="marca-logo__punto marca-logo__punto--2" cx="410" cy="206" r="21" fill="currentColor"/></svg></span>', raiz: true },
     sesiones:    { archivo: 'sessions',   titulo: 'Sesiones',    raiz: true },
     practica:    { archivo: 'practice',   titulo: 'Práctica',    raiz: true },
     grabaciones: { archivo: 'recordings', titulo: 'Grabaciones', raiz: true },

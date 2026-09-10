@@ -137,10 +137,21 @@ window.ResumenMes = (function () {
       }
     }
 
+    // Diario de sensaciones del rango (un emoji por día).
+    var sensaciones = null;
+    try {
+      if (window.Sensaciones && window.Sensaciones.entre) {
+        var iniISO = _iso(new Date(anio, mesIni, 1));
+        var finISO = _iso(new Date(anio, mesFin + 1, 0));
+        sensaciones = window.Sensaciones.resumen(window.Sensaciones.entre(iniISO, finISO));
+      }
+    } catch (e) {}
+
     return {
       diasSet: diasSet, porCancion: porCancion, titulos: titulos,
       diasPorMes: diasPorMes, porDiaSemana: porDiaSemana, reproPorTitulo: reproPorTitulo,
       escuchas: escuchas, trozos: trozos, aprendidas: aprendidas,
+      sensaciones: sensaciones,
     };
   }
 
@@ -222,6 +233,7 @@ window.ResumenMes = (function () {
 
     var topEstudiadas = _topEstudiadas(e, 2, 3);
     var topEscuchadas = _topEscuchadas(e, 3, 3);
+    var topJuego = _topEstudiadas(e, 2, 4);   // lista más laxa para los mini-juegos
     var diaSemana = _diaFavorito(e.porDiaSemana, 6);
 
     // Grabaciones y logros del mes (por su timestamp de creación).
@@ -247,14 +259,17 @@ window.ResumenMes = (function () {
       cancionTop: cancionTop,
       topEstudiadas: topEstudiadas,
       topEscuchadas: topEscuchadas,
+      topJuego: topJuego,
       diaSemana: diaSemana,
       aprendidas: aprendidas,
       trozos: trozos,
       escuchas: escuchas,
       grabaciones: { n: grabN, seg: Math.round(grabSeg) },
       logros: logros,
+      sensaciones: e.sensaciones,
     };
-    datos.hayAlgo = nDias > 0 || grabN > 0 || aprendidas.length > 0 || logros.length > 0;
+    datos.hayAlgo = nDias > 0 || grabN > 0 || aprendidas.length > 0 || logros.length > 0 ||
+      (e.sensaciones && e.sensaciones.n > 0);
     datos.frase = frase(datos);
     return datos;
   }
@@ -285,6 +300,7 @@ window.ResumenMes = (function () {
 
     var topEstudiadas = _topEstudiadas(e, 3, 5);   // el anual enseña top 5
     var topEscuchadas = _topEscuchadas(e, 5, 5);
+    var topJuego = _topEstudiadas(e, 2, 4);   // lista más laxa para los mini-juegos
     var diaSemana = _diaFavorito(e.porDiaSemana, 20);
 
     var grab = _grabacionesEntre(iniTs, finTs);
@@ -323,6 +339,7 @@ window.ResumenMes = (function () {
       cancionTop: cancionTop,
       topEstudiadas: topEstudiadas,
       topEscuchadas: topEscuchadas,
+      topJuego: topJuego,
       diaSemana: diaSemana,
       aprendidas: e.aprendidas,
       trozos: e.trozos,
@@ -332,9 +349,10 @@ window.ResumenMes = (function () {
       mesTop: mesTop,
       conciertos: conciertos,
       recuerdos: recuerdos,
+      sensaciones: e.sensaciones,
     };
     datos.hayAlgo = nDias > 0 || grab.n > 0 || e.aprendidas.length > 0 ||
-      logros.length > 0 || recuerdos.length > 0;
+      logros.length > 0 || recuerdos.length > 0 || (e.sensaciones && e.sensaciones.n > 0);
     datos.frase = fraseAnual(datos);
     return datos;
   }

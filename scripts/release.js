@@ -43,22 +43,36 @@ const mCode = gradle.match(/versionCode\s+(\d+)/);
 const mName = gradle.match(/versionName\s+"([^"]+)"/);
 if (!mCode || !mName) abortar('No encuentro versionCode / versionName en app/build.gradle.');
 
-const nuevoCode = Number(mCode[1]) + 1;
-let nuevoName = mName[1];
+// El nombre visible y el nº de bundle OTA viven en src/data/version.json
+// (única fuente de verdad). Aquí los subimos y los reflejamos en Gradle.
+const verPath = resolve(raiz, 'src/data/version.json');
+const ver = existsSync(verPath)
+  ? JSON.parse(readFileSync(verPath, 'utf8'))
+  : { bundle: Number(mCode[1]) || 0, nombre: mName[1] };
+
+// Cada APK es también una base de bundle nueva: sube el contador OTA, así
+// dos APK seguidos (sin OTA en medio) nunca chocan en versionCode.
+const nuevoBundle = Number(ver.bundle || 0) + 1;
+
+let nuevoName = ver.nombre || mName[1];
 if (nombrePedido) {
   nuevoName = nombrePedido;
 } else if (!soloCode) {
-  // Sube el último número que ya tiene (1.3 -> 1.4 ; 1.3.1 -> 1.3.2).
-  const p = nuevoName.split('.').map(Number);
-  p[p.length - 1] += 1;
-  nuevoName = p.join('.');
+  // Sube el 2.º número y limpia el parche de OTA: 1.18 -> 1.19 ; 1.18.4 -> 1.19.
+  const p = String(nuevoName).split('.').map((n) => parseInt(n, 10) || 0);
+  while (p.length < 2) p.push(0);
+  p[1] += 1;
+  nuevoName = p.slice(0, 2).join('.');
 }
 
+writeFileSync(verPath, JSON.stringify({ bundle: nuevoBundle, nombre: nuevoName }, null, 2) + '\n');
+
+const nuevoCode = nuevoBundle; // versionCode Android = contador de bundle OTA
 gradle = gradle
   .replace(/versionCode\s+\d+/, 'versionCode ' + nuevoCode)
   .replace(/versionName\s+"[^"]+"/, 'versionName "' + nuevoName + '"');
 writeFileSync(gradleBuild, gradle);
-console.log(`\n▶ Versión  ${mName[1]} (code ${mCode[1]})  →  ${nuevoName} (code ${nuevoCode})\n`);
+console.log(`\n▶ Versión  ${ver.nombre || mName[1]} (bundle ${ver.bundle || 0})  →  ${nuevoName} (bundle/code ${nuevoCode})\n`);
 
 /* ---------- 2. Entorno de compilación ---------- */
 

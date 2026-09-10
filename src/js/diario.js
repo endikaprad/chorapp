@@ -21,6 +21,7 @@
      'fragmento'    marcar un trozo difícil
      'grabacion'    guardar una grabación cantando     (extra: { dur })
      'sesion'       abrir una sesión del coro          (extra: { fecha })
+     'memoria'      test de memoria de la letra        (extra: { aciertos, total })
 
    Cada evento lleva los ids que apliquen (cancionId, sesionId,
    marcaId) y un `titulo` legible.
@@ -120,6 +121,7 @@ window.Diario = (function () {
     var fragmentos = 0;
     var fragPorTitulo = {};  // titulo -> n
     var grabaciones = [];    // [{ titulo, dur }]
+    var memoria = {};        // clave -> { titulo, aciertos, total, veces }
     var sesiones = {};       // sesionId -> { titulo, fecha, veces }
     var primera = null, ultima = null;
 
@@ -155,6 +157,19 @@ window.Diario = (function () {
         fragPorTitulo[tit] = (fragPorTitulo[tit] || 0) + 1;
       } else if (ev.t === 'grabacion') {
         grabaciones.push({ titulo: tit, dur: (ev.extra && ev.extra.dur) || 0 });
+      } else if (ev.t === 'memoria') {
+        var km = ev.cancionId || ev.marcaId || tit;
+        var ac = (ev.extra && +ev.extra.aciertos) || 0;
+        var to = (ev.extra && +ev.extra.total) || 0;
+        var di = (ev.extra && ev.extra.dificultad) || null;
+        // Nos quedamos con el mejor intento del día por canción.
+        if (!memoria[km] || ac > memoria[km].aciertos) {
+          memoria[km] = {
+            titulo: tit, aciertos: ac, total: to, dif: di,
+            veces: (memoria[km] ? memoria[km].veces : 0),
+          };
+        }
+        memoria[km].veces++;
       } else if (ev.t === 'sesion') {
         var ks = ev.sesionId || tit;
         if (!sesiones[ks]) {
@@ -182,17 +197,31 @@ window.Diario = (function () {
     var reproducciones = Object.keys(repro).map(function (k) { return repro[k]; })
       .sort(function (a, b) { return b.veces - a.veces; });
     var sesionesAbiertas = Object.keys(sesiones).map(function (k) { return sesiones[k]; });
+    var memoriaLista = Object.keys(memoria).map(function (k) { return memoria[k]; });
     var fragmentosLista = Object.keys(fragPorTitulo).map(function (t) {
       return { titulo: t, n: fragPorTitulo[t] };
     });
 
     var hay = !!(estudiado.length || reproducciones.length || aprendidas.length ||
                  otrosEstados.length || fragmentos || grabaciones.length ||
-                 sesionesAbiertas.length);
+                 sesionesAbiertas.length || memoriaLista.length);
+
+    var sensacion = null;
+    try {
+      if (window.Sensaciones && window.Sensaciones.delDia) {
+        var se = window.Sensaciones.delDia(iso);
+        if (se) {
+          var so = window.Sensaciones.opcion(se.emo);
+          if (so) sensacion = { id: so.id, emoji: so.emoji, etq: so.etq };
+        }
+      }
+    } catch (e) {}
+    if (sensacion) hay = true;
 
     return {
       iso: iso,
       hayAlgo: hay,
+      sensacion: sensacion,
       estudiado: estudiado,
       reproducciones: reproducciones,
       aprendidas: aprendidas,
@@ -200,6 +229,7 @@ window.Diario = (function () {
       fragmentos: fragmentos,
       fragmentosLista: fragmentosLista,
       grabaciones: grabaciones,
+      memoria: memoriaLista,
       sesionesAbiertas: sesionesAbiertas,
       primera: primera,
       ultima: ultima,

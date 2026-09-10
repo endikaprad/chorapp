@@ -90,9 +90,21 @@ const ver = existsSync(verPath)
   ? JSON.parse(readFileSync(verPath, 'utf8'))
   : { bundle: 0, nombre: '0' };
 const nuevoBundle = Number(ver.bundle || 0) + 1;
-const nuevoNombre = nombrePedido || ver.nombre || String(nuevoBundle);
+
+// Nombre visible: una OTA es un "parche" sobre la versión del APK.
+//   1.18    -> 1.18.1      (añade el 3.er número)
+//   1.18.3  -> 1.18.4      (sube el 3.er número)
+// `npm run release` sube el 2.º número (1.18 -> 1.19) y deja la app en un
+// nombre limpio para la siguiente tanda de OTAs.
+function siguienteParche(nombre) {
+  const p = String(nombre || '1.0').split('.').map((n) => parseInt(n, 10) || 0);
+  while (p.length < 3) p.push(0);
+  p[2] += 1;
+  return p.slice(0, 3).join('.');
+}
+const nuevoNombre = nombrePedido || siguienteParche(ver.nombre);
 writeFileSync(verPath, JSON.stringify({ bundle: nuevoBundle, nombre: nuevoNombre }, null, 2) + '\n');
-console.log(`\n▶ Bundle  ${ver.bundle || 0}  →  ${nuevoBundle}   (nombre ${nuevoNombre})`);
+console.log(`\n▶ Versión  ${ver.nombre || '?'}  →  ${nuevoNombre}   (bundle ${ver.bundle || 0} → ${nuevoBundle})`);
 
 console.log('\n▶ npm run build\n');
 run('npm', ['run', 'build']);

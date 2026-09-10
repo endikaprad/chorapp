@@ -1,9 +1,11 @@
 /* ============================================================
    fonetica.js — Ayuda de IA para las letras.
-   window.IA.fonetica(texto, { idioma }) -> Promise<string>   (cómo suena)
-   window.IA.traducir(texto, { idioma }) -> Promise<string>   (traducción)
+   window.IA.fonetica(texto, { idioma })  -> Promise<string>   (cómo suena)
+   window.IA.traducir(texto, { idioma })  -> Promise<string>   (traducción)
+   window.IA.comentario(texto)            -> Promise<string>   (comentario de "la profe" tras el test de memoria)
 
-   Se usa desde el modo estudio (botón "Generar cómo se pronuncia").
+   Se usa desde el modo estudio (botón "Generar cómo se pronuncia" y
+   el test de memoria de la letra).
 
    Todo el trabajo lo hace el Cloudflare Worker (ruta POST /ia): la clave
    de Gemini vive allí, nunca en el APK. La app solo manda
@@ -35,7 +37,7 @@ window.IA = (function () {
       .catch(function () { cfgIA = { url: '', token: '' }; return cfgIA; });
   }
 
-  // tarea: 'fonetica' | 'traduccion'
+  // tarea: 'fonetica' | 'traduccion' | 'comentario'
   function pedir(tarea, texto, idioma) {
     texto = String(texto == null ? '' : texto).replace(/\r\n?/g, '\n').trim();
     if (!texto) return Promise.reject(new Error('vacío'));
@@ -75,5 +77,6 @@ window.IA = (function () {
   return {
     fonetica: function (texto, opts) { return pedir('fonetica', texto, (opts || {}).idioma); },
     traducir: function (texto, opts) { return pedir('traduccion', texto, (opts || {}).idioma); },
+    comentario: function (texto) { return pedir('comentario', texto, ''); },
   };
 })();
