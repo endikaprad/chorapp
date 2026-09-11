@@ -508,23 +508,20 @@ button {
 }
 .subsaludo strong { color: var(--color-texto); font-weight: 600; }
 
-/* Frase del día — mensaje cálido bajo el saludo de Inicio */
+/* Frase del día — mensaje cálido bajo el saludo de Inicio; texto, no tarjeta */
 .frase-dia {
-  margin: -8px 0 22px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: var(--color-superficie);
-  border: 1px solid var(--color-borde);
-  color: var(--color-texto);
-  font-size: 1.02rem;
+  margin: -10px 0 20px;
+  padding: 0;
+  color: var(--color-texto-2);
+  font-size: 0.96rem;
+  font-style: italic;
   line-height: 1.45;
   animation: frase-dia-in 420ms var(--curva) both;
 }
 .frase-dia--especial {
-  border-color: color-mix(in srgb, var(--color-acento) 45%, var(--color-borde));
-  background: var(--color-acento-suave);
-  color: var(--color-acento-oscuro);
+  color: var(--color-acento);
   font-weight: 600;
+  font-style: normal;
 }
 @keyframes frase-dia-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -539,14 +536,14 @@ button {
 .cuenta-concierto {
   display: flex;
   align-items: center;
-  gap: 13px;
+  gap: 11px;
   width: 100%;
   text-align: left;
-  margin: -8px 0 22px;
-  padding: 14px 15px;
-  border-radius: 14px;
-  background: var(--color-concierto-suave);
-  border: 1px solid color-mix(in srgb, var(--color-concierto) 40%, var(--color-borde));
+  margin: -8px 0 20px;
+  padding: 10px 13px;
+  border-radius: 12px;
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--color-concierto) 45%, var(--color-borde));
   color: var(--color-texto);
   transition: transform var(--dur-micro) var(--curva);
   animation: frase-dia-in 420ms var(--curva) both;
@@ -557,9 +554,9 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   background: var(--color-concierto);
   color: #fff;
 }
@@ -874,12 +871,38 @@ button {
   background: linear-gradient(90deg, var(--color-acento), var(--color-acento-oscuro));
   transition: width 600ms var(--curva);
 }
-.logros__grid {
+.logros__grid { display: flex; flex-direction: column; gap: 20px; }
+.logros__grupo { display: flex; flex-direction: column; gap: 12px; }
+.logros__grupo-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--fuente-titulo);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-texto-2);
+}
+.logros__grupo-titulo::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--dif-bronce);
+}
+.logros__grupo-titulo--bronce { color: var(--dif-bronce-oscuro); }
+.logros__grupo-titulo--plata { color: var(--dif-plata-oscuro); }
+.logros__grupo-titulo--plata::before { background: var(--dif-plata); }
+.logros__grupo-titulo--oro { color: var(--dif-oro-oscuro); }
+.logros__grupo-titulo--oro::before { background: var(--dif-oro); }
+.logros__grupo-titulo--platino { color: var(--dif-platino-oscuro); }
+.logros__grupo-titulo--platino::before { background: var(--dif-platino); }
+.logros__grupo-cuenta { font-family: var(--fuente-cuerpo); font-size: 12px; font-weight: 600; color: var(--color-texto-2); opacity: 0.75; }
+.logros__subgrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px 8px;
 }
-@media (max-width: 360px) { .logros__grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 360px) { .logros__subgrid { grid-template-columns: repeat(3, 1fr); } }
 .logro {
   display: flex;
   flex-direction: column;
@@ -947,6 +970,44 @@ button {
   background-repeat: no-repeat;
   background-position: center;
 }
+
+/* Dificultad — bronce/plata son sobrios, oro/platino se notan más
+   especiales: color propio, más brillo y (en platino) un anillo que gira
+   despacio para que destaque aun en reposo entre los demás. */
+:root {
+  --dif-bronce: #A9713F;
+  --dif-bronce-oscuro: #7C5029;
+  --dif-plata: var(--color-acento);
+  --dif-plata-oscuro: var(--color-acento-oscuro);
+  --dif-oro: #C99A2E;
+  --dif-oro-oscuro: #93690F;
+  --dif-platino: #6C3FD6;
+  --dif-platino-oscuro: #1512D6;
+}
+.logro--hecho.logro--bronce .logro__medalla {
+  background: linear-gradient(150deg, var(--dif-bronce), var(--dif-bronce-oscuro));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--dif-bronce) 32%, transparent);
+}
+.logro--hecho.logro--oro .logro__medalla {
+  background: linear-gradient(150deg, var(--dif-oro), var(--dif-oro-oscuro));
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--dif-oro) 40%, transparent);
+}
+.logro--hecho.logro--oro .logro__titulo { color: var(--dif-oro-oscuro); }
+.logro--hecho.logro--platino .logro__medalla {
+  background: linear-gradient(150deg, var(--dif-platino), var(--dif-platino-oscuro));
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--dif-platino) 46%, transparent);
+}
+.logro--hecho.logro--platino .logro__titulo { color: var(--dif-platino-oscuro); font-weight: 700; }
+.logro--hecho.logro--platino .logro__medalla::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0%, rgba(255, 255, 255, 0.9) 10%, transparent 26%, transparent 100%);
+  animation: logro-anillo-lento 3200ms linear infinite;
+}
+@keyframes logro-anillo-lento { to { transform: rotate(360deg); } }
+
 .logros__grid .logro { animation: entra-item 260ms var(--curva) both; }
 .logro--nuevo .logro__medalla { animation: cal-sello 420ms var(--curva) both; }
 
@@ -970,12 +1031,25 @@ button {
   .logros__grid .logro,
   .logro--nuevo .logro__medalla,
   .logro--destacado,
-  .logro--destacado .logro__medalla { animation: none; }
+  .logro--destacado .logro__medalla,
+  .logro--hecho.logro--platino .logro__medalla::before { animation: none; }
   .logros__barra i { transition: none; }
 }
 
 /* Hoja con el detalle de un logro */
 .hoja--logro .hoja__panel { text-align: center; }
+.logro-det__dif {
+  display: inline-block;
+  margin: 0 auto 2px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dif-bronce-oscuro);
+}
+.logro-det__dif--plata { color: var(--dif-plata-oscuro); }
+.logro-det__dif--oro { color: var(--dif-oro-oscuro); }
+.logro-det__dif--platino { color: var(--dif-platino-oscuro); }
 .logro-det__medalla {
   width: 84px;
   height: 84px;
@@ -988,6 +1062,18 @@ button {
   box-shadow: 0 6px 18px color-mix(in srgb, var(--color-acento) 30%, transparent);
 }
 .logro-det__medalla svg { width: 38px; height: 38px; color: #fff; }
+.logro-det__medalla--bronce {
+  background: linear-gradient(150deg, var(--dif-bronce), var(--dif-bronce-oscuro));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--dif-bronce) 30%, transparent);
+}
+.logro-det__medalla--oro {
+  background: linear-gradient(150deg, var(--dif-oro), var(--dif-oro-oscuro));
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--dif-oro) 38%, transparent);
+}
+.logro-det__medalla--platino {
+  background: linear-gradient(150deg, var(--dif-platino), var(--dif-platino-oscuro));
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--dif-platino) 42%, transparent);
+}
 .logro-det__medalla--bloq {
   background: var(--color-borde);
   box-shadow: none;
@@ -1077,6 +1163,64 @@ button {
 .logro-toast.is-saliendo {
   animation: logro-toast-out 520ms cubic-bezier(0.4, 0, 0.2, 1) both;
   pointer-events: none;
+}
+
+/* Variantes por dificultad: bronce discreto, oro más cálido y brillante,
+   platino con borde y resplandor propios para que destaque de verdad. */
+.logro-toast--bronce {
+  border-color: color-mix(in srgb, var(--dif-bronce) 40%, var(--color-borde));
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--dif-bronce) 14%, var(--color-superficie)) 0%, var(--color-superficie) 60%);
+}
+.logro-toast--oro {
+  border-color: color-mix(in srgb, var(--dif-oro) 45%, var(--color-borde));
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--dif-oro) 20%, var(--color-superficie)) 0%, var(--color-superficie) 60%);
+  box-shadow:
+    0 14px 34px rgba(7, 7, 7, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 12px 28px -8px color-mix(in srgb, var(--dif-oro) 55%, transparent);
+}
+.logro-toast--platino {
+  border-color: color-mix(in srgb, var(--dif-platino) 50%, var(--color-borde));
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--dif-platino) 22%, var(--color-superficie)) 0%, var(--color-superficie) 60%);
+  box-shadow:
+    0 16px 38px rgba(7, 7, 7, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 14px 32px -6px color-mix(in srgb, var(--dif-platino) 60%, transparent);
+}
+.logro-toast--bronce .logro-toast__medalla {
+  background: linear-gradient(150deg, var(--dif-bronce), var(--dif-bronce-oscuro));
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--dif-bronce) 45%, transparent);
+}
+.logro-toast--oro .logro-toast__medalla {
+  background: linear-gradient(150deg, var(--dif-oro), var(--dif-oro-oscuro));
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--dif-oro) 55%, transparent);
+}
+.logro-toast--platino .logro-toast__medalla {
+  background: linear-gradient(150deg, var(--dif-platino), var(--dif-platino-oscuro));
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--dif-platino) 60%, transparent);
+}
+.logro-toast--bronce .logro-toast__eyebrow { color: var(--dif-bronce-oscuro); }
+.logro-toast--oro .logro-toast__eyebrow { color: var(--dif-oro-oscuro); }
+.logro-toast--platino .logro-toast__eyebrow { color: var(--dif-platino-oscuro); }
+.logro-toast--bronce .logro-toast__glow { background: radial-gradient(circle, color-mix(in srgb, var(--dif-bronce) 55%, transparent) 0%, transparent 70%); }
+.logro-toast--oro .logro-toast__glow { background: radial-gradient(circle, color-mix(in srgb, var(--dif-oro) 60%, transparent) 0%, transparent 70%); }
+.logro-toast--platino .logro-toast__glow { background: radial-gradient(circle, color-mix(in srgb, var(--dif-platino) 65%, transparent) 0%, transparent 70%); }
+.logro-toast--bronce .logro-toast__tiempo,
+.logro-toast--bronce .logro-toast__medalla::after { background: linear-gradient(90deg, var(--dif-bronce), var(--dif-bronce-oscuro)); }
+.logro-toast--oro .logro-toast__tiempo,
+.logro-toast--oro .logro-toast__medalla::after { background: linear-gradient(90deg, var(--dif-oro), var(--dif-oro-oscuro)); }
+.logro-toast--platino .logro-toast__tiempo,
+.logro-toast--platino .logro-toast__medalla::after { background: linear-gradient(90deg, var(--dif-platino), var(--dif-platino-oscuro)); }
+/* Platino: además del anillo giratorio de siempre, un pulso extra alrededor
+   de toda la tarjeta al aparecer — es EL logro más difícil, debe notarse. */
+.logro-toast--platino.is-visible { animation: logro-toast-in 560ms cubic-bezier(0.22, 1.2, 0.36, 1) both, logro-toast-pulso-platino 1400ms var(--curva) 480ms both; }
+@keyframes logro-toast-pulso-platino {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--dif-platino) 55%, transparent); }
+  60%  { box-shadow: 0 0 0 14px color-mix(in srgb, var(--dif-platino) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logro-toast--platino.is-visible { animation: none; }
 }
 
 /* Resplandor tras la medalla */
@@ -1224,25 +1368,26 @@ button {
 
 /* Estado de hoy (Inicio) — recordatorio cálido, no dashboard */
 .hoy {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  margin: 4px 0 18px;
-  padding: 14px 16px;
-  background: var(--color-superficie);
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio);
-  font-size: 15px;
-  color: var(--color-texto);
+  gap: 7px;
+  width: fit-content;
+  margin: 0 0 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-texto-2);
 }
 .hoy__punto {
-  width: 10px;
-  height: 10px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--color-acento);
   flex-shrink: 0;
 }
-.hoy--hecho { border-color: color-mix(in srgb, var(--estado-aprendida) 40%, var(--color-borde)); }
+.hoy--hecho { color: var(--estado-aprendida); }
 .hoy--hecho .hoy__punto { background: var(--estado-aprendida); }
 .hoy--pendiente .hoy__punto { animation: cal-late 2.4s var(--curva) infinite; }
 
@@ -4395,6 +4540,22 @@ body.sin-scroll { overflow: hidden; }
 }
 .cal__dia--abrible.cal__dia--concierto::after { display: none; }
 
+/* Días de la semana con ensayo fijo: un borde ámbar fino (distinto del
+   cobalto que ya usa "hoy", para no confundir los dos anillos). El
+   anillo de "hoy" tiene más especificidad y gana cuando coinciden. */
+.cal__dia--ensayo {
+  box-shadow: inset 0 0 0 1.5px var(--estado-progreso);
+}
+.cal__dia--ensayo.cal__dia--concierto {
+  box-shadow: inset 0 0 0 1.5px #fff;
+}
+
+/* Días en pausa (vacaciones, sin coro…): sin borde de ensayo y algo
+   apagados, para que se note que esa semana no cuenta. */
+.cal__dia--pausa:not(.cal__dia--hecho):not(.cal__dia--concierto) {
+  opacity: 0.55;
+}
+
 /* Botón "Añadir día de concierto" bajo el calendario */
 .btn-concierto {
   display: flex;
@@ -4535,6 +4696,493 @@ body.sin-scroll { overflow: hidden; }
 /* El "Resumen del mes" es ahora el Wrapped a pantalla completa
    (js/wrapped.js). Sus estilos están al final de este archivo
    (bloque "Wrapped"). El botón .btn-mes de Práctica se conserva arriba. */
+
+/* Tarjeta "Resumen disponible" — el aviso de que el Wrapped del mes (o el
+   anual) sigue a mano, en Inicio y en Práctica. Aparece pocos días, así
+   que se trata distinto de cualquier otro botón: gradiente cobalto propio,
+   un brillo que la recorre una vez al aparecer y chispas sutiles alrededor
+   del icono, para que destaque como algo especial y no como un botón más. */
+.tarjeta-resumen {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 128px;
+  margin-top: 20px;
+  padding: 22px 20px;
+  overflow: hidden;
+  text-align: left;
+  color: #fff;
+  background: linear-gradient(155deg, var(--color-acento-oscuro) 0%, #0a0836 100%);
+  border: none;
+  border-radius: 22px;
+  box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--color-acento) 65%, transparent);
+  animation: tr-entra 480ms var(--curva) both;
+  transition: transform var(--dur-micro) var(--curva), box-shadow var(--dur-micro) var(--curva);
+}
+.tarjeta-resumen:active {
+  transform: scale(0.97);
+  box-shadow: 0 4px 14px -6px color-mix(in srgb, var(--color-acento) 60%, transparent);
+}
+@keyframes tr-entra {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Fondo vivo: dos manchas cobalto que vagan muy despacio dentro de la
+   tarjeta (mismo lenguaje que el fondo de la app y del Wrapped a pantalla
+   completa), en vez de un gradiente estático. Solo `transform`, nunca se
+   re-rasteriza. */
+.tarjeta-resumen__fondo { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.tarjeta-resumen__mancha {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, #fff 55%, var(--color-acento)) 0%,
+    color-mix(in srgb, var(--color-acento) 70%, transparent) 45%,
+    transparent 72%);
+  opacity: 0.55;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.tarjeta-resumen__mancha:nth-child(1) {
+  width: 150px; height: 150px; top: -50px; left: -34px;
+  animation-name: tr-mancha-1; animation-duration: 13s;
+}
+.tarjeta-resumen__mancha:nth-child(2) {
+  width: 130px; height: 130px; bottom: -56px; right: 8%;
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, #fff 40%, var(--color-acento-oscuro)) 0%,
+    color-mix(in srgb, var(--color-acento-oscuro) 65%, transparent) 45%,
+    transparent 72%);
+  animation-name: tr-mancha-2; animation-duration: 16s;
+}
+@keyframes tr-mancha-1 {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(26px, 14px, 0) scale(1.25); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes tr-mancha-2 {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(-20px, -10px, 0) scale(1.2); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+/* Barrido de brillo diagonal, una vez, al aparecer la tarjeta. */
+.tarjeta-resumen__brillo {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 30%,
+    color-mix(in srgb, #fff 35%, transparent) 48%, transparent 66%);
+  transform: translateX(-120%);
+  animation: tr-brillo 1.6s 550ms var(--curva) both;
+  pointer-events: none;
+}
+@keyframes tr-brillo { to { transform: translateX(120%); } }
+
+.tarjeta-resumen__ico {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: color-mix(in srgb, #fff 20%, transparent);
+  color: #fff;
+}
+.tarjeta-resumen__ico svg { width: 28px; height: 28px; }
+/* Chispas: tres puntitos que parpadean alrededor del icono, como si el
+   resumen "brillase". Sutil: nada de confeti agresivo. */
+.tarjeta-resumen__chispas { position: absolute; inset: 0; pointer-events: none; }
+.tarjeta-resumen__chispas i {
+  position: absolute;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0;
+  animation: tr-chispa 2.6s ease-in-out infinite;
+}
+.tarjeta-resumen__chispas i:nth-child(1) { top: 16px; left: 58px; animation-delay: .2s; }
+.tarjeta-resumen__chispas i:nth-child(2) { top: 54px; left: 74px; animation-delay: 1.1s; }
+.tarjeta-resumen__chispas i:nth-child(3) { top: 28px; left: 84px; animation-delay: 1.9s; }
+@keyframes tr-chispa {
+  0%, 100% { opacity: 0; transform: scale(0.4); }
+  50%      { opacity: .9; transform: scale(1); }
+}
+
+/* Icono decorativo grande y muy tenue en la esquina — sol, copo de nieve,
+   estrella, flor, hoja… cambia según el tema del mes (ver más abajo). Solo
+   se ve el icono que corresponda al modificador --enero/--febrero/etc. */
+.tarjeta-resumen__decor {
+  position: absolute;
+  top: -20px; right: -16px;
+  width: 108px; height: 108px;
+  color: #fff;
+  pointer-events: none;
+}
+.tarjeta-resumen__decor svg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  display: none;
+  opacity: 0.24;   /* icono de trazos (sol/copo): sutil de por sí */
+}
+
+/* Partículas del tema: 6 puntitos reutilizables cuya posición horizontal
+   se fija aquí y cuya forma/color/animación pone cada tema (nieve, hojas,
+   pétalos, burbujas…). Ocultas por defecto (solo el mes activo las pinta). */
+.tarjeta-resumen__particulas { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.tarjeta-resumen__particulas i { position: absolute; top: -12%; opacity: 0; display: none; }
+.tarjeta-resumen__particulas i:nth-child(1) { left: 8%;  animation-delay: 0s; }
+.tarjeta-resumen__particulas i:nth-child(2) { left: 22%; animation-delay: 1.1s; }
+.tarjeta-resumen__particulas i:nth-child(3) { left: 40%; animation-delay: 2.3s; }
+.tarjeta-resumen__particulas i:nth-child(4) { left: 58%; animation-delay: .6s; }
+.tarjeta-resumen__particulas i:nth-child(5) { left: 76%; animation-delay: 1.8s; }
+.tarjeta-resumen__particulas i:nth-child(6) { left: 91%; animation-delay: 2.9s; }
+
+.tarjeta-resumen__cuerpo { position: relative; flex: 1 1 auto; min-width: 0; }
+.tarjeta-resumen__eyebrow {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, #fff 78%, transparent);
+}
+.tarjeta-resumen__titulo {
+  display: block;
+  margin-top: 4px;
+  font-size: 1.28rem;
+  line-height: 1.22;
+  font-weight: 700;
+  color: #fff;
+}
+.tarjeta-resumen__pie {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: color-mix(in srgb, #fff 70%, transparent);
+}
+.tarjeta-resumen__flecha {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: color-mix(in srgb, #fff 14%, transparent);
+  color: #fff;
+}
+.tarjeta-resumen__flecha svg { width: 19px; height: 19px; display: block; }
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta-resumen { animation: frase-dia-fade 120ms linear both; }
+  .tarjeta-resumen:active { transform: none; }
+  .tarjeta-resumen__brillo, .tarjeta-resumen__chispas i, .tarjeta-resumen__mancha { animation: none; display: none; }
+}
+
+/* Variante ANUAL de la tarjeta-resumen: negro y dorado, única en la app —
+   el cierre de año es un momento distinto a cualquier resumen mensual, así
+   que no comparte el gradiente cobalto. Manchas y chispas en dorado, borde
+   fino dorado y el titular ("¡Feliz 2027!") reluce con el mismo barrido
+   metálico que el cierre del Wrapped anual (w-oro-brilla). */
+.tarjeta-resumen--anual {
+  background: linear-gradient(155deg, #1c1400 0%, #0a0704 55%, #000 100%);
+  border: 1px solid rgba(255, 224, 148, 0.4);
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 224, 148, 0.06) inset;
+}
+.tarjeta-resumen--anual:active {
+  box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 224, 148, 0.06) inset;
+}
+.tarjeta-resumen--anual .tarjeta-resumen__mancha:nth-child(1) {
+  background: radial-gradient(circle at 50% 50%,
+    #FFE9B0 0%, color-mix(in srgb, #F3B33F 70%, transparent) 45%, transparent 72%);
+  opacity: 0.4;
+}
+.tarjeta-resumen--anual .tarjeta-resumen__mancha:nth-child(2) {
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, #fff 30%, #7A4E00) 0%, color-mix(in srgb, #7A4E00 70%, transparent) 45%, transparent 72%);
+  opacity: 0.5;
+}
+.tarjeta-resumen--anual .tarjeta-resumen__brillo {
+  background: linear-gradient(115deg, transparent 30%,
+    rgba(255, 233, 176, 0.45) 48%, transparent 66%);
+}
+.tarjeta-resumen--anual .tarjeta-resumen__ico {
+  background: linear-gradient(155deg, rgba(255, 233, 176, 0.24), rgba(122, 78, 0, 0.32));
+  color: #FFE9B0;
+  box-shadow: 0 0 0 1px rgba(255, 224, 148, 0.35), 0 0 14px -2px rgba(243, 179, 63, 0.55);
+  animation: tr-anual-pulso 2.4s ease-in-out infinite;
+}
+@keyframes tr-anual-pulso {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255, 224, 148, 0.35), 0 0 14px -2px rgba(243, 179, 63, 0.55); }
+  50%      { box-shadow: 0 0 0 1px rgba(255, 224, 148, 0.55), 0 0 20px 0px rgba(243, 179, 63, 0.8); }
+}
+.tarjeta-resumen--anual .tarjeta-resumen__chispas i { background: #FFE9B0; }
+.tarjeta-resumen--anual .tarjeta-resumen__eyebrow { color: rgba(255, 233, 176, 0.78); }
+.tarjeta-resumen--anual .tarjeta-resumen__titulo {
+  display: inline-block;
+  background-image: linear-gradient(100deg,
+    #7A4E00 0%, #F3B33F 22%, #FFE9B0 42%, #FFF6DF 50%, #FFE9B0 58%, #F3B33F 78%, #7A4E00 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: w-oro-brilla 3.4s linear infinite;
+}
+.tarjeta-resumen--anual .tarjeta-resumen__flecha { color: rgba(255, 233, 176, 0.85); }
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta-resumen--anual .tarjeta-resumen__ico { animation: none; }
+  .tarjeta-resumen--anual .tarjeta-resumen__titulo { animation: none; background-position: -84% 0; }
+}
+
+/* ============================================================
+   Temas por MES — cada uno de los 11 meses con Wrapped mensual (todos
+   menos diciembre, que solo tiene el Wrapped ANUAL) viste la tarjeta a
+   su manera: gradiente propio, icono grande en la esquina
+   (.tarjeta-resumen__decor svg[data-tema-ico]) y partículas propias.
+   Ningún mes repite el diseño de otro, aunque sean de la misma estación
+   (ResumenMes.temaMes en resumenmes.js decide cuál). Las manchas base se
+   atenúan para no competir con el decorado de cada mes.
+   ============================================================ */
+.tarjeta-resumen[class*="tarjeta-resumen--"]:not(.tarjeta-resumen--anual) .tarjeta-resumen__mancha { opacity: 0.28; }
+
+@keyframes tr-sol-gira { to { transform: rotate(360deg); } }
+@keyframes tr-hoja-mece {
+  0%, 100% { transform: rotate(-6deg); }
+  50%      { transform: rotate(8deg); }
+}
+@keyframes tr-estrella-respira {
+  0%, 100% { opacity: .35; transform: scale(1); }
+  50%      { opacity: .6;  transform: scale(1.12); }
+}
+@keyframes tr-gota-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(6px); }
+}
+@keyframes tr-niebla-deriva {
+  0%, 100% { transform: translate3d(-8px, 0, 0); }
+  50%      { transform: translate3d(10px, 5px, 0); }
+}
+@keyframes tr-nieve {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0); }
+  8%   { opacity: .9; }
+  50%  { transform: translate3d(8px, 74px, 0); }
+  90%  { opacity: .7; }
+  100% { opacity: 0; transform: translate3d(-4px, 158px, 0); }
+}
+@keyframes tr-confeti {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) scale(.5); }
+  16%  { opacity: .9; }
+  84%  { opacity: .4; }
+  100% { opacity: 0; transform: translate3d(9px, 150px, 0) scale(1); }
+}
+@keyframes tr-brote {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); }
+  12%  { opacity: .85; }
+  88%  { opacity: .5; }
+  100% { opacity: 0; transform: translate3d(-6px, 150px, 0) rotate(70deg); }
+}
+@keyframes tr-gota-cae {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) scaleY(1); }
+  10%  { opacity: .85; }
+  85%  { opacity: .5; }
+  100% { opacity: 0; transform: translate3d(0, 168px, 0) scaleY(1.3); }
+}
+@keyframes tr-petalo {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); }
+  10%  { opacity: .9; }
+  50%  { transform: translate3d(14px, 78px, 0) rotate(140deg); }
+  90%  { opacity: .5; }
+  100% { opacity: 0; transform: translate3d(-10px, 158px, 0) rotate(280deg); }
+}
+@keyframes tr-luciernaga {
+  0%, 100% { opacity: .15; transform: translate3d(0, 0, 0) scale(.75); }
+  50%      { opacity: .9;  transform: translate3d(5px, -8px, 0) scale(1.2); }
+}
+@keyframes tr-burbuja {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) scale(0.6); }
+  15%  { opacity: .85; }
+  90%  { opacity: .3; }
+  100% { opacity: 0; transform: translate3d(6px, -160px, 0) scale(1.1); }
+}
+@keyframes tr-calor {
+  0%, 100% { opacity: .18; transform: translate3d(0, 0, 0) scale(.8); }
+  50%      { opacity: .7;  transform: translate3d(-4px, -6px, 0) scale(1.15); }
+}
+@keyframes tr-hoja-cae {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); }
+  10%  { opacity: .9; }
+  50%  { transform: translate3d(-12px, 76px, 0) rotate(160deg); }
+  90%  { opacity: .6; }
+  100% { opacity: 0; transform: translate3d(10px, 158px, 0) rotate(320deg); }
+}
+@keyframes tr-hoja-remolino {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) rotate(0deg); }
+  12%  { opacity: .95; }
+  50%  { transform: translate3d(18px, 80px, 0) rotate(220deg); }
+  88%  { opacity: .55; }
+  100% { opacity: 0; transform: translate3d(-14px, 162px, 0) rotate(400deg); }
+}
+
+/* --- Enero: azul noche profundo, copo girando y nieve cayendo. --- */
+.tarjeta-resumen--enero {
+  background: linear-gradient(155deg, #24408a 0%, #0b1330 70%, #060a1e 100%);
+}
+.tarjeta-resumen--enero .tarjeta-resumen__decor svg[data-tema-ico="enero"] {
+  display: block; animation: tr-sol-gira 42s linear infinite;
+}
+.tarjeta-resumen--enero .tarjeta-resumen__particulas i {
+  display: block; width: 5px; height: 5px; border-radius: 50%; background: #fff;
+  filter: drop-shadow(0 0 2px rgba(255,255,255,.6));
+  animation: tr-nieve 6.5s linear infinite;
+}
+
+/* --- Febrero: violeta a fucsia, corazón latiendo (el del logo Bihotsak)
+   y confeti rosa cayendo. --- */
+.tarjeta-resumen--febrero {
+  background: linear-gradient(155deg, #7a3aa8 0%, #b8215f 55%, #3a0f2e 100%);
+}
+.tarjeta-resumen--febrero .tarjeta-resumen__decor svg[data-tema-ico="febrero"] {
+  display: block; opacity: 0.42;
+  animation: tr-estrella-respira 1.8s ease-in-out infinite;
+}
+.tarjeta-resumen--febrero .tarjeta-resumen__particulas i {
+  display: block; width: 6px; height: 6px; border-radius: 50%;
+  background: color-mix(in srgb, #fff 45%, #ff6fa8);
+  animation: tr-confeti 6s ease-in-out infinite;
+}
+
+/* --- Marzo: verde lima a celeste, brote meciéndose y hojitas al viento. --- */
+.tarjeta-resumen--marzo {
+  background: linear-gradient(155deg, #8fd450 0%, #4fae7a 55%, #14324a 100%);
+}
+.tarjeta-resumen--marzo .tarjeta-resumen__decor svg[data-tema-ico="marzo"] {
+  display: block; opacity: 0.4; filter: drop-shadow(0 1px 3px rgba(0,0,0,.18));
+  animation: tr-hoja-mece 4s ease-in-out infinite;
+}
+.tarjeta-resumen--marzo .tarjeta-resumen__particulas i {
+  display: block; width: 6px; height: 5px; border-radius: 60% 40% 60% 40%;
+  background: color-mix(in srgb, #fff 35%, #7bd68a);
+  animation: tr-brote 6.4s linear infinite;
+}
+
+/* --- Abril: lavanda de lluvia a verde, gota que bota y lluvia fina. --- */
+.tarjeta-resumen--abril {
+  background: linear-gradient(155deg, #6f7fd6 0%, #4a8f8a 60%, #17303a 100%);
+}
+.tarjeta-resumen--abril .tarjeta-resumen__decor svg[data-tema-ico="abril"] {
+  display: block; opacity: 0.4; filter: drop-shadow(0 1px 3px rgba(0,0,0,.2));
+  animation: tr-gota-bob 2.2s ease-in-out infinite;
+}
+.tarjeta-resumen--abril .tarjeta-resumen__particulas i {
+  display: block; width: 3px; height: 12px; border-radius: 40%;
+  background: color-mix(in srgb, #fff 55%, #a9c6ff);
+  animation: tr-gota-cae 2.4s linear infinite;
+}
+
+/* --- Mayo: rosa coral a verde esmeralda, flor girando y pétalos. --- */
+.tarjeta-resumen--mayo {
+  background: linear-gradient(155deg, #ff9fc2 0%, #ffd6a5 45%, #2f8f63 100%);
+}
+.tarjeta-resumen--mayo .tarjeta-resumen__decor svg[data-tema-ico="mayo"] {
+  display: block; opacity: 0.4; filter: drop-shadow(0 1px 3px rgba(0,0,0,.18));
+  animation: tr-sol-gira 46s linear infinite;
+}
+.tarjeta-resumen--mayo .tarjeta-resumen__particulas i {
+  display: block; width: 6px; height: 6px; border-radius: 60% 60% 60% 0;
+  background: color-mix(in srgb, #fff 55%, #ffb8d4);
+  animation: tr-petalo 7.5s ease-in-out infinite;
+}
+
+/* --- Junio: dorado suave de noche larga, sol tranquilo y luciérnagas. --- */
+.tarjeta-resumen--junio {
+  background: linear-gradient(155deg, #e0a53e 0%, #b06a8a 55%, #2a2050 100%);
+}
+.tarjeta-resumen--junio .tarjeta-resumen__decor svg[data-tema-ico="junio"] {
+  display: block; animation: tr-sol-gira 55s linear infinite;
+}
+.tarjeta-resumen--junio .tarjeta-resumen__particulas i {
+  display: block; width: 4px; height: 4px; border-radius: 50%;
+  background: color-mix(in srgb, #fff 60%, #ffd97a);
+  animation: tr-luciernaga 3.2s ease-in-out infinite;
+}
+
+/* --- Julio: naranja a turquesa de playa, sol con olas y burbujas. --- */
+.tarjeta-resumen--julio {
+  background: linear-gradient(155deg, #ff8f4d 0%, #ff7a90 40%, #159c9c 100%);
+}
+.tarjeta-resumen--julio .tarjeta-resumen__decor svg[data-tema-ico="julio"] {
+  display: block; animation: tr-sol-gira 34s linear infinite;
+}
+.tarjeta-resumen--julio .tarjeta-resumen__particulas i {
+  display: block; top: auto; bottom: -14%; width: 6px; height: 6px; border-radius: 50%;
+  background: color-mix(in srgb, #fff 70%, transparent);
+  animation: tr-burbuja 4.6s ease-in infinite;
+}
+
+/* --- Agosto: rojo fuego a arena, sol grande y calorina. --- */
+.tarjeta-resumen--agosto {
+  background: linear-gradient(155deg, #ff6b3d 0%, #e8451f 45%, #7a2a12 100%);
+}
+.tarjeta-resumen--agosto .tarjeta-resumen__decor svg[data-tema-ico="agosto"] {
+  display: block; animation: tr-sol-gira 22s linear infinite;
+}
+.tarjeta-resumen--agosto .tarjeta-resumen__particulas i {
+  display: block; width: 5px; height: 5px; border-radius: 50%;
+  background: color-mix(in srgb, #fff 55%, #ffb27a);
+  animation: tr-calor 2.4s ease-in-out infinite;
+}
+
+/* --- Septiembre: mostaza a verde apagado, vuelta a la rutina. --- */
+.tarjeta-resumen--septiembre {
+  background: linear-gradient(155deg, #c99a2e 0%, #7a8a3c 55%, #2c3418 100%);
+}
+.tarjeta-resumen--septiembre .tarjeta-resumen__decor svg[data-tema-ico="septiembre"] {
+  display: block; opacity: 0.38; filter: drop-shadow(0 1px 3px rgba(0,0,0,.2));
+  animation: tr-hoja-mece 6s ease-in-out infinite;
+}
+.tarjeta-resumen--septiembre .tarjeta-resumen__particulas i {
+  display: block; width: 6px; height: 5px; border-radius: 55% 45% 55% 45%;
+  background: color-mix(in srgb, #fff 25%, #c9a24a);
+  animation: tr-hoja-cae 8s linear infinite;
+}
+
+/* --- Octubre: naranja intenso a marrón, hojas cayendo en remolino. --- */
+.tarjeta-resumen--octubre {
+  background: linear-gradient(155deg, #d97a2c 0%, #a5501c 55%, #4a2c14 100%);
+}
+.tarjeta-resumen--octubre .tarjeta-resumen__decor svg[data-tema-ico="octubre"] {
+  display: block; opacity: 0.4; filter: drop-shadow(0 1px 3px rgba(0,0,0,.2));
+  animation: tr-hoja-mece 5s ease-in-out infinite;
+}
+.tarjeta-resumen--octubre .tarjeta-resumen__particulas i {
+  display: block; width: 7px; height: 5px; border-radius: 60% 40% 60% 40%;
+  background: color-mix(in srgb, #fff 30%, #e8934a);
+  animation: tr-hoja-remolino 6.8s linear infinite;
+}
+
+/* --- Noviembre: niebla gris-violeta, luna entre bruma. --- */
+.tarjeta-resumen--noviembre {
+  background: linear-gradient(155deg, #5b6b8a 0%, #433a5c 55%, #16121f 100%);
+}
+.tarjeta-resumen--noviembre .tarjeta-resumen__decor svg[data-tema-ico="noviembre"] {
+  display: block; opacity: 0.4; filter: drop-shadow(0 1px 3px rgba(0,0,0,.22));
+  animation: tr-niebla-deriva 6s ease-in-out infinite;
+}
+.tarjeta-resumen--noviembre .tarjeta-resumen__particulas i {
+  display: block; width: 16px; height: 6px; border-radius: 50%; filter: blur(1px);
+  background: color-mix(in srgb, #fff 45%, transparent);
+  animation: tr-niebla-part 9s ease-in-out infinite;
+}
+@keyframes tr-niebla-part {
+  0%, 100% { opacity: .12; transform: translate3d(-14px, 0, 0); }
+  50%      { opacity: .32; transform: translate3d(16px, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta-resumen__decor svg { animation: none !important; }
+  .tarjeta-resumen__particulas i { animation: none !important; display: none !important; }
+}
 
 /* Bloque de concierto dentro de la hoja "Resumen del día" */
 .resumen__bloque--concierto {
@@ -5126,6 +5774,126 @@ body.reordenando { cursor: grabbing; user-select: none; }
 .practica__repasar .tarjeta__cuerpo { gap: 5px; }
 .practica__repasar .repasar__nota { margin-top: 0; white-space: normal; }
 .practica__repasar .chip { margin-top: 2px; }
+
+/* Aviso del día de ensayo: mismo formato que "repasar lo difícil" pero
+   con el acento propio del coro para que destaque como algo del día. */
+.practica__repasar--ensayo {
+  background: var(--color-acento-suave);
+  border: 1px solid color-mix(in srgb, var(--color-acento) 30%, transparent);
+}
+.practica__repasar--ensayo .tarjeta__titulo { color: var(--color-acento-oscuro); }
+
+/* Selector de días de la semana (hoja "Días de ensayo") */
+.dias-semana {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 4px;
+}
+.dias-semana__dia {
+  flex: 1;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-texto-2);
+  background: var(--color-fondo);
+  border: 1.5px solid var(--color-borde);
+  border-radius: 12px;
+  transition: transform var(--dur-micro) var(--curva),
+              background var(--dur-micro) var(--curva),
+              color var(--dur-micro) var(--curva),
+              border-color var(--dur-micro) var(--curva);
+}
+.dias-semana__dia.is-sel {
+  background: var(--color-acento);
+  border-color: var(--color-acento);
+  color: #fff;
+}
+.dias-semana__dia:active { transform: scale(0.92); }
+@media (prefers-reduced-motion: reduce) {
+  .dias-semana__dia { transition: none; }
+  .dias-semana__dia:active { transform: none; }
+}
+
+/* Pausas de ensayo (vacaciones, sin coro…) — hoja "Días de ensayo" */
+.ensayo-pausas { margin: 20px 0 4px; }
+.ensayo-pausas__cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ensayo-pausas__add {
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-acento);
+  padding: 4px 2px;
+}
+.ensayo-pausas__add:active { opacity: 0.6; }
+.ensayo-pausas__pista {
+  font-size: 12.5px;
+  color: var(--color-texto-2);
+  margin-top: 2px;
+}
+.ensayo-pausas__lista {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ensayo-pausas__it {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--color-fondo);
+  border: 1px solid var(--color-borde);
+  border-radius: 10px;
+}
+.ensayo-pausas__rango {
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ensayo-pausas__nota {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-texto-2);
+}
+.ensayo-pausas__quitar {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-texto-2);
+}
+.ensayo-pausas__quitar svg { width: 15px; height: 15px; }
+.ensayo-pausas__quitar:active { opacity: 0.6; }
+.ensayo-pausas__form {
+  margin-top: 12px;
+  padding: 14px;
+  background: var(--color-fondo);
+  border: 1px solid var(--color-borde);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ensayo-pausas__form-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 
 /* Curiosidades bajo el calendario — datitos sueltos, tono ligero */
 .practica__datos {
@@ -7669,9 +8437,12 @@ body.wrapped-abierto { overflow: hidden; }
   background-position: 50% 0%;
   animation: w-bg 24s ease-in-out infinite alternate;
 }
+/* El anual es negro y dorado — Nochevieja, no "violeta con purpurina".
+   Sin el drift de tono (w-tinte): el negro tiene que quedarse negro. */
 .wrapped--anual .w-fondo::before {
-  background: linear-gradient(165deg, #3B2E8F 0%, #1B1466 50%, #0B0740 100%);
+  background: linear-gradient(165deg, #221a08 0%, #100c05 55%, #000000 100%);
 }
+.wrapped--anual .w-fondo { animation: none; }
 .w-fondo { animation: w-tinte 38s ease-in-out infinite; }
 @keyframes w-bg {
   from { background-position: 50% 0%; }
@@ -7721,13 +8492,418 @@ body.wrapped-abierto { overflow: hidden; }
 @keyframes w-drift-2 { to { transform: translate(-18%, -14%); } }
 @keyframes w-drift-3 { to { transform: translate(-14%, 20%); } }
 
-.wrapped--anual {
-  background-color: #1B1466;
-  background-image: linear-gradient(165deg, #3B2E8F 0%, #1B1466 50%, #0B0740 100%);
+/* Grano fino sobre el fondo: le quita el aire "degradado plano de CSS"
+   y lo acerca a un póster impreso. Estático (sin animar) por rendimiento. */
+.w-fondo::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-.wrapped--anual .w-blob--1 { background: #6E5AD8; }
-.wrapped--anual .w-blob--2 { background: #1B1466; }
-.wrapped--anual .w-blob--3 { background: #8A5CC9; opacity: 0.26; }
+
+.wrapped--anual {
+  background-color: #100C05;
+  background-image: linear-gradient(165deg, #221a08 0%, #100c05 55%, #000000 100%);
+}
+.wrapped--anual .w-blob--1 { background: #F3B33F; opacity: 0.16; }
+.wrapped--anual .w-blob--2 { background: #7A4E00; opacity: 0.32; }
+.wrapped--anual .w-blob--3 { background: #FFE9B0; opacity: 0.1; }
+
+/* ============================================================
+   Temporadas del Wrapped MENSUAL — cada uno de los 11 meses con
+   Wrapped propio (ResumenMes.temaMes) viste el Wrapped a su manera:
+   fondo, manchas, icono grande de fondo, partículas y el acento de
+   color de cada slide (--w-acento, ver más abajo). Ningún mes repite
+   el diseño de otro, ni siquiera entre meses de la misma estación.
+   Diciembre no lleva ninguna de estas clases: no tiene Wrapped
+   mensual, solo el ANUAL (.wrapped--anual, negro y dorado de siempre).
+   Se desactiva el drift de tono (w-tinte) porque está calibrado para
+   la familia cobalto y aquí cada mes ya tiene su propia paleta fija.
+   ============================================================ */
+.wrapped--enero, .wrapped--febrero, .wrapped--marzo, .wrapped--abril,
+.wrapped--mayo, .wrapped--junio, .wrapped--julio, .wrapped--agosto,
+.wrapped--septiembre, .wrapped--octubre, .wrapped--noviembre { background-image: none; }
+.wrapped--enero .w-fondo, .wrapped--febrero .w-fondo, .wrapped--marzo .w-fondo,
+.wrapped--abril .w-fondo, .wrapped--mayo .w-fondo, .wrapped--junio .w-fondo,
+.wrapped--julio .w-fondo, .wrapped--agosto .w-fondo, .wrapped--septiembre .w-fondo,
+.wrapped--octubre .w-fondo, .wrapped--noviembre .w-fondo { animation: none; }
+
+.wrapped--enero { background-color: #10224F; }
+.wrapped--enero .w-fondo::before { background: linear-gradient(165deg, #3A5FA8 0%, #142A5E 55%, #060B1E 100%); }
+.wrapped--enero .w-blob--1 { background: #8FB6FF; opacity: 0.3; }
+.wrapped--enero .w-blob--2 { background: #1B2E63; opacity: 0.42; }
+.wrapped--enero .w-blob--3 { background: #D8E8FF; opacity: 0.16; }
+
+.wrapped--febrero { background-color: #3A0F2E; }
+.wrapped--febrero .w-fondo::before { background: linear-gradient(165deg, #7A3AA8 0%, #B8215F 55%, #3A0F2E 100%); }
+.wrapped--febrero .w-blob--1 { background: #E37DD1; opacity: 0.32; }
+.wrapped--febrero .w-blob--2 { background: #B8215F; opacity: 0.36; }
+.wrapped--febrero .w-blob--3 { background: #FF9FD1; opacity: 0.2; }
+
+.wrapped--marzo { background-color: #14324A; }
+.wrapped--marzo .w-fondo::before { background: linear-gradient(165deg, #8FD450 0%, #4FAE7A 55%, #14324A 100%); }
+.wrapped--marzo .w-blob--1 { background: #B6EE7C; opacity: 0.3; }
+.wrapped--marzo .w-blob--2 { background: #2E6B4C; opacity: 0.4; }
+.wrapped--marzo .w-blob--3 { background: #DFF7B8; opacity: 0.18; }
+
+.wrapped--abril { background-color: #17303A; }
+.wrapped--abril .w-fondo::before { background: linear-gradient(165deg, #6F7FD6 0%, #4A8F8A 60%, #17303A 100%); }
+.wrapped--abril .w-blob--1 { background: #9FB0FF; opacity: 0.3; }
+.wrapped--abril .w-blob--2 { background: #2E6B67; opacity: 0.4; }
+.wrapped--abril .w-blob--3 { background: #C9E8E4; opacity: 0.16; }
+
+.wrapped--mayo { background-color: #B03C6E; }
+.wrapped--mayo .w-fondo::before { background: linear-gradient(165deg, #FF9FC2 0%, #FFD6A5 45%, #2F8F63 100%); }
+.wrapped--mayo .w-blob--1 { background: #FFC2DC; opacity: 0.38; }
+.wrapped--mayo .w-blob--2 { background: #2F8F63; opacity: 0.32; }
+.wrapped--mayo .w-blob--3 { background: #FFE3B0; opacity: 0.26; }
+
+.wrapped--junio { background-color: #3A2E5E; }
+.wrapped--junio .w-fondo::before { background: linear-gradient(165deg, #E0A53E 0%, #B06A8A 55%, #2A2050 100%); }
+.wrapped--junio .w-blob--1 { background: #FFD98A; opacity: 0.3; }
+.wrapped--junio .w-blob--2 { background: #7A4E7E; opacity: 0.36; }
+.wrapped--junio .w-blob--3 { background: #E8B4CE; opacity: 0.2; }
+
+.wrapped--julio { background-color: #E8672A; }
+.wrapped--julio .w-fondo::before { background: linear-gradient(165deg, #FF8F4D 0%, #FF7A90 40%, #159C9C 100%); }
+.wrapped--julio .w-blob--1 { background: #FFC166; opacity: 0.4; }
+.wrapped--julio .w-blob--2 { background: #159C9C; opacity: 0.36; }
+.wrapped--julio .w-blob--3 { background: #FF7A90; opacity: 0.26; }
+
+.wrapped--agosto { background-color: #7A2A12; }
+.wrapped--agosto .w-fondo::before { background: linear-gradient(165deg, #FF6B3D 0%, #E8451F 45%, #4A180C 100%); }
+.wrapped--agosto .w-blob--1 { background: #FFA25C; opacity: 0.4; }
+.wrapped--agosto .w-blob--2 { background: #A02A10; opacity: 0.42; }
+.wrapped--agosto .w-blob--3 { background: #FFD6A0; opacity: 0.2; }
+
+.wrapped--septiembre { background-color: #2C3418; }
+.wrapped--septiembre .w-fondo::before { background: linear-gradient(165deg, #C99A2E 0%, #7A8A3C 55%, #22280F 100%); }
+.wrapped--septiembre .w-blob--1 { background: #E8C563; opacity: 0.32; }
+.wrapped--septiembre .w-blob--2 { background: #4E5C22; opacity: 0.4; }
+.wrapped--septiembre .w-blob--3 { background: #D9E39A; opacity: 0.18; }
+
+.wrapped--octubre { background-color: #6B3A16; }
+.wrapped--octubre .w-fondo::before { background: linear-gradient(165deg, #D97A2C 0%, #A5501C 55%, #34200E 100%); }
+.wrapped--octubre .w-blob--1 { background: #F0A860; opacity: 0.34; }
+.wrapped--octubre .w-blob--2 { background: #7A3A12; opacity: 0.42; }
+.wrapped--octubre .w-blob--3 { background: #FFD8A0; opacity: 0.2; }
+
+.wrapped--noviembre { background-color: #16121F; }
+.wrapped--noviembre .w-fondo::before { background: linear-gradient(165deg, #5B6B8A 0%, #433A5C 55%, #0F0C17 100%); }
+.wrapped--noviembre .w-blob--1 { background: #9CA9C4; opacity: 0.24; }
+.wrapped--noviembre .w-blob--2 { background: #2E2740; opacity: 0.46; }
+.wrapped--noviembre .w-blob--3 { background: #D8DCE8; opacity: 0.12; }
+
+/* Icono decorativo grande y muy tenue (copo/corazón/brote/gota/flor/
+   sol/hoja/luna…), inyectado por wrapped.js según el tema. Reutiliza
+   las animaciones de giro/mecido/respiración de la tarjeta-resumen. */
+.w-decor-temporada {
+  position: absolute;
+  z-index: 1;
+  color: #fff;
+  pointer-events: none;
+}
+.w-decor-temporada svg { width: 100%; height: 100%; display: block; }
+.wrapped--enero .w-decor-temporada {
+  top: 2%; left: -16%; width: 66vw; max-width: 360px; opacity: 0.14;
+  animation: tr-sol-gira 80s linear infinite;
+}
+.wrapped--febrero .w-decor-temporada {
+  top: 4%; right: -8%; width: 40vw; max-width: 210px; opacity: 0.2;
+  animation: tr-estrella-respira 2s ease-in-out infinite;
+}
+.wrapped--marzo .w-decor-temporada {
+  top: 3%; left: -8%; width: 40vw; max-width: 220px; opacity: 0.2;
+  animation: tr-hoja-mece 4.5s ease-in-out infinite;
+}
+.wrapped--abril .w-decor-temporada {
+  top: 4%; right: -6%; width: 36vw; max-width: 190px; opacity: 0.2;
+  animation: tr-gota-bob 2.4s ease-in-out infinite;
+}
+.wrapped--mayo .w-decor-temporada {
+  top: 6%; right: -10%; width: 58vw; max-width: 320px; opacity: 0.18;
+  animation: tr-sol-gira 90s linear infinite;
+}
+.wrapped--junio .w-decor-temporada {
+  top: 4%; right: -10%; width: 46vw; max-width: 250px; opacity: 0.18;
+  animation: tr-sol-gira 60s linear infinite;
+}
+.wrapped--julio .w-decor-temporada {
+  top: 4%; right: -12%; width: 60vw; max-width: 330px; opacity: 0.16;
+  animation: tr-sol-gira 40s linear infinite;
+}
+.wrapped--agosto .w-decor-temporada {
+  top: 3%; right: -14%; width: 64vw; max-width: 350px; opacity: 0.18;
+  animation: tr-sol-gira 26s linear infinite;
+}
+.wrapped--septiembre .w-decor-temporada {
+  top: 4%; left: -8%; width: 42vw; max-width: 230px; opacity: 0.2;
+  animation: tr-hoja-mece 6.5s ease-in-out infinite;
+}
+.wrapped--octubre .w-decor-temporada {
+  top: 4%; left: -10%; width: 58vw; max-width: 320px; opacity: 0.2;
+  animation: tr-hoja-mece 6s ease-in-out infinite;
+}
+.wrapped--noviembre .w-decor-temporada {
+  top: 3%; right: -8%; width: 48vw; max-width: 260px; opacity: 0.16;
+  animation: tr-niebla-deriva 7s ease-in-out infinite;
+}
+
+/* Partículas de mes a pantalla completa: 12 puntos repartidos en
+   ancho; cada mes pone forma, color y caída/subida (recorridos en vh,
+   no en px, para que crucen toda la pantalla). */
+.w-particulas { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
+.w-particulas i { position: absolute; top: -6%; opacity: 0; display: none; }
+.w-particulas i:nth-child(1)  { left: 4%;  animation-delay: 0s; }
+.w-particulas i:nth-child(2)  { left: 12%; animation-delay: 1.4s; }
+.w-particulas i:nth-child(3)  { left: 20%; animation-delay: 2.8s; }
+.w-particulas i:nth-child(4)  { left: 30%; animation-delay: .6s; }
+.w-particulas i:nth-child(5)  { left: 40%; animation-delay: 2s; }
+.w-particulas i:nth-child(6)  { left: 50%; animation-delay: 3.4s; }
+.w-particulas i:nth-child(7)  { left: 58%; animation-delay: 1s; }
+.w-particulas i:nth-child(8)  { left: 66%; animation-delay: 2.4s; }
+.w-particulas i:nth-child(9)  { left: 74%; animation-delay: .2s; }
+.w-particulas i:nth-child(10) { left: 82%; animation-delay: 1.8s; }
+.w-particulas i:nth-child(11) { left: 90%; animation-delay: 3.1s; }
+.w-particulas i:nth-child(12) { left: 96%; animation-delay: .9s; }
+
+/* Enero: nieve cayendo. */
+.wrapped--enero .w-particulas i {
+  display: block; width: 6px; height: 6px; border-radius: 50%; background: #fff;
+  filter: drop-shadow(0 0 3px rgba(255,255,255,.65));
+  animation: w-nieve-cae 11s linear infinite;
+}
+.wrapped--enero .w-particulas i:nth-child(3n) { animation-duration: 13.5s; }
+.wrapped--enero .w-particulas i:nth-child(3n+1) { animation-duration: 9.5s; }
+@keyframes w-nieve-cae {
+  0%   { opacity: 0; transform: translate3d(0, -6vh, 0); }
+  8%   { opacity: .9; }
+  50%  { transform: translate3d(3vw, 54vh, 0); }
+  92%  { opacity: .55; }
+  100% { opacity: 0; transform: translate3d(-3vw, 112vh, 0); }
+}
+
+/* Febrero: confeti rosa. */
+.wrapped--febrero .w-particulas i {
+  display: block; width: 6px; height: 6px; border-radius: 50%;
+  background: color-mix(in srgb, #fff 40%, #ff6fa8);
+  animation: w-confeti-flota 10s ease-in-out infinite;
+}
+.wrapped--febrero .w-particulas i:nth-child(3n) { animation-duration: 12.5s; }
+.wrapped--febrero .w-particulas i:nth-child(3n+1) { animation-duration: 8.5s; }
+@keyframes w-confeti-flota {
+  0%   { opacity: 0; transform: translate3d(0, -6vh, 0) scale(.6); }
+  14%  { opacity: .9; }
+  86%  { opacity: .4; }
+  100% { opacity: 0; transform: translate3d(4vw, 112vh, 0) scale(1); }
+}
+
+/* Marzo: hojitas de brote al viento. */
+.wrapped--marzo .w-particulas i {
+  display: block; width: 8px; height: 6px; border-radius: 60% 40% 60% 40%;
+  background: color-mix(in srgb, #fff 30%, #7bd68a);
+  animation: w-brote-flota 12s linear infinite;
+}
+.wrapped--marzo .w-particulas i:nth-child(3n) { animation-duration: 14.5s; }
+.wrapped--marzo .w-particulas i:nth-child(3n+1) { animation-duration: 9.5s; }
+@keyframes w-brote-flota {
+  0%   { opacity: 0; transform: translate3d(0, -6vh, 0) rotate(0deg); }
+  12%  { opacity: .85; }
+  50%  { transform: translate3d(-6vw, 54vh, 0) rotate(90deg); }
+  88%  { opacity: .5; }
+  100% { opacity: 0; transform: translate3d(6vw, 112vh, 0) rotate(200deg); }
+}
+
+/* Abril: lluvia fina y rápida. */
+.wrapped--abril .w-particulas i {
+  display: block; width: 3px; height: 22px; border-radius: 40%;
+  background: color-mix(in srgb, #fff 55%, #a9c6ff);
+  animation: w-gota-cae 2.6s linear infinite;
+}
+.wrapped--abril .w-particulas i:nth-child(3n) { animation-duration: 2.9s; }
+.wrapped--abril .w-particulas i:nth-child(3n+1) { animation-duration: 2.2s; }
+@keyframes w-gota-cae {
+  0%   { opacity: 0; transform: translate3d(0, -6vh, 0) scaleY(1); }
+  10%  { opacity: .8; }
+  85%  { opacity: .4; }
+  100% { opacity: 0; transform: translate3d(0, 112vh, 0) scaleY(1.3); }
+}
+
+/* Mayo: pétalos cayendo. */
+.wrapped--mayo .w-particulas i {
+  display: block; width: 9px; height: 9px; border-radius: 60% 60% 60% 0;
+  background: color-mix(in srgb, #fff 55%, #ffb8d4);
+  animation: w-petalo-flota 13s ease-in-out infinite;
+}
+.wrapped--mayo .w-particulas i:nth-child(3n) { animation-duration: 15.5s; }
+.wrapped--mayo .w-particulas i:nth-child(3n+1) { animation-duration: 10.5s; }
+@keyframes w-petalo-flota {
+  0%   { opacity: 0; transform: translate3d(0, -6vh, 0) rotate(0deg); }
+  10%  { opacity: .9; }
+  50%  { transform: translate3d(6vw, 54vh, 0) rotate(140deg); }
+  90%  { opacity: .5; }
+  100% { opacity: 0; transform: translate3d(-5vw, 112vh, 0) rotate(280deg); }
+}
+
+/* Junio: luciérnagas parpadeando en su sitio. */
+.wrapped--junio .w-particulas i {
+  display: block; top: 12%; width: 5px; height: 5px; border-radius: 50%;
+  background: color-mix(in srgb, #fff 55%, #ffd97a);
+  animation: w-luciernaga-flota 3.4s ease-in-out infinite;
+}
+.wrapped--junio .w-particulas i:nth-child(3n) { top: 46%; animation-duration: 4.2s; }
+.wrapped--junio .w-particulas i:nth-child(3n+1) { top: 74%; animation-duration: 2.8s; }
+@keyframes w-luciernaga-flota {
+  0%, 100% { opacity: .12; transform: translate3d(0, 0, 0) scale(.7); }
+  50%      { opacity: .85; transform: translate3d(1.5vw, -2vh, 0) scale(1.2); }
+}
+
+/* Julio: burbujas de playa subiendo. */
+.wrapped--julio .w-particulas i {
+  display: block; top: auto; bottom: -6%; width: 8px; height: 8px; border-radius: 50%;
+  background: color-mix(in srgb, #fff 70%, transparent);
+  animation: w-burbuja-sube 9s ease-in infinite;
+}
+.wrapped--julio .w-particulas i:nth-child(3n) { animation-duration: 11s; }
+.wrapped--julio .w-particulas i:nth-child(3n+1) { animation-duration: 7.5s; }
+@keyframes w-burbuja-sube {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) scale(.6); }
+  12%  { opacity: .85; }
+  88%  { opacity: .3; }
+  100% { opacity: 0; transform: translate3d(3vw, -108vh, 0) scale(1.15); }
+}
+
+/* Agosto: calorina — puntos de calor titilando en su sitio. */
+.wrapped--agosto .w-particulas i {
+  display: block; top: 20%; width: 6px; height: 6px; border-radius: 50%;
+  background: color-mix(in srgb, #fff 55%, #ffb27a);
+  animation: w-calor-flota 2.6s ease-in-out infinite;
+}
+.wrapped--agosto .w-particulas i:nth-child(3n) { top: 55%; animation-duration: 3.2s; }
+.wrapped--agosto .w-particulas i:nth-child(3n+1) { top: 82%; animation-duration: 2.1s; }
+@keyframes w-calor-flota {
+  0%, 100% { opacity: .16; transform: translate3d(0, 0, 0) scale(.75); }
+  50%      { opacity: .65; transform: translate3d(-1.2vw, -1.6vh, 0) scale(1.2); }
+}
+
+/* Septiembre: primeras hojas, cayendo lento. */
+.wrapped--septiembre .w-particulas i {
+  display: block; width: 9px; height: 7px; border-radius: 55% 45% 55% 45%;
+  background: color-mix(in srgb, #fff 25%, #c9a24a);
+  animation: w-hoja-flota 15s linear infinite;
+}
+.wrapped--septiembre .w-particulas i:nth-child(3n) { animation-duration: 18s; }
+.wrapped--septiembre .w-particulas i:nth-child(3n+1) { animation-duration: 12.5s; }
+@keyframes w-hoja-flota {
+  0%   { opacity: 0; transform: translate3d(0, -6vh, 0) rotate(0deg); }
+  10%  { opacity: .9; }
+  50%  { transform: translate3d(-6vw, 54vh, 0) rotate(160deg); }
+  90%  { opacity: .55; }
+  100% { opacity: 0; transform: translate3d(5vw, 112vh, 0) rotate(320deg); }
+}
+
+/* Octubre: hojas cayendo en remolino, abundantes. */
+.wrapped--octubre .w-particulas i {
+  display: block; width: 11px; height: 8px; border-radius: 60% 40% 60% 40%;
+  background: color-mix(in srgb, #fff 25%, #e8934a);
+  animation: w-hoja-remolino 11s linear infinite;
+}
+.wrapped--octubre .w-particulas i:nth-child(3n) { animation-duration: 13s; }
+.wrapped--octubre .w-particulas i:nth-child(3n+1) { animation-duration: 9s; }
+@keyframes w-hoja-remolino {
+  0%   { opacity: 0; transform: translate3d(0, -6vh, 0) rotate(0deg); }
+  12%  { opacity: .95; }
+  50%  { transform: translate3d(9vw, 54vh, 0) rotate(220deg); }
+  88%  { opacity: .55; }
+  100% { opacity: 0; transform: translate3d(-7vw, 112vh, 0) rotate(400deg); }
+}
+
+/* Noviembre: niebla, jirones grandes y muy tenues a la deriva. */
+.wrapped--noviembre .w-particulas i {
+  display: block; width: 26px; height: 9px; border-radius: 50%; filter: blur(2px);
+  background: color-mix(in srgb, #fff 45%, transparent);
+  animation: w-niebla-flota 14s ease-in-out infinite;
+}
+.wrapped--noviembre .w-particulas i:nth-child(3n) { animation-duration: 17s; }
+.wrapped--noviembre .w-particulas i:nth-child(3n+1) { animation-duration: 11s; }
+@keyframes w-niebla-flota {
+  0%, 100% { opacity: .1; transform: translate3d(-6vw, 0, 0); }
+  50%      { opacity: .28; transform: translate3d(6vw, 1vh, 0); }
+}
+
+/* Tipografía: un mismo tipo de letra en toda la app (legibilidad para
+   Ama), pero cada mes lo pone a su ritmo con peso y espaciado —
+   apretado y frío en enero, suelto en julio... */
+.wrapped--enero .w-titular--mes { letter-spacing: -0.035em; font-weight: 800; }
+.wrapped--febrero .w-titular--mes { letter-spacing: -0.005em; font-weight: 750; }
+.wrapped--marzo .w-titular--mes { letter-spacing: 0.01em; font-weight: 700; }
+.wrapped--abril .w-titular--mes { letter-spacing: -0.01em; font-weight: 750; }
+.wrapped--mayo .w-titular--mes { letter-spacing: 0.01em; font-weight: 700; }
+.wrapped--junio .w-titular--mes { letter-spacing: 0em; font-weight: 750; }
+.wrapped--julio .w-titular--mes { letter-spacing: 0.005em; font-weight: 750; }
+.wrapped--agosto .w-titular--mes { letter-spacing: -0.01em; font-weight: 800; }
+.wrapped--septiembre .w-titular--mes { letter-spacing: -0.01em; font-weight: 800; }
+.wrapped--octubre .w-titular--mes { letter-spacing: -0.01em; font-weight: 800; }
+.wrapped--noviembre .w-titular--mes { letter-spacing: -0.02em; font-weight: 800; }
+
+/* Acentos de color por variante de slide (--w-acento), en la paleta de
+   cada mes en vez del cobalto/naranja/rosa/turquesa genérico. */
+.wrapped--enero .w-var-0 { --w-acento: 154, 196, 255; }
+.wrapped--enero .w-var-1 { --w-acento: 200, 220, 255; }
+.wrapped--enero .w-var-2 { --w-acento: 120, 170, 255; }
+.wrapped--enero .w-var-3 { --w-acento: 230, 240, 255; }
+
+.wrapped--febrero .w-var-0 { --w-acento: 255, 140, 190; }
+.wrapped--febrero .w-var-1 { --w-acento: 220, 130, 255; }
+.wrapped--febrero .w-var-2 { --w-acento: 255, 110, 150; }
+.wrapped--febrero .w-var-3 { --w-acento: 235, 190, 255; }
+
+.wrapped--marzo .w-var-0 { --w-acento: 150, 220, 130; }
+.wrapped--marzo .w-var-1 { --w-acento: 190, 235, 120; }
+.wrapped--marzo .w-var-2 { --w-acento: 110, 200, 160; }
+.wrapped--marzo .w-var-3 { --w-acento: 210, 240, 160; }
+
+.wrapped--abril .w-var-0 { --w-acento: 150, 170, 240; }
+.wrapped--abril .w-var-1 { --w-acento: 130, 200, 210; }
+.wrapped--abril .w-var-2 { --w-acento: 170, 190, 255; }
+.wrapped--abril .w-var-3 { --w-acento: 190, 225, 220; }
+
+.wrapped--mayo .w-var-0 { --w-acento: 255, 159, 194; }
+.wrapped--mayo .w-var-1 { --w-acento: 255, 214, 165; }
+.wrapped--mayo .w-var-2 { --w-acento: 130, 210, 170; }
+.wrapped--mayo .w-var-3 { --w-acento: 220, 180, 255; }
+
+.wrapped--junio .w-var-0 { --w-acento: 255, 214, 138; }
+.wrapped--junio .w-var-1 { --w-acento: 230, 170, 210; }
+.wrapped--junio .w-var-2 { --w-acento: 200, 150, 220; }
+.wrapped--junio .w-var-3 { --w-acento: 255, 230, 170; }
+
+.wrapped--julio .w-var-0 { --w-acento: 255, 176, 89; }
+.wrapped--julio .w-var-1 { --w-acento: 255, 111, 111; }
+.wrapped--julio .w-var-2 { --w-acento: 40, 200, 200; }
+.wrapped--julio .w-var-3 { --w-acento: 255, 214, 102; }
+
+.wrapped--agosto .w-var-0 { --w-acento: 255, 130, 80; }
+.wrapped--agosto .w-var-1 { --w-acento: 255, 90, 60; }
+.wrapped--agosto .w-var-2 { --w-acento: 255, 170, 90; }
+.wrapped--agosto .w-var-3 { --w-acento: 255, 200, 130; }
+
+.wrapped--septiembre .w-var-0 { --w-acento: 232, 197, 99; }
+.wrapped--septiembre .w-var-1 { --w-acento: 180, 190, 100; }
+.wrapped--septiembre .w-var-2 { --w-acento: 210, 160, 70; }
+.wrapped--septiembre .w-var-3 { --w-acento: 220, 220, 150; }
+
+.wrapped--octubre .w-var-0 { --w-acento: 232, 148, 74; }
+.wrapped--octubre .w-var-1 { --w-acento: 217, 122, 44; }
+.wrapped--octubre .w-var-2 { --w-acento: 200, 130, 60; }
+.wrapped--octubre .w-var-3 { --w-acento: 240, 190, 120; }
+
+.wrapped--noviembre .w-var-0 { --w-acento: 160, 172, 200; }
+.wrapped--noviembre .w-var-1 { --w-acento: 190, 175, 220; }
+.wrapped--noviembre .w-var-2 { --w-acento: 140, 150, 190; }
+.wrapped--noviembre .w-var-3 { --w-acento: 210, 210, 225; }
 
 /* Barra superior: silencio · progreso · cerrar, todo en una fila alineada */
 .w-top {
@@ -7736,7 +8912,7 @@ body.wrapped-abierto { overflow: hidden; }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: calc(env(safe-area-inset-top) + 12px) 16px 2px;
+  padding: calc(env(safe-area-inset-top, 20px) + 18px) 16px 2px;
   pointer-events: none;   /* deja pasar el toque a las zonas de avance… */
 }
 .w-top .w-mute,
@@ -7827,8 +9003,8 @@ body.wrapped-abierto { overflow: hidden; }
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(env(safe-area-inset-top) + 40px);
-  bottom: calc(env(safe-area-inset-bottom) + 66px);
+  top: calc(env(safe-area-inset-top) + 58px);
+  bottom: calc(env(safe-area-inset-bottom) + 82px);
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -7849,12 +9025,13 @@ body.wrapped-abierto { overflow: hidden; }
 /* La portada y el cierre respiran mejor centrados */
 .w-slide--portada .w-slide__in { justify-content: center; gap: clamp(14px, 4vh, 30px); }
 .w-slide--cierre .w-slide__in { justify-content: center; gap: clamp(12px, 3vh, 22px); }
+.w-slide--anionuevo .w-slide__in { justify-content: center; gap: clamp(14px, 3.5vh, 26px); position: relative; }
 
 /* Entrada en cascada de cada elemento del slide.
    Longhands (no el atajo `animation`) para NO pisar el `animation-delay`
    escalonado de abajo: el atajo lo reseteaba a 0 y todo entraba a la vez.
    `:where()` mantiene baja la especificidad para que los nth-child ganen. */
-.w-slide--entra .w-slide__in > *:where(:not(.w-tops):not(.w-aprend):not(.w-medallas):not(.w-recuerdo)) {
+.w-slide--entra .w-slide__in > *:where(:not(.w-tops):not(.w-aprend):not(.w-medallas):not(.w-recuerdo):not(.w-chispas)) {
   animation-name: w-rise;
   animation-duration: 520ms;
   animation-timing-function: var(--curva);
@@ -7888,15 +9065,32 @@ body.wrapped-abierto { overflow: hidden; }
   from { opacity: 0; transform: translateX(32px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-.w-slide--entra.w-var-1 .w-slide__in > *:where(:not(.w-tops):not(.w-aprend):not(.w-medallas):not(.w-recuerdo)) {
+.w-slide--entra.w-var-1 .w-slide__in > *:where(:not(.w-tops):not(.w-aprend):not(.w-medallas):not(.w-recuerdo):not(.w-chispas)) {
   animation-name: w-rise-pop;
 }
-.w-slide--entra.w-var-2 .w-slide__in > *:where(:not(.w-tops):not(.w-aprend):not(.w-medallas):not(.w-recuerdo)) {
+.w-slide--entra.w-var-2 .w-slide__in > *:where(:not(.w-tops):not(.w-aprend):not(.w-medallas):not(.w-recuerdo):not(.w-chispas)) {
   animation-name: w-rise-izq;
 }
-.w-slide--entra.w-var-3 .w-slide__in > *:where(:not(.w-tops):not(.w-aprend):not(.w-medallas):not(.w-recuerdo)) {
+.w-slide--entra.w-var-3 .w-slide__in > *:where(:not(.w-tops):not(.w-aprend):not(.w-medallas):not(.w-recuerdo):not(.w-chispas)) {
   animation-name: w-rise-der;
 }
+
+/* Cada variante lleva también su propio color de acento (--w-acento, en
+   "r,g,b" para poder jugar con la opacidad). Se usa en el resplandor de
+   la cifra, la pastilla de la nota y el punto del eyebrow: cada slide de
+   dato se siente con personalidad propia, no el mismo azul repetido 20
+   veces seguidas. En el anual los tonos se calientan (dorado/rosa). */
+.w-var-0 { --w-acento: 130, 150, 255; }
+.w-var-1 { --w-acento: 255, 189, 110; }
+.w-var-2 { --w-acento: 255, 130, 190; }
+.w-var-3 { --w-acento: 120, 230, 210; }
+/* El anual es negro y dorado de punta a punta: las 4 variantes se quedan
+   en la misma familia de oro (claro / medio / bronce / ámbar) en vez de
+   saltar de color, para que la identidad de Nochevieja no se rompa. */
+.wrapped--anual .w-var-0 { --w-acento: 255, 224, 148; }
+.wrapped--anual .w-var-1 { --w-acento: 243, 179, 63; }
+.wrapped--anual .w-var-2 { --w-acento: 199, 145, 40; }
+.wrapped--anual .w-var-3 { --w-acento: 255, 199, 90; }
 
 /* Listas: los ítems entran escalonados.
    Longhands (no atajo) para que el `animation-delay` de los nth-child no se
@@ -7950,6 +9144,7 @@ body.wrapped-abierto { overflow: hidden; }
   font-weight: 800;
   line-height: 1.04;
   margin: 0;
+  padding-bottom: 0.12em; /* si no, el contenedor con scroll (overflow-y) recorta descendentes como la "g" */
   max-width: 100%;
   overflow-wrap: break-word;
   hyphens: auto;
@@ -7962,11 +9157,25 @@ body.wrapped-abierto { overflow: hidden; }
 .w-pie { font-size: 14px; color: rgba(255, 255, 255, 0.68); margin: 0; }
 
 .w-cifra {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   margin: 0;
+}
+/* Halo de color detrás de la cifra, con el acento del slide — le da
+   profundidad y hace que cada número se sienta "iluminado" desde dentro. */
+.w-cifra__glow {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 78vw; height: 78vw;
+  max-width: 340px; max-height: 340px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(var(--w-acento, 130,150,255), 0.32), transparent 68%);
+  filter: blur(2px);
+  pointer-events: none;
+  z-index: -1;
 }
 .w-cifra__n {
   font-family: var(--fuente-titulo);
@@ -7974,6 +9183,11 @@ body.wrapped-abierto { overflow: hidden; }
   font-size: clamp(92px, 34vw, 168px);
   line-height: 0.92;
   letter-spacing: -0.02em;
+  background: linear-gradient(180deg, #fff 0%, rgba(255, 255, 255, 0.86) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 6px 30px rgba(var(--w-acento, 130,150,255), 0.45);
 }
 .w-cifra__de {
   font-size: clamp(15px, 4.4vw, 19px);
@@ -7992,19 +9206,16 @@ body.wrapped-abierto { overflow: hidden; }
   color: rgba(255, 255, 255, 0.76);
   margin: 0;
 }
-/* En la mitad de los slides la "nota" (el comentario suelto) sale con
-   letra manuscrita, como una anotación al margen — variedad tipográfica
-   contenida al Wrapped, que ya es su propia experiencia de pantalla
-   completa; el resto de la app se queda en Plus Jakarta Sans. */
+/* En la mitad de los slides la "nota" sale como una pastilla de color con
+   el acento del slide — un guiño, no un cambio de tipografía. */
 .w-var-1 .w-nota, .w-var-3 .w-nota {
-  font-family: 'Caveat', 'Segoe Script', 'Bradley Hand', cursive;
-  font-size: clamp(19px, 5.6vw, 23px);
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.86);
-  line-height: 1.3;
+  display: inline-block;
+  background: rgba(var(--w-acento), 0.16);
+  border: 1px solid rgba(var(--w-acento), 0.32);
+  border-radius: 14px;
+  padding: 9px 14px;
+  color: #fff;
 }
-.w-var-1 .w-nota { transform: rotate(-1.2deg); }
-.w-var-3 .w-nota { transform: rotate(1deg); }
 .w-cancion {
   font-family: var(--fuente-titulo);
   font-weight: 800;
@@ -8015,6 +9226,7 @@ body.wrapped-abierto { overflow: hidden; }
   max-width: 100%;
   overflow-wrap: break-word;
   hyphens: auto;
+  text-shadow: 0 4px 24px rgba(var(--w-acento, 130,150,255), 0.5);
 }
 .w-cierre {
   font-family: var(--fuente-titulo);
@@ -8152,18 +9364,6 @@ body.wrapped-abierto { overflow: hidden; }
   border: 1.5px solid rgba(255, 255, 255, 0.5);
 }
 .wrapped--anual .w-btn--ghost { color: #fff; }
-.w-cerrar-link {
-  margin: 0 auto;
-  padding: 8px 20px;
-  border: 0;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.7);
-  font-family: var(--fuente-texto);
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: underline;
-  cursor: pointer;
-}
 
 /* Mientras la última slide (cierre) está en pantalla, el toque no salta */
 .wrapped.w-cierre-activo .w-zona { pointer-events: none; }
@@ -8220,6 +9420,11 @@ body.wrapped-abierto { overflow: hidden; }
   line-height: 1.15;
   margin: 8px 0 0;
 }
+.w-recuerdo__cuando {
+  font-size: clamp(13px, 3.8vw, 15px);
+  color: rgba(255, 255, 255, 0.72);
+  margin: 4px 0 0;
+}
 .w-recuerdo__nota {
   font-size: clamp(15px, 4.4vw, 17px);
   line-height: 1.45;
@@ -8233,7 +9438,8 @@ body.wrapped-abierto { overflow: hidden; }
 .w-slide--entra .w-recuerdo__txt > * { animation: w-rise 480ms var(--curva) both; }
 .w-slide--entra .w-recuerdo__txt > *:nth-child(1) { animation-delay: 260ms; }
 .w-slide--entra .w-recuerdo__txt > *:nth-child(2) { animation-delay: 340ms; }
-.w-slide--entra .w-recuerdo__txt > *:nth-child(3) { animation-delay: 420ms; }
+.w-slide--entra .w-recuerdo__txt > *:nth-child(3) { animation-delay: 380ms; }
+.w-slide--entra .w-recuerdo__txt > *:nth-child(4) { animation-delay: 440ms; }
 .w-medallas { margin: 0; }
 
 /* Mini-juego "adivina" */
@@ -8365,7 +9571,7 @@ body.wrapped-abierto { overflow: hidden; }
   z-index: 3;
   display: flex;
   gap: 10px;
-  padding: 8px 16px calc(env(safe-area-inset-bottom) + 16px);
+  padding: 14px 16px calc(env(safe-area-inset-bottom, 20px) + 20px);
 }
 .w-paso {
   flex: 1;
@@ -8425,8 +9631,36 @@ body.wrapped-abierto { overflow: hidden; }
   background: linear-gradient(150deg, #FFE9B0, #F3B33F);
 }
 .wrapped--anual .w-check svg { stroke: #FFE9B0; }
-.wrapped--anual .w-btn { color: #6E2CC9; }
-.wrapped--anual .w-paso--next { color: #6E2CC9; }
+
+/* Botones del cierre anual: un relleno oscuro con borde dorado — que se
+   note que son botones, no texto suelto — y solo la LETRA (el span
+   .w-btn__tx de dentro) reluce en bucle, como las luces de Nochevieja. */
+.wrapped--anual .w-btn,
+.wrapped--anual .w-paso--next {
+  background: linear-gradient(160deg, rgba(255, 224, 148, 0.20), rgba(122, 78, 0, 0.26));
+  border: 1.5px solid rgba(255, 224, 148, 0.55);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.wrapped--anual .w-btn--ghost {
+  background: rgba(255, 224, 148, 0.08);
+  border: 1.5px solid rgba(255, 224, 148, 0.38);
+  box-shadow: none;
+}
+.wrapped--anual .w-btn .w-btn__tx,
+.wrapped--anual .w-paso--next .w-btn__tx {
+  display: inline-block;
+  background-image: linear-gradient(100deg,
+    #7A4E00 0%, #F3B33F 22%, #FFE9B0 42%, #FFF6DF 50%, #FFE9B0 58%, #F3B33F 78%, #7A4E00 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: w-oro-brilla 3.4s linear infinite;
+}
+@keyframes w-oro-brilla {
+  from { background-position: 0% 0; }
+  to   { background-position: -200% 0; }
+}
 
 /* ============================================================
    Wrapped — rediseño: más movimiento y mini-juegos nuevos
@@ -8480,6 +9714,155 @@ body.wrapped-abierto { overflow: hidden; }
   to   { background-position: -40% 0; }
 }
 
+/* --- Campanadas: el remate del anual, negro y dorado --- */
+.w-slide--anionuevo .w-eyebrow {
+  padding-left: 0;
+  text-align: center;
+  letter-spacing: 0.16em;
+  color: rgba(255, 224, 148, 0.85);
+}
+.w-slide--anionuevo .w-eyebrow::before { display: none; }
+.w-anio {
+  margin: 0;
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: clamp(30px, 9.5vw, 50px);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  background-image: linear-gradient(100deg,
+    #FFE9B0 0%, #F3B33F 38%, #fff6df 50%, #F3B33F 62%, #FFE9B0 100%);
+  background-size: 280% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 10px 46px rgba(243, 179, 63, 0.5);
+}
+.w-slide--anionuevo.w-slide--entra .w-anio {
+  animation: w-pop 680ms var(--curva) 160ms both, w-brillo 1700ms var(--curva) 760ms 1;
+}
+.w-slide--anionuevo .w-frase,
+.w-slide--anionuevo .w-nota { text-align: center; }
+.w-slide--anionuevo .w-nota { color: rgba(255, 233, 176, 0.78); }
+
+/* Fogonazo al aterrizar: un destello que se abre detrás del año, como si
+   la propia cifra hubiera detonado. Una sola vez, al entrar. */
+.w-slide--anionuevo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: radial-gradient(circle at 50% 44%,
+    rgba(255, 246, 223, 0.95) 0%, rgba(255, 224, 148, 0.35) 32%, transparent 68%);
+  opacity: 0;
+  pointer-events: none;
+}
+.w-slide--anionuevo.w-slide--entra::before {
+  animation: w-fogonazo 750ms ease-out 60ms both;
+}
+@keyframes w-fogonazo {
+  0%   { opacity: 0; transform: scale(0.35); }
+  32%  { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1.7); }
+}
+
+/* Chispas doradas que estallan desde el centro al llegar al slide.
+   12 puntos repartidos cada 30°, cada uno con su propio destino final
+   (no hay seno/coseno en CSS puro, así que van precalculados). */
+.w-chispas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.w-chispas span {
+  position: absolute;
+  left: 50%; top: 42%;
+  width: 6px; height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: #FFE9B0;
+  box-shadow: 0 0 10px 2px rgba(255, 224, 148, 0.8);
+  opacity: 0;
+  --tx: 0px; --ty: 0px;
+}
+.w-slide--anionuevo.w-slide--entra .w-chispas span {
+  animation: w-chispa 1100ms cubic-bezier(0.15, 0.7, 0.3, 1) both;
+}
+.w-chispas span:nth-child(1)  { --tx: 130px;  --ty: 0px;    animation-delay: 80ms; }
+.w-chispas span:nth-child(2)  { --tx: 113px;  --ty: 65px;   animation-delay: 140ms; background: #F3B33F; }
+.w-chispas span:nth-child(3)  { --tx: 65px;   --ty: 113px;  animation-delay: 60ms; }
+.w-chispas span:nth-child(4)  { --tx: 0px;    --ty: 130px;  animation-delay: 180ms; background: #F3B33F; }
+.w-chispas span:nth-child(5)  { --tx: -65px;  --ty: 113px;  animation-delay: 100ms; }
+.w-chispas span:nth-child(6)  { --tx: -113px; --ty: 65px;   animation-delay: 160ms; background: #F3B33F; }
+.w-chispas span:nth-child(7)  { --tx: -130px; --ty: 0px;    animation-delay: 40ms; }
+.w-chispas span:nth-child(8)  { --tx: -113px; --ty: -65px;  animation-delay: 200ms; background: #F3B33F; }
+.w-chispas span:nth-child(9)  { --tx: -65px;  --ty: -113px; animation-delay: 120ms; }
+.w-chispas span:nth-child(10) { --tx: 0px;    --ty: -130px; animation-delay: 220ms; background: #F3B33F; }
+.w-chispas span:nth-child(11) { --tx: 65px;   --ty: -113px; animation-delay: 20ms; }
+.w-chispas span:nth-child(12) { --tx: 113px;  --ty: -65px;  animation-delay: 240ms; background: #F3B33F; }
+@keyframes w-chispa {
+  0%   { opacity: 0; transform: translate(0, 0) scale(0.4); }
+  18%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(1); }
+}
+
+/* Cohetes de fondo: suben desde abajo y estallan, en bucle, mientras el
+   slide está en pantalla (el `display:none` de [hidden] pausa y resetea
+   la animación sola al salir, así que no hace falta pararla a mano).
+   Cada uno es un <span>: ::before es la estela que sube, ::after el
+   estallido — ambos leen `color` (puesto inline) vía currentColor y
+   `--d` (el desfase) para que no salten todos a la vez. */
+.w-fuegos {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.w-cohete { position: absolute; width: 0; height: 0; }
+.w-cohete::before {
+  content: '';
+  position: absolute;
+  left: -2px; top: -2px;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 10px 12px -1px currentColor;
+  opacity: 0;
+}
+.w-cohete::after {
+  content: '';
+  position: absolute;
+  left: -36px; top: -36px;
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle, currentColor 0%, transparent 70%);
+  opacity: 0;
+  transform: scale(0.2);
+}
+.w-slide--anionuevo.w-slide--entra .w-cohete::before {
+  animation: w-cohete-sube 3.8s ease-out infinite;
+  animation-delay: var(--d, 0s);
+}
+.w-slide--anionuevo.w-slide--entra .w-cohete::after {
+  animation: w-cohete-estalla 3.8s ease-out infinite;
+  animation-delay: var(--d, 0s);
+}
+@keyframes w-cohete-sube {
+  0%   { opacity: 0; transform: translateY(52vh); }
+  5%   { opacity: 1; }
+  22%  { opacity: 0.9; transform: translateY(0); }
+  27%  { opacity: 0; transform: translateY(0); }
+  100% { opacity: 0; }
+}
+@keyframes w-cohete-estalla {
+  0%, 22% { opacity: 0; transform: scale(0.2); }
+  28%  { opacity: 0.85; transform: scale(1); }
+  48%  { opacity: 0; transform: scale(1.5); }
+  100% { opacity: 0; }
+}
+
 /* --- Cifra grande: anillo que late al aterrizar --- */
 .w-cifra { position: relative; }
 .w-slide--entra .w-cifra::before {
@@ -8489,13 +9872,12 @@ body.wrapped-abierto { overflow: hidden; }
   width: 220px; height: 220px;
   margin: -110px 0 0 -110px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.4);
+  border: 2px solid rgba(var(--w-acento, 255,255,255), 0.55);
   transform: scale(0.4);
   opacity: 0;
   animation: w-anillo 900ms var(--curva) 260ms 1;
   pointer-events: none;
 }
-.wrapped--anual .w-slide--entra .w-cifra::before { border-color: rgba(255, 233, 176, 0.5); }
 @keyframes w-anillo {
   0%   { transform: scale(0.4); opacity: 0; }
   35%  { opacity: 0.9; }
@@ -8522,7 +9904,7 @@ body.wrapped-abierto { overflow: hidden; }
 .w-eq span {
   width: 5px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.85);
+  background: linear-gradient(180deg, #fff, rgba(var(--w-acento, 255,255,255), 0.9));
   height: 30%;
   animation: w-eq-baila 900ms ease-in-out infinite alternate;
 }
@@ -8619,14 +10001,25 @@ body.wrapped-abierto { overflow: hidden; }
   .w-eq span { animation: none; height: 60%; }
   .w-slide--entra .w-cifra::before,
   .w-slide--portada.w-slide--entra .w-titular--mes,
-  .w-slide--cancion.w-slide--entra .w-cancion { animation: none; }
+  .w-slide--cancion.w-slide--entra .w-cancion,
+  .w-slide--anionuevo.w-slide--entra .w-anio { animation: none; }
+  .w-slide--anionuevo.w-slide--entra::before { animation: none; opacity: 0; }
+  .w-chispas, .w-fuegos { display: none; }
+  .wrapped--anual .w-btn .w-btn__tx,
+  .wrapped--anual .w-paso--next .w-btn__tx { animation: none; background-position: -84% 0; }
   .w-orden__op:active { transform: none; }
 }
 .wrapped--sin-motion .w-notas { display: none; }
 .wrapped--sin-motion .w-eq span { animation: none; height: 60%; }
 .wrapped--sin-motion .w-slide--entra .w-cifra::before,
 .wrapped--sin-motion .w-slide--portada.w-slide--entra .w-titular--mes,
-.wrapped--sin-motion .w-slide--cancion.w-slide--entra .w-cancion { animation: none; }
+.wrapped--sin-motion .w-slide--cancion.w-slide--entra .w-cancion,
+.wrapped--sin-motion .w-slide--anionuevo.w-slide--entra .w-anio { animation: none; }
+.wrapped--sin-motion .w-slide--anionuevo.w-slide--entra::before { animation: none; opacity: 0; }
+.wrapped--sin-motion .w-chispas, .wrapped--sin-motion .w-fuegos { display: none; }
+.wrapped--sin-motion .w-particulas, .wrapped--sin-motion .w-decor-temporada { display: none; }
+.wrapped--sin-motion.wrapped--anual .w-btn .w-btn__tx,
+.wrapped--sin-motion.wrapped--anual .w-paso--next .w-btn__tx { animation: none; background-position: -84% 0; }
 
 /* ============================================================
    Bienvenida — presentación a pantalla completa, solo la 1ª vez.
@@ -9660,12 +11053,12 @@ body.bv-aterriza #vista {
 .bv-gem-ic svg { display: block; width: 100%; height: 100%; }
 .bv-gem-tx {
   background: linear-gradient(100deg, #6BA9FF 0%, #A98BFF 30%, #F0A6C8 48%, #A98BFF 68%, #6BA9FF 100%);
-  background-size: 260% 100%;
+  background-size: 200% 100%;
   -webkit-background-clip: text; background-clip: text;
   color: transparent;
   animation: bv-gem-sheen 4.5s linear infinite;
 }
-@keyframes bv-gem-sheen { to { background-position: -260% 0; } }
+@keyframes bv-gem-sheen { to { background-position: -200% 0; } }
 
 /* --- Letra en directo: KARAOKE ESPACIAL. La pila de versos flota en 3D
    (el que suena viene al frente y nítido, el resto retrocede y se apaga),

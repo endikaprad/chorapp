@@ -250,6 +250,13 @@ window.ResumenMes = (function () {
     var grabN = grab.n, grabSeg = grab.seg;
     var logros = _logrosEntre(iniTs, finTs);
 
+    var tiempoSeg = 0;
+    try {
+      if (window.Tiempo && window.Tiempo.segundosEntre) {
+        tiempoSeg = window.Tiempo.segundosEntre(_iso(new Date(anio, mes, 1)), _iso(new Date(anio, mes + 1, 0)));
+      }
+    } catch (e) {}
+
     var nDias = Object.keys(diasSet).length;
     var nCanciones = Object.keys(porCancion).length;
 
@@ -274,6 +281,7 @@ window.ResumenMes = (function () {
       grabaciones: { n: grabN, seg: Math.round(grabSeg) },
       logros: logros,
       sensaciones: e.sensaciones,
+      tiempoSeg: tiempoSeg,
     };
     datos.hayAlgo = nDias > 0 || grabN > 0 || aprendidas.length > 0 || logros.length > 0 ||
       (e.sensaciones && e.sensaciones.n > 0);
@@ -313,6 +321,13 @@ window.ResumenMes = (function () {
     var grab = _grabacionesEntre(iniTs, finTs);
     var logros = _logrosEntre(iniTs, finTs);
 
+    var tiempoSeg = 0;
+    try {
+      if (window.Tiempo && window.Tiempo.segundosEntre) {
+        tiempoSeg = window.Tiempo.segundosEntre(_iso(new Date(anio, 0, 1)), _iso(new Date(anio, 11, 31)));
+      }
+    } catch (e) {}
+
     var conciertos = 0;
     var recuerdos = [];
     if (window.Conciertos && window.Conciertos.listar) {
@@ -324,6 +339,7 @@ window.ResumenMes = (function () {
           recuerdos.push({
             titulo: c.lugar || 'Un concierto',
             fecha: c.fecha,
+            hora: c.hora || '',
             nota: r.nota || '',
             tieneFoto: !!r.foto,
             fotoClave: window.Conciertos.claveFoto
@@ -357,6 +373,7 @@ window.ResumenMes = (function () {
       conciertos: conciertos,
       recuerdos: recuerdos,
       sensaciones: e.sensaciones,
+      tiempoSeg: tiempoSeg,
     };
     datos.hayAlgo = nDias > 0 || grab.n > 0 || e.aprendidas.length > 0 ||
       logros.length > 0 || recuerdos.length > 0 || (e.sensaciones && e.sensaciones.n > 0);
@@ -556,6 +573,16 @@ window.ResumenMes = (function () {
     if (window.Wrapped && window.Wrapped.cerrar) window.Wrapped.cerrar();
   }
 
+  // Tema visual de la tarjeta "Resumen disponible" y del Wrapped mensual:
+  // CADA mes (0-11) tiene su propio tema, distinto de los demás — nunca se
+  // repite el mismo diseño entre dos meses, aunque sean de la misma
+  // estación (enero no es igual que febrero, agosto no es igual que julio).
+  // Diciembre no tiene tema propio: ese mes no hay Wrapped MENSUAL, solo el
+  // Wrapped ANUAL del 31 de diciembre (con su propio negro y dorado).
+  var TEMAS_MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', ''];
+  function temaMes(mes) { return TEMAS_MES[mes] || ''; }
+
   return {
     datosDe: datosDe,
     datosAnuales: datosAnuales,
@@ -566,6 +593,7 @@ window.ResumenMes = (function () {
     marcarVisto: marcarVisto,
     marcarAnualVisto: marcarAnualVisto,
     nombreMes: nombreMes,
+    temaMes: temaMes,
     abrirHoja: abrirHoja,
     cerrarHoja: cerrarHoja,
   };

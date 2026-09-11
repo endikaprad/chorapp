@@ -47,6 +47,13 @@ window.Calendario = (function () {
       conciertos = setC;
     }
 
+    // Días de la semana con ensayo fijo (0 = Lunes … 6 = Domingo). Se
+    // bordean todos los días del mes que caen en esos días de semana,
+    // salvo que `opts.enPausa(iso)` diga que ese día está en vacaciones
+    // o sin coro.
+    var diasEnsayo = opts.diasEnsayo || [];
+    var enPausa = typeof opts.enPausa === 'function' ? opts.enPausa : function () { return false; };
+
     var hoy = new Date();
     var isoHoy = iso(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
     var vistaAnio = hoy.getFullYear();
@@ -102,9 +109,12 @@ window.Calendario = (function () {
         var clave = iso(vistaAnio, vistaMes, d);
         var clases = 'cal__dia';
         var esConcierto = !!conciertos[clave];
+        var diaSemana = (new Date(vistaAnio, vistaMes, d).getDay() + 6) % 7;
         var pulsable = !!opts.onDia && (esConcierto ||
                        (clave <= isoHoy && (practicados[clave] || conActividad[clave])));
         if (practicados[clave]) clases += ' cal__dia--hecho';
+        if (diasEnsayo.indexOf(diaSemana) !== -1 && !enPausa(clave)) clases += ' cal__dia--ensayo';
+        if (enPausa(clave)) clases += ' cal__dia--pausa';
         if (esConcierto) clases += ' cal__dia--concierto';
         if (clave === isoHoy) clases += ' cal__dia--hoy';
         if (clave > isoHoy && !esConcierto) clases += ' cal__dia--futuro';

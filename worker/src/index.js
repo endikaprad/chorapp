@@ -68,6 +68,16 @@ export default {
       return ota(request, cors, env);
     }
 
+    // --- Copia de seguridad en la nube: ruta GET /backups ---
+    // Las reglas de la RTDB solo dejan LEER /backups con auth (para que no
+    // sea pública); ESCRIBIR sí está abierto, por eso backup.js sube la copia
+    // directo desde el móvil pero para el botón "Sincronizar con la nube"
+    // hace falta pasar por aquí: el Worker sí tiene credenciales (service
+    // account) para leer la última copia y devolvérsela a la app.
+    if (request.method === 'GET' && /\/backups\/?$/.test(pathname)) {
+      return backups(cors, env);
+    }
+
     if (request.method !== 'POST') {
       return json({ error: 'usa POST' }, 405, cors);
     }
@@ -212,6 +222,27 @@ async function ota(request, cors, env) {
     } catch (e) { /* da igual */ }
 
     return json({ ok: true, bundle, push }, 200, cors);
+  } catch (e) {
+    return json({ error: String((e && e.message) || e) }, 500, cors);
+  }
+}
+
+// GET /backups: devuelve el contenido de /backups/ultima de la RTDB.
+async function backups(cors, env) {
+  let sa;
+  try { sa = JSON.parse(env.SERVICE_ACCOUNT); }
+  catch (e) { return json({ error: 'SERVICE_ACCOUNT no es JSON válido' }, 500, cors); }
+
+  const dbUrl = String(env.DB_URL || '').replace(/\/+$/, '');
+  try {
+    const accessToken = await getAccessToken(sa);
+    const r = await fetch(
+      `${dbUrl}/backups/ultima.json?access_token=${encodeURIComponent(accessToken)}`
+    );
+    if (!r.ok) return json({ error: 'no se pudo leer la copia' }, 502, cors);
+    const datos = await r.json();
+    if (!datos) return json({ error: 'todavía no hay ninguna copia en la nube' }, 404, cors);
+    return json(datos, 200, cors);
   } catch (e) {
     return json({ error: String((e && e.message) || e) }, 500, cors);
   }

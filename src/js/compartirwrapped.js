@@ -21,18 +21,52 @@ window.CompartirWrapped = (function () {
   var COL = W - PAD * 2;
   var FUENTE = "'Plus Jakarta Sans', -apple-system, 'Segoe UI', Roboto, sans-serif";
 
-  // Paletas (coinciden con el fondo del Wrapped en pantalla).
+  // Genérica de reserva (por si algún mes no tuviera tema, o datos sin mes).
   var TEMA_MES = {
     g0: '#5A5CF0', g1: '#2A24C8', g2: '#0B0870',
     tinte: '#B9BAFF', texto: '#FFFFFF', apagado: 'rgba(255,255,255,0.72)',
     barra: '#FFFFFF', barraFondo: 'rgba(255,255,255,0.16)',
     tarjeta: 'rgba(255,255,255,0.10)',
   };
+  // Negro y dorado — el anual es Nochevieja, no "violeta con purpurina"
+  // (mismos tonos que el fondo del Wrapped en pantalla, ver .wrapped--anual).
   var TEMA_ANUAL = {
-    g0: '#3B2E8F', g1: '#1B1466', g2: '#0B0740',
-    tinte: '#FFE9B0', texto: '#FFFFFF', apagado: 'rgba(255,255,255,0.72)',
+    g0: '#221a08', g1: '#100c05', g2: '#000000',
+    tinte: '#FFE9B0', texto: '#FFFFFF', apagado: 'rgba(255,233,176,0.72)',
     barra: '#F3B33F', barraFondo: 'rgba(255,233,176,0.18)',
-    tarjeta: 'rgba(255,255,255,0.09)',
+    tarjeta: 'rgba(255,224,148,0.09)',
+  };
+
+  // Convierte "#RRGGBB" a "rgba(r,g,b,a)".
+  function _rgba(hex, a) {
+    var n = parseInt(hex.replace('#', ''), 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  // Construye la paleta de un mes a partir de su gradiente (3 tonos, iguales
+  // que .wrapped--<mes> en styles.css) y su color de acento (--w-acento).
+  function _tema(g0, g1, g2, acento) {
+    return {
+      g0: g0, g1: g1, g2: g2,
+      tinte: acento, texto: '#FFFFFF', apagado: _rgba(acento, 0.72),
+      barra: acento, barraFondo: _rgba(acento, 0.2),
+      tarjeta: 'rgba(255,255,255,0.10)',
+    };
+  }
+  // Paletas por mes — el póster para compartir usa el MISMO fondo que el
+  // Wrapped a pantalla completa de ese mes, no un azul genérico. Diciembre
+  // no tiene entrada: ese mes solo existe el póster ANUAL (TEMA_ANUAL).
+  var TEMA_POR_MES = {
+    enero:      _tema('#3A5FA8', '#142A5E', '#060B1E', '#9AC4FF'),
+    febrero:    _tema('#7A3AA8', '#B8215F', '#3A0F2E', '#FF8CBE'),
+    marzo:      _tema('#8FD450', '#4FAE7A', '#14324A', '#9BE07E'),
+    abril:      _tema('#6F7FD6', '#4A8F8A', '#17303A', '#9FB0FF'),
+    mayo:       _tema('#FF9FC2', '#FFD6A5', '#2F8F63', '#FF9FC2'),
+    junio:      _tema('#E0A53E', '#B06A8A', '#2A2050', '#FFD98A'),
+    julio:      _tema('#FF8F4D', '#FF7A90', '#159C9C', '#FFB089'),
+    agosto:     _tema('#FF6B3D', '#E8451F', '#4A180C', '#FFA25C'),
+    septiembre: _tema('#C99A2E', '#7A8A3C', '#22280F', '#E8C563'),
+    octubre:    _tema('#D97A2C', '#A5501C', '#34200E', '#F0A860'),
+    noviembre:  _tema('#5B6B8A', '#433A5C', '#0F0C17', '#B9C4E0'),
   };
 
   function f(px, peso) { return (peso || 400) + ' ' + px + 'px ' + FUENTE; }
@@ -76,7 +110,9 @@ window.CompartirWrapped = (function () {
 
   function pintar(ctx, datos) {
     var esAnual = !!datos.esAnual;
-    var T = esAnual ? TEMA_ANUAL : TEMA_MES;
+    var tema = !esAnual && window.ResumenMes && window.ResumenMes.temaMes
+      ? window.ResumenMes.temaMes(datos.mes) : '';
+    var T = esAnual ? TEMA_ANUAL : (TEMA_POR_MES[tema] || TEMA_MES);
 
     // --- Fondo: degradado + dos halos suaves ---
     var g = ctx.createLinearGradient(0, 0, W * 0.3, H);
@@ -89,7 +125,7 @@ window.CompartirWrapped = (function () {
       ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
     }
     halo(W * 0.15, H * 0.12, 620, esAnual ? 'rgba(255,233,176,0.16)' : 'rgba(255,255,255,0.16)');
-    halo(W * 0.95, H * 0.9, 720, esAnual ? 'rgba(110,44,201,0.28)' : 'rgba(120,120,255,0.22)');
+    halo(W * 0.95, H * 0.9, 720, esAnual ? 'rgba(243,179,63,0.22)' : _rgba(T.tinte, 0.24));
 
     ctx.textBaseline = 'alphabetic';
     var y = PAD + 28;

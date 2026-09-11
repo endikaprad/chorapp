@@ -16,6 +16,7 @@ window.Pagina_conciertos = (function () {
   var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
   var urls = [];   // object URLs de miniaturas a revocar al salir
+  var _render = 0; // token: descarta URLs de una pintar() ya obsoleta
 
   function hoyISO() {
     var d = new Date();
@@ -97,12 +98,17 @@ window.Pagina_conciertos = (function () {
     }
     cont.innerHTML = html;
 
-    // Cargar miniaturas de recuerdo.
+    // Cargar miniaturas de recuerdo. Token de render: si llega otra pintar()
+    // antes de que resuelva alguna promesa de esta, sus URLs se descartan en
+    // vez de asignarse a un <img> ya destruido (evita blobs huérfanos que se
+    // revocan mientras el navegador aún los está cargando).
     urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
     urls = [];
+    var miRender = ++_render;
     Array.prototype.forEach.call(cont.querySelectorAll('[data-thumb]'), function (img) {
       if (!window.Archivos) return;
       window.Archivos.url(img.getAttribute('data-thumb')).then(function (u) {
+        if (miRender !== _render) { if (u) URL.revokeObjectURL(u); return; }
         if (u) { img.src = u; urls.push(u); }
         else { var p = img.closest('.conc-card__foto'); if (p) p.remove(); }
       }).catch(function () {});

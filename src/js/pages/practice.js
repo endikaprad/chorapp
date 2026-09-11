@@ -32,9 +32,6 @@ window.Pagina_practice = (function () {
     // el frame de entrada antes de que arranque este trabajo pesado.
     setTimeout(function () {
       if (!document.body.contains(raiz)) return;
-      // DIAGNÓSTICO TEMPORAL — quitar cuando se resuelva el lag de Práctica.
-      var _dT0 = performance.now();
-      var _d = function (etq) { console.info('[perf] practica/' + etq + ': ' + (performance.now() - _dT0).toFixed(1) + 'ms'); };
 
       // Se calculan una sola vez aquí y se reparten: Logros y "repasar"
       // necesitan el mismo listar() de canciones/sesiones (que relee y
@@ -44,15 +41,12 @@ window.Pagina_practice = (function () {
         canciones: window.Canciones ? window.Canciones.listar() : [],
         sesiones: window.Sesiones ? window.Sesiones.listar() : [],
       };
-      _d('listar canciones+sesiones');
       pintarLogros(raiz, pre);
-      _d('pintarLogros');
       pintarResumenMes(raiz);
-      _d('pintarResumenMes');
+      pintarEnsayoHoy(raiz, pre);
       pintarRepasar(raiz, pre);
-      _d('pintarRepasar');
       montarCalendario(raiz);
-      _d('montarCalendario');
+      pintarConfigEnsayo(raiz);
 
       var btnConc = raiz.querySelector('[data-ir-conciertos]');
       if (btnConc) {
@@ -66,7 +60,6 @@ window.Pagina_practice = (function () {
       if (btnAdd) btnAdd.addEventListener('click', function () { abrirFormConcierto(null); });
 
       pintarDatos(raiz);
-      _d('pintarDatos (fin)');
     }, 0);
 
     // Se ha llegado aquí tocando un aviso de logro: llevar a ESE logro.
@@ -87,7 +80,7 @@ window.Pagina_practice = (function () {
     var obs = new MutationObserver(function () {
       if (!document.body.contains(raiz)) {
         cerrarResumen(); cerrarFormConcierto(); cerrarLogro(); cerrarPrograma();
-        cerrarRecuerdo(); cerrarFotoFull();
+        cerrarRecuerdo(); cerrarFotoFull(); cerrarConfigEnsayo();
         if (window.ResumenMes) window.ResumenMes.cerrarHoja();
         obs.disconnect();
       }
@@ -184,6 +177,9 @@ window.Pagina_practice = (function () {
      Botón "Ver el resumen del mes" — abre la hoja de resumenmes.js
      con el balance del mes anterior (si hubo algo que contar).
      ---------------------------------------------------------- */
+  var TEMAS_MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre'];
+
   function pintarResumenMes(raiz) {
     var btn = raiz.querySelector('[data-resumen-mes]');
     if (!btn || !window.ResumenMes || !window.ResumenMes.disponiblePractica) return;
@@ -192,8 +188,15 @@ window.Pagina_practice = (function () {
     try { d = window.ResumenMes.disponiblePractica(); } catch (e) { return; }
     if (!d) return;   // fuera de la ventana de 5 días: el botón no se ve
 
+    var elEyebrow = raiz.querySelector('[data-resumen-mes-eyebrow]');
+    if (elEyebrow) elEyebrow.textContent = d.esAnual ? 'Tu Wrapped anual' : 'Wrapped del mes';
     raiz.querySelector('[data-resumen-mes-texto]').textContent =
-      d.esAnual ? ('Tu ' + d.anio + ' en ChorApp') : ('Resumen de ' + d.nombreMes);
+      d.esAnual ? ('¡Feliz ' + (d.anio + 1) + '!') : ('Resumen de ' + d.nombreMes);
+    btn.classList.toggle('tarjeta-resumen--anual', !!d.esAnual);
+    TEMAS_MES.forEach(function (t) { btn.classList.remove('tarjeta-resumen--' + t); });
+    if (!d.esAnual && window.ResumenMes.temaMes) {
+      btn.classList.add('tarjeta-resumen--' + window.ResumenMes.temaMes(d.mes));
+    }
     btn.addEventListener('click', function () { window.ResumenMes.abrirHoja(d); });
     btn.hidden = false;
   }
@@ -214,24 +217,39 @@ window.Pagina_practice = (function () {
     raiz.querySelector('[data-logros-cuenta]').textContent =
       res.hechos + ' de ' + res.total;
 
-    // Orden: conseguidos primero (por grupo), luego los pendientes
-    // ordenados por lo cerca que están de caer.
-    var hechos = lista.filter(function (l) { return l.hecho; });
-    var pend = lista.filter(function (l) { return !l.hecho; })
-      .sort(function (a, b) { return b.progreso - a.progreso; });
-    var orden = hechos.concat(pend);
+    // Agrupados por dificultad, de menos a más difícil (bronce → plata →
+    // oro → platino), con su propia etiqueta encima de cada bloque. Dentro
+    // de cada grupo: primero los conseguidos, luego los pendientes por
+    // cercanía a caer.
+    var ORDEN_DIF = ['bronce', 'plata', 'oro', 'platino'];
+    var NOMBRE_DIF = { bronce: 'Bronce', plata: 'Plata', oro: 'Oro', platino: 'Platino' };
 
     var grid = raiz.querySelector('[data-logros-grid]');
-    grid.innerHTML = orden.map(function (l, i) {
-      var prog = l.hecho
-        ? ''
-        : '<span class="logro__prog">' + Math.min(l.valor, l.objetivo) + '/' + l.objetivo + '</span>';
-      return '<button type="button" class="logro' + (l.hecho ? ' logro--hecho' : '') + '" ' +
-        'data-logro="' + l.id + '" style="animation-delay:' + (i * 28) + 'ms">' +
-        '<span class="logro__medalla">' + window.Logros.icono(l.icono) + '</span>' +
-        '<span class="logro__titulo">' + escapar(l.titulo) + '</span>' +
-        prog +
-      '</button>';
+    var contador = 0;
+    grid.innerHTML = ORDEN_DIF.map(function (dif) {
+      var delGrupo = lista.filter(function (l) { return (l.dificultad || 'bronce') === dif; });
+      if (!delGrupo.length) return '';
+      var hechos = delGrupo.filter(function (l) { return l.hecho; });
+      var pend = delGrupo.filter(function (l) { return !l.hecho; })
+        .sort(function (a, b) { return b.progreso - a.progreso; });
+      var items = hechos.concat(pend).map(function (l) {
+        var prog = l.hecho
+          ? ''
+          : '<span class="logro__prog">' + Math.min(l.valor, l.objetivo) + '/' + l.objetivo + '</span>';
+        var i = contador++;
+        return '<button type="button" class="logro logro--' + dif + (l.hecho ? ' logro--hecho' : '') + '" ' +
+          'data-logro="' + l.id + '" style="animation-delay:' + (i * 28) + 'ms">' +
+          '<span class="logro__medalla">' + window.Logros.icono(l.icono) + '</span>' +
+          '<span class="logro__titulo">' + escapar(l.titulo) + '</span>' +
+          prog +
+        '</button>';
+      }).join('');
+      return '<div class="logros__grupo">' +
+        '<h3 class="logros__grupo-titulo logros__grupo-titulo--' + dif + '">' +
+          NOMBRE_DIF[dif] + '<span class="logros__grupo-cuenta">' + hechos.length + '/' + delGrupo.length + '</span>' +
+        '</h3>' +
+        '<div class="logros__subgrid">' + items + '</div>' +
+      '</div>';
     }).join('');
 
     grid.onclick = function (ev) {
@@ -281,13 +299,17 @@ window.Pagina_practice = (function () {
     var comoLoHizo = '';
     try { comoLoHizo = window.Logros.detalle(l) || ''; } catch (e) {}
 
+    var dif = l.dificultad || 'bronce';
+    var difNombre = l.dificultadNombre || dif;
+
     hojaLogro = document.createElement('div');
-    hojaLogro.className = 'hoja hoja--logro';
+    hojaLogro.className = 'hoja hoja--logro hoja--logro-' + dif;
     hojaLogro.innerHTML =
       '<div class="hoja__fondo" data-cerrar></div>' +
       '<div class="hoja__panel" role="dialog" aria-modal="true" aria-label="Logro">' +
         '<div class="hoja__asa"></div>' +
-        '<div class="logro-det__medalla' + (l.hecho ? '' : ' logro-det__medalla--bloq') + '">' +
+        '<p class="logro-det__dif logro-det__dif--' + dif + '">' + escapar(difNombre) + '</p>' +
+        '<div class="logro-det__medalla logro-det__medalla--' + dif + (l.hecho ? '' : ' logro-det__medalla--bloq') + '">' +
           window.Logros.icono(l.icono) + '</div>' +
         (l.hecho
           ? '<p class="logro-det__pill">Conseguido</p>'
@@ -341,11 +363,15 @@ window.Pagina_practice = (function () {
     var dias = window.Practica ? window.Practica.diasPracticados() : [];
     var conActividad = window.Diario ? window.Diario.dias() : [];
     var conciertos = window.Conciertos ? window.Conciertos.mapa() : {};
+    var diasEnsayo = window.Ensayos ? window.Ensayos.dias() : [];
+    var enPausa = window.Ensayos ? window.Ensayos.enPausa : null;
 
     window.Calendario.crear(cont, {
       practicados: dias,
       conActividad: conActividad,
       conciertos: conciertos,
+      diasEnsayo: diasEnsayo,
+      enPausa: enPausa,
       onDia: abrirResumenDia,
     });
   }
@@ -1336,6 +1362,283 @@ window.Pagina_practice = (function () {
   }
 
   /* ----------------------------------------------------------
+     Repaso rápido antes del ensayo — si hoy toca ensayo (según
+     los días configurados en Ensayos), sugiere 2-3 canciones:
+     primero las que tienen fragmentos difíciles pendientes, y si
+     falta hueco, las menos practicadas esta semana.
+     ---------------------------------------------------------- */
+  function pintarEnsayoHoy(raiz, pre) {
+    var btn = raiz.querySelector('[data-ensayo-hoy]');
+    if (!btn) return;
+    if (!window.Ensayos || !window.Ensayos.esHoyEnsayo()) { btn.hidden = true; return; }
+
+    var canciones = pre.canciones || (window.Canciones ? window.Canciones.listar() : []);
+    var estadoPorId = {};
+    canciones.forEach(function (c) { estadoPorId[c.id] = c.estado; });
+
+    var dificiles = window.Sesiones ? window.Sesiones.repasoPendiente(pre.sesiones).filter(function (p) {
+      if (!p.cancionId) return true;
+      var e = estadoPorId[p.cancionId];
+      return e === undefined || e !== 'aprendida';
+    }).sort(function (a, b) { return b.trozos - a.trozos; }) : [];
+
+    // Veces que se ha practicado cada canción esta semana (lunes-domingo).
+    var reg = window.Practica ? window.Practica.leer() : {};
+    var hoyD = new Date();
+    var lunes = new Date(hoyD);
+    lunes.setDate(hoyD.getDate() - ((hoyD.getDay() + 6) % 7));
+    var isoLunes = window.Practica.hoyISO(lunes);
+    var vecesSemana = {};
+    Object.keys(reg).forEach(function (f) {
+      if (f < isoLunes) return;
+      (reg[f] || []).forEach(function (id) { vecesSemana[id] = (vecesSemana[id] || 0) + 1; });
+    });
+
+    var yaIds = {};
+    var elegidas = [];
+    dificiles.forEach(function (p) {
+      if (elegidas.length >= 3) return;
+      var clave = p.cancionId || p.ref.marca.id;
+      if (yaIds[clave]) return;
+      yaIds[clave] = true;
+      elegidas.push({ titulo: p.titulo, ref: p.ref });
+    });
+    if (elegidas.length < 3) {
+      canciones.filter(function (c) {
+        return c.estado !== 'aprendida' && !yaIds[c.id];
+      }).sort(function (a, b) {
+        return (vecesSemana[a.id] || 0) - (vecesSemana[b.id] || 0);
+      }).forEach(function (c) {
+        if (elegidas.length >= 3) return;
+        var ref = window.Sesiones && window.Sesiones.ultimaMarcaDeCancion ?
+          window.Sesiones.ultimaMarcaDeCancion(c.id) : null;
+        if (!ref) return;   // sin ensayo ni canción suelta: nada que abrir
+        elegidas.push({ titulo: c.titulo, ref: ref });
+      });
+    }
+
+    if (!elegidas.length) { btn.hidden = true; return; }
+
+    var diaTxt = window.Ensayos.NOMBRES[window.Ensayos.diaSemanaHoy()];
+    raiz.querySelector('[data-ensayo-hoy-titulo]').textContent = 'Hoy es ' + diaTxt.toLowerCase() + ': tienes ensayo';
+    raiz.querySelector('[data-ensayo-hoy-nota]').textContent =
+      elegidas.length === 1
+        ? 'Repasa «' + elegidas[0].titulo + '» antes de ir'
+        : 'Repasa ' + elegidas.map(function (e) { return '«' + e.titulo + '»'; }).join(', ') + ' antes de ir';
+
+    btn.addEventListener('click', function () {
+      var primera = elegidas[0];
+      window.App.ir('estudio', { datos: { sesionId: primera.ref.sesion.id, marcaId: primera.ref.marca.id } });
+    });
+    btn.hidden = false;
+  }
+
+  /* ----------------------------------------------------------
+     Configurar días de ensayo — hoja con chips L M X J V S D
+     para marcar los días fijos de ensayo del coro.
+     ---------------------------------------------------------- */
+  function pintarConfigEnsayo(raiz) {
+    var btn = raiz.querySelector('[data-config-ensayo]');
+    if (!btn || !window.Ensayos) return;
+    var texto = raiz.querySelector('[data-config-ensayo-texto]');
+    actualizarTextoConfigEnsayo(texto);
+    btn.addEventListener('click', function () { abrirConfigEnsayo(texto); });
+  }
+
+  function actualizarTextoConfigEnsayo(texto) {
+    if (!texto) return;
+    var resumen = window.Ensayos.textoResumen();
+    texto.textContent = resumen ? 'Ensayo los ' + resumen : 'Configura tus días de ensayo';
+  }
+
+  var hojaEnsayo = null;
+  var fpPausaDesde = null;
+  var fpPausaHasta = null;
+
+  function abrirConfigEnsayo(texto) {
+    cerrarConfigEnsayo();
+    var actuales = window.Ensayos.dias();
+
+    hojaEnsayo = document.createElement('div');
+    hojaEnsayo.className = 'hoja hoja--ensayo';
+    hojaEnsayo.innerHTML =
+      '<div class="hoja__fondo" data-cerrar></div>' +
+      '<div class="hoja__panel" role="dialog" aria-modal="true" aria-label="Días de ensayo">' +
+        '<div class="hoja__asa"></div>' +
+        '<h2 class="hoja__titulo">¿Qué días tenéis ensayo?</h2>' +
+        '<p class="programa__pista">Esos días marcaré el calendario y te sugeriré repasar antes de ir.</p>' +
+        '<div class="dias-semana" data-dias></div>' +
+
+        '<div class="ensayo-pausas">' +
+          '<div class="ensayo-pausas__cab">' +
+            '<span class="campo__label">Vacaciones o semanas sin coro</span>' +
+            '<button type="button" class="ensayo-pausas__add" data-add-pausa>+ Añadir</button>' +
+          '</div>' +
+          '<p class="ensayo-pausas__pista">Mientras dure, esos días no cuentan como ensayo.</p>' +
+          '<ul class="ensayo-pausas__lista" data-lista-pausas></ul>' +
+          '<div class="ensayo-pausas__form" data-form-pausa hidden>' +
+            '<div class="campo">' +
+              '<span class="campo__label">Desde</span>' +
+              '<div data-fp-desde></div>' +
+            '</div>' +
+            '<div class="campo">' +
+              '<span class="campo__label">Hasta</span>' +
+              '<div data-fp-hasta></div>' +
+            '</div>' +
+            '<label class="campo">' +
+              '<span class="campo__label">Motivo <span class="campo__opcional">(opcional)</span></span>' +
+              '<input type="text" data-pausa-nota placeholder="Vacaciones de verano…" />' +
+            '</label>' +
+            '<div class="ensayo-pausas__form-acciones">' +
+              '<button type="button" class="btn btn--texto" data-cancelar-pausa>Cancelar</button>' +
+              '<button type="button" class="btn btn--primario" data-guardar-pausa>Añadir pausa</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="hoja__acciones">' +
+          '<button type="button" class="btn btn--texto" data-cerrar>Cancelar</button>' +
+          '<button type="button" class="btn btn--primario" data-guardar>Guardar</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(hojaEnsayo);
+
+    var cont = hojaEnsayo.querySelector('[data-dias]');
+    var elegidos = actuales.slice();
+    cont.innerHTML = window.Ensayos.NOMBRES.map(function (nombre, i) {
+      var sel = elegidos.indexOf(i) !== -1;
+      return '<button type="button" class="dias-semana__dia' + (sel ? ' is-sel' : '') + '" data-dia="' + i + '">' +
+        window.Ensayos.ABREV[i] + '</button>';
+    }).join('');
+
+    cont.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-dia]');
+      if (!b) return;
+      var n = Number(b.getAttribute('data-dia'));
+      var pos = elegidos.indexOf(n);
+      if (pos === -1) { elegidos.push(n); b.classList.add('is-sel'); }
+      else { elegidos.splice(pos, 1); b.classList.remove('is-sel'); }
+    });
+
+    var formPausa = hojaEnsayo.querySelector('[data-form-pausa]');
+    var listaPausas = hojaEnsayo.querySelector('[data-lista-pausas]');
+
+    function pintarPausas() {
+      var pausas = window.Ensayos.listarPausas();
+      if (!pausas.length) {
+        listaPausas.innerHTML = '';
+        listaPausas.hidden = true;
+        return;
+      }
+      listaPausas.hidden = false;
+      listaPausas.innerHTML = pausas.map(function (p) {
+        return '<li class="ensayo-pausas__it" data-pausa="' + p.id + '">' +
+          '<span class="ensayo-pausas__rango">' +
+            escapar(fechaCorta(p.desde)) + ' – ' + escapar(fechaCorta(p.hasta)) +
+            (p.nota ? '<span class="ensayo-pausas__nota">' + escapar(p.nota) + '</span>' : '') +
+          '</span>' +
+          '<button type="button" class="ensayo-pausas__quitar" data-quitar-pausa aria-label="Quitar pausa">' + ICO_X + '</button>' +
+        '</li>';
+      }).join('');
+    }
+
+    listaPausas.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-quitar-pausa]');
+      if (!b) return;
+      var li = b.closest('.ensayo-pausas__it');
+      window.Ensayos.borrarPausa(li.getAttribute('data-pausa'));
+      pintarPausas();
+    });
+
+    pintarPausas();
+
+    function destruirFpsPausa() {
+      if (fpPausaDesde && fpPausaDesde.destruir) { try { fpPausaDesde.destruir(); } catch (e) {} }
+      if (fpPausaHasta && fpPausaHasta.destruir) { try { fpPausaHasta.destruir(); } catch (e) {} }
+      fpPausaDesde = null;
+      fpPausaHasta = null;
+    }
+
+    hojaEnsayo.querySelector('[data-add-pausa]').addEventListener('click', function () {
+      formPausa.hidden = false;
+      hojaEnsayo.querySelector('[data-pausa-nota]').value = '';
+      var hoy = window.Ensayos.hoyISO();
+      destruirFpsPausa();
+      fpPausaDesde = window.FechaPicker.montar(hojaEnsayo.querySelector('[data-fp-desde]'), {
+        valor: hoy, maxHoy: false, rapidos: false,
+      });
+      fpPausaHasta = window.FechaPicker.montar(hojaEnsayo.querySelector('[data-fp-hasta]'), {
+        valor: hoy, maxHoy: false, rapidos: false,
+      });
+    });
+
+    hojaEnsayo.querySelector('[data-cancelar-pausa]').addEventListener('click', function () {
+      formPausa.hidden = true;
+      destruirFpsPausa();
+    });
+
+    hojaEnsayo.querySelector('[data-guardar-pausa]').addEventListener('click', function () {
+      var desde = fpPausaDesde ? fpPausaDesde.valor() : '';
+      var hasta = fpPausaHasta ? fpPausaHasta.valor() : '';
+      if (desde > hasta) {
+        if (window.UI) window.UI.aviso('La fecha "hasta" no puede ser anterior a "desde"', { tipo: 'error' });
+        return;
+      }
+      window.Ensayos.guardarPausa({
+        desde: desde, hasta: hasta,
+        nota: hojaEnsayo.querySelector('[data-pausa-nota]').value,
+      });
+      formPausa.hidden = true;
+      destruirFpsPausa();
+      pintarPausas();
+    });
+
+    Array.prototype.forEach.call(hojaEnsayo.querySelectorAll('[data-cerrar]'), function (el) {
+      el.addEventListener('click', cerrarConfigEnsayo);
+    });
+    document.addEventListener('keydown', cerrarConfigEnsayoEsc);
+
+    hojaEnsayo.querySelector('[data-guardar]').addEventListener('click', function () {
+      window.Ensayos.guardarDias(elegidos);
+      cerrarConfigEnsayo();
+      actualizarTextoConfigEnsayo(texto);
+      montarCalendario();
+      pintarEnsayoHoy(raizActual, {
+        canciones: window.Canciones ? window.Canciones.listar() : [],
+        sesiones: window.Sesiones ? window.Sesiones.listar() : [],
+      });
+      if (window.UI) window.UI.aviso('Días de ensayo guardados', { tipo: 'ok' });
+    });
+
+    void hojaEnsayo.offsetHeight;
+    hojaEnsayo.classList.add('is-abierta');
+  }
+
+  function cerrarConfigEnsayoEsc(e) { if (e.key === 'Escape') cerrarConfigEnsayo(); }
+  function cerrarConfigEnsayo() {
+    document.removeEventListener('keydown', cerrarConfigEnsayoEsc);
+    if (fpPausaDesde && fpPausaDesde.destruir) { try { fpPausaDesde.destruir(); } catch (e) {} }
+    if (fpPausaHasta && fpPausaHasta.destruir) { try { fpPausaHasta.destruir(); } catch (e) {} }
+    fpPausaDesde = null;
+    fpPausaHasta = null;
+    var h = hojaEnsayo;
+    hojaEnsayo = null;
+    if (!h) return;
+    h.classList.remove('is-abierta');
+    var quita = function () { if (h.parentNode) h.parentNode.removeChild(h); };
+    h.addEventListener('transitionend', quita, { once: true });
+    setTimeout(quita, 320);
+  }
+
+  // "24 dic" / "6 ene" — para las filas de pausas.
+  var MES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  function fechaCorta(iso) {
+    var p = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    if (!p) return iso || '';
+    return Number(p[3]) + ' ' + MES_CORTO[Number(p[2]) - 1];
+  }
+
+  /* ----------------------------------------------------------
      Fragmentos difíciles pendientes — invita a repasarlos.
      Solo cuentan las canciones que aún no están aprendidas.
      ---------------------------------------------------------- */
@@ -1414,7 +1717,7 @@ window.Pagina_practice = (function () {
   // Conciertos al salir, ya que sus hojas viven en este módulo).
   function cerrarHojasConcierto() {
     cerrarResumen(); cerrarFormConcierto(); cerrarPrograma();
-    cerrarRecuerdo(); cerrarFotoFull();
+    cerrarRecuerdo(); cerrarFotoFull(); cerrarConfigEnsayo();
   }
 
   return {

@@ -161,23 +161,23 @@ window.Logros = (function () {
     // vez (Diario.todos()). Antes se releía y re-parseaba el diario entero
     // por cada día con dias()+delDia(), lo que con meses de historial se
     // notaba como lag al entrar en Práctica.
-    var madrugaDias = [], noctDias = [], memoriaPerfectas = 0;
+    var madrugaDias = [], noctDias = [], trasnocheDias = [], memoriaPerfectas = 0;
     if (window.Diario) {
       var diarioCompleto = window.Diario.todos();
       Object.keys(diarioCompleto).forEach(function (dia) {
-        var horaMin = null, horaMax = null;
+        var horasEstudio = [];
         (diarioCompleto[dia] || []).forEach(function (ev) {
           if (ev.t === 'estudio' && ev.ts) {
-            var h = new Date(ev.ts).getHours();
-            if (horaMin === null || h < horaMin) horaMin = h;
-            if (horaMax === null || h > horaMax) horaMax = h;
+            horasEstudio.push(new Date(ev.ts).getHours());
           } else if (ev.t === 'memoria' && ev.extra && ev.extra.total > 0 &&
                      ev.extra.aciertos >= ev.extra.total) {
             memoriaPerfectas++;
           }
         });
-        if (horaMin !== null && horaMin < 9) madrugaDias.push(dia);
-        if (horaMax !== null && horaMax >= 22) noctDias.push(dia);
+        // Madrugar = entre las 5 y las 9. Antes de las 5 es trasnochar, no madrugar.
+        if (horasEstudio.some(function (h) { return h >= 5 && h < 9; })) madrugaDias.push(dia);
+        if (horasEstudio.some(function (h) { return h >= 22; })) noctDias.push(dia);
+        if (horasEstudio.some(function (h) { return h >= 0 && h < 5; })) trasnocheDias.push(dia);
       });
     }
 
@@ -205,6 +205,7 @@ window.Logros = (function () {
       trozos: trozos,
       madrugaDias: madrugaDias,
       noctDias: noctDias,
+      trasnocheDias: trasnocheDias,
       memoriaPerfectas: memoriaPerfectas,
       etiquetadas: etiquetadas,
       sensacionDias: sensacionDias,
@@ -227,6 +228,7 @@ window.Logros = (function () {
       trozos: dt.trozos.length,
       madruga: dt.madrugaDias.length,
       noct: dt.noctDias.length,
+      trasnoche: dt.trasnocheDias.length,
       memoriaPerfecta: dt.memoriaPerfectas,
       etiquetadas: dt.etiquetadas,
       sensaciones: dt.sensacionDias,
@@ -235,81 +237,91 @@ window.Logros = (function () {
     };
   }
 
-  /* --- Catálogo --------------------------------------------- */
+  /* --- Dificultad ---------------------------------------------
+     Cuatro niveles de rareza, de menos a más difícil de conseguir.
+     Cada uno tiene su propio color, brillo y sonido (ver más abajo)
+     para que un logro de oro o platino SE NOTE que es especial. */
+  var DIFICULTADES = ['bronce', 'plata', 'oro', 'platino'];
+  var NOMBRE_DIF = { bronce: 'Bronce', plata: 'Plata', oro: 'Oro', platino: 'Platino' };
+
   var CATALOGO = [
-    { id: 'racha-3',   grupo: 'Racha',      icono: 'llama',      m: 'racha', objetivo: 3,
+    { id: 'racha-3',   grupo: 'Racha',      icono: 'llama',      m: 'racha', objetivo: 3, dif: 'bronce',
       titulo: 'Primer impulso',  desc: '3 días seguidos estudiando.' },
-    { id: 'racha-7',   grupo: 'Racha',      icono: 'llama',      m: 'racha', objetivo: 7,
+    { id: 'racha-7',   grupo: 'Racha',      icono: 'llama',      m: 'racha', objetivo: 7, dif: 'plata',
       titulo: 'Una semana',      desc: '7 días de racha sin fallar.' },
-    { id: 'racha-14',  grupo: 'Racha',      icono: 'llama',      m: 'racha', objetivo: 14,
+    { id: 'racha-14',  grupo: 'Racha',      icono: 'llama',      m: 'racha', objetivo: 14, dif: 'plata',
       titulo: 'Dos semanas',     desc: '14 días de racha. Ya es costumbre.' },
-    { id: 'racha-30',  grupo: 'Racha',      icono: 'llama',      m: 'racha', objetivo: 30,
+    { id: 'racha-30',  grupo: 'Racha',      icono: 'llama',      m: 'racha', objetivo: 30, dif: 'oro',
       titulo: 'Un mes entero',   desc: '30 días seguidos. Impresionante.' },
-    { id: 'racha-100', grupo: 'Racha',      icono: 'trofeo',     m: 'racha', objetivo: 100,
+    { id: 'racha-100', grupo: 'Racha',      icono: 'trofeo',     m: 'racha', objetivo: 100, dif: 'platino',
       titulo: 'Cien días',       desc: '100 días de racha. Palabras mayores.' },
 
-    { id: 'dias-10',   grupo: 'Constancia', icono: 'calendario', m: 'dias', objetivo: 10,
+    { id: 'dias-10',   grupo: 'Constancia', icono: 'calendario', m: 'dias', objetivo: 10, dif: 'bronce',
       titulo: 'Cogiendo el ritmo', desc: '10 días de estudio en total.' },
-    { id: 'dias-50',   grupo: 'Constancia', icono: 'calendario', m: 'dias', objetivo: 50,
+    { id: 'dias-50',   grupo: 'Constancia', icono: 'calendario', m: 'dias', objetivo: 50, dif: 'plata',
       titulo: 'Medio centenar',    desc: '50 días de estudio acumulados.' },
-    { id: 'dias-150',  grupo: 'Constancia', icono: 'calendario', m: 'dias', objetivo: 150,
+    { id: 'dias-150',  grupo: 'Constancia', icono: 'calendario', m: 'dias', objetivo: 150, dif: 'oro',
       titulo: 'Incansable',        desc: '150 días de estudio. Toda una vida de coro.' },
 
-    { id: 'canc-1',    grupo: 'Repertorio', icono: 'nota', m: 'canciones', objetivo: 1,
+    { id: 'canc-1',    grupo: 'Repertorio', icono: 'nota', m: 'canciones', objetivo: 1, dif: 'bronce',
       titulo: 'Empieza el repertorio', desc: 'Has estudiado tu primera canción.' },
-    { id: 'canc-5',    grupo: 'Repertorio', icono: 'nota', m: 'canciones', objetivo: 5,
+    { id: 'canc-5',    grupo: 'Repertorio', icono: 'nota', m: 'canciones', objetivo: 5, dif: 'plata',
       titulo: 'Cinco canciones',       desc: 'Cinco canciones distintas trabajadas.' },
-    { id: 'canc-15',   grupo: 'Repertorio', icono: 'nota', m: 'canciones', objetivo: 15,
+    { id: 'canc-15',   grupo: 'Repertorio', icono: 'nota', m: 'canciones', objetivo: 15, dif: 'oro',
       titulo: 'Repertorio de concierto', desc: '15 canciones distintas. Ya es un programa.' },
 
-    { id: 'apr-1',     grupo: 'Aprendidas', icono: 'estrella', m: 'aprendidas', objetivo: 1,
+    { id: 'apr-1',     grupo: 'Aprendidas', icono: 'estrella', m: 'aprendidas', objetivo: 1, dif: 'bronce',
       titulo: 'La primera aprendida', desc: 'Marcaste tu primera canción como aprendida.' },
-    { id: 'apr-5',     grupo: 'Aprendidas', icono: 'estrella', m: 'aprendidas', objetivo: 5,
+    { id: 'apr-5',     grupo: 'Aprendidas', icono: 'estrella', m: 'aprendidas', objetivo: 5, dif: 'plata',
       titulo: 'Cinco en el bolsillo',  desc: '5 canciones aprendidas del todo.' },
-    { id: 'apr-12',    grupo: 'Aprendidas', icono: 'estrella', m: 'aprendidas', objetivo: 12,
+    { id: 'apr-12',    grupo: 'Aprendidas', icono: 'estrella', m: 'aprendidas', objetivo: 12, dif: 'oro',
       titulo: 'Te las sabes todas',    desc: '12 canciones aprendidas.' },
 
-    { id: 'grab-1',    grupo: 'Tu voz', icono: 'micro', m: 'grabaciones', objetivo: 1,
+    { id: 'grab-1',    grupo: 'Tu voz', icono: 'micro', m: 'grabaciones', objetivo: 1, dif: 'bronce',
       titulo: 'Primer ensayo grabado', desc: 'Te grabaste cantando por primera vez.' },
-    { id: 'grab-10',   grupo: 'Tu voz', icono: 'micro', m: 'grabaciones', objetivo: 10,
+    { id: 'grab-10',   grupo: 'Tu voz', icono: 'micro', m: 'grabaciones', objetivo: 10, dif: 'plata',
       titulo: 'Diez tomas',            desc: '10 grabaciones tuyas guardadas.' },
-    { id: 'grab-30',   grupo: 'Tu voz', icono: 'micro', m: 'grabaciones', objetivo: 30,
+    { id: 'grab-30',   grupo: 'Tu voz', icono: 'micro', m: 'grabaciones', objetivo: 30, dif: 'oro',
       titulo: 'Tu propio archivo',     desc: '30 grabaciones. Escúchate crecer.' },
 
-    { id: 'troz-5',    grupo: 'Detalle', icono: 'estrella', m: 'trozos', objetivo: 5,
+    { id: 'troz-5',    grupo: 'Detalle', icono: 'estrella', m: 'trozos', objetivo: 5, dif: 'bronce',
       titulo: 'Al detalle',   desc: 'Marcaste 5 trozos difíciles para repasarlos.' },
-    { id: 'troz-20',   grupo: 'Detalle', icono: 'estrella', m: 'trozos', objetivo: 20,
+    { id: 'troz-20',   grupo: 'Detalle', icono: 'estrella', m: 'trozos', objetivo: 20, dif: 'plata',
       titulo: 'Nada se te escapa', desc: '20 trozos difíciles marcados.' },
 
-    { id: 'memoria-1', grupo: 'Detalle', icono: 'estrella', m: 'memoriaPerfecta', objetivo: 1,
+    { id: 'memoria-1', grupo: 'Detalle', icono: 'estrella', m: 'memoriaPerfecta', objetivo: 1, dif: 'bronce',
       titulo: 'De memoria',    desc: 'Superaste el test de memoria sin fallar ni un verso.' },
-    { id: 'memoria-5', grupo: 'Detalle', icono: 'estrella', m: 'memoriaPerfecta', objetivo: 5,
+    { id: 'memoria-5', grupo: 'Detalle', icono: 'estrella', m: 'memoriaPerfecta', objetivo: 5, dif: 'oro',
       titulo: 'Sin chuleta',   desc: '5 veces perfecta en el test de memoria de la letra.' },
 
-    { id: 'madruga-5', grupo: 'Horario', icono: 'sol',  m: 'madruga', objetivo: 5,
-      titulo: 'Madrugadora',  desc: '5 días estudiando antes de las 9 de la mañana.' },
-    { id: 'noct-5',    grupo: 'Horario', icono: 'luna', m: 'noct', objetivo: 5,
+    { id: 'madruga-5', grupo: 'Horario', icono: 'sol',  m: 'madruga', objetivo: 5, dif: 'bronce',
+      titulo: 'Madrugadora',  desc: '5 días estudiando entre las 5 y las 9 de la mañana.' },
+    { id: 'noct-5',    grupo: 'Horario', icono: 'luna', m: 'noct', objetivo: 5, dif: 'bronce',
       titulo: 'Búho nocturno', desc: '5 días estudiando pasadas las 22h.' },
+    { id: 'trasnoche-5', grupo: 'Horario', icono: 'luna', m: 'trasnoche', objetivo: 5, dif: 'plata',
+      titulo: 'Trasnochadora', desc: '5 días estudiando de madrugada, entre medianoche y las 5.' },
 
-    { id: 'etiq-5',    grupo: 'Organización', icono: 'etiqueta', m: 'etiquetadas', objetivo: 5,
+    { id: 'etiq-5',    grupo: 'Organización', icono: 'etiqueta', m: 'etiquetadas', objetivo: 5, dif: 'bronce',
       titulo: 'Todo en su sitio', desc: '5 canciones con etiquetas para organizar el repertorio.' },
 
-    { id: 'sensa-10',  grupo: 'Detalle', icono: 'estrella', m: 'sensaciones', objetivo: 10,
+    { id: 'sensa-10',  grupo: 'Detalle', icono: 'estrella', m: 'sensaciones', objetivo: 10, dif: 'plata',
       titulo: 'Se sincera',   desc: '10 días registrando cómo te sentiste tras el ensayo.' },
 
-    { id: 'concierto-1', grupo: 'Conciertos', icono: 'trofeo', m: 'conciertos', objetivo: 1,
+    { id: 'concierto-1', grupo: 'Conciertos', icono: 'trofeo', m: 'conciertos', objetivo: 1, dif: 'bronce',
       titulo: 'Al escenario', desc: 'Viviste tu primer concierto con la app.' },
-    { id: 'concierto-5', grupo: 'Conciertos', icono: 'trofeo', m: 'conciertos', objetivo: 5,
+    { id: 'concierto-5', grupo: 'Conciertos', icono: 'trofeo', m: 'conciertos', objetivo: 5, dif: 'oro',
       titulo: 'De gira',      desc: '5 conciertos. Ya es una temporada.' },
-    { id: 'recuerdo-1',  grupo: 'Conciertos', icono: 'nota',   m: 'recuerdos', objetivo: 1,
+    { id: 'recuerdo-1',  grupo: 'Conciertos', icono: 'nota',   m: 'recuerdos', objetivo: 1, dif: 'bronce',
       titulo: 'Para el recuerdo', desc: 'Guardaste tu primer recuerdo de un concierto.' },
   ];
 
   function _construye(l, m) {
     var valor = m[l.m] || 0;
+    var dif = l.dif || 'bronce';
     return {
       id: l.id, grupo: l.grupo, icono: l.icono, titulo: l.titulo, desc: l.desc,
       objetivo: l.objetivo, m: l.m, valor: valor,
+      dificultad: dif, dificultadNombre: NOMBRE_DIF[dif] || NOMBRE_DIF.bronce,
       hecho: valor >= l.objetivo,
       progreso: Math.max(0, Math.min(1, valor / l.objetivo)),
     };
@@ -410,15 +422,21 @@ window.Logros = (function () {
     }
 
     if (l.m === 'madruga') {
-      if (!v) return 'Todavía no has estudiado antes de las 9 de la mañana.';
+      if (!v) return 'Todavía no has estudiado entre las 5 y las 9 de la mañana.';
       return (hecho ? 'Ya van ' : 'Llevas ') + v + (v === 1 ? ' día' : ' días') +
-             ' estudiando antes de las 9. Te ' + (hecho ? 'gusta madrugar.' : 'faltan ' + (obj - v) + '.');
+             ' estudiando entre las 5 y las 9. Te ' + (hecho ? 'gusta madrugar.' : 'faltan ' + (obj - v) + '.');
     }
 
     if (l.m === 'noct') {
       if (!v) return 'Todavía no has estudiado pasadas las 22h.';
       return (hecho ? 'Ya van ' : 'Llevas ') + v + (v === 1 ? ' día' : ' días') +
              ' estudiando de noche.' + (hecho ? '' : ' Te faltan ' + (obj - v) + '.');
+    }
+
+    if (l.m === 'trasnoche') {
+      if (!v) return 'Todavía no has estudiado de madrugada, entre medianoche y las 5.';
+      return (hecho ? 'Ya van ' : 'Llevas ') + v + (v === 1 ? ' día' : ' días') +
+             ' estudiando de madrugada.' + (hecho ? ' Menuda trasnochadora.' : ' Te faltan ' + (obj - v) + '.');
     }
 
     if (l.m === 'memoriaPerfecta') {
@@ -507,7 +525,7 @@ window.Logros = (function () {
     } catch (e) { return null; }
   }
 
-  function _campanada(ac, hz, cuando, dur, vol) {
+  function _campanada(ac, hz, cuando, dur, vol, brillo) {
     var t0 = ac.currentTime + cuando;
     var g = ac.createGain();
     g.gain.setValueAtTime(0, t0);
@@ -516,7 +534,7 @@ window.Logros = (function () {
     g.connect(ac.destination);
     [
       { tipo: 'triangle', mul: 1, vol: 0.9 },
-      { tipo: 'sine', mul: 2.01, vol: 0.22 },
+      { tipo: 'sine', mul: 2.01, vol: brillo == null ? 0.22 : brillo },
     ].forEach(function (v) {
       var o = ac.createOscillator();
       o.type = v.tipo;
@@ -529,16 +547,33 @@ window.Logros = (function () {
     });
   }
 
-  function _sonido(indice) {
+  // Cada nivel de dificultad tiene su propio "carácter" sonoro: el bronce
+  // es breve y discreto; el platino, un arpegio largo y brillante que deja
+  // claro que ha caído algo gordo. `indice` > 0 = no es el primero de la
+  // tanda (toast simultáneos): siempre suena un tin discreto para no saturar.
+  var ARPEGIOS_DIF = {
+    // Do5 · Mi5 · Sol5 — sencillo y rápido.
+    bronce:  { notas: [523.25, 659.25, 783.99],                     paso: 0.08,  vol: 0.13, brillo: 0.16 },
+    // Do5 · Mi5 · Sol5 · Do6 — el arpegio "de siempre".
+    plata:   { notas: [523.25, 659.25, 783.99, 1046.5],             paso: 0.085, vol: 0.14, brillo: 0.22 },
+    // Do5 · Mi5 · Sol5 · Do6 · Mi6 — más largo y más agudo al final.
+    oro:     { notas: [523.25, 659.25, 783.99, 1046.5, 1318.5],     paso: 0.08,  vol: 0.15, brillo: 0.3 },
+    // Do5 · Mi5 · Sol5 · Do6 · Mi6 · Sol6 — el más largo y brillante de todos.
+    platino: { notas: [523.25, 659.25, 783.99, 1046.5, 1318.5, 1568.0], paso: 0.075, vol: 0.16, brillo: 0.38 },
+  };
+
+  function _sonido(indice, dificultad) {
     var ac = _audio();
     if (!ac) return;
     if (indice > 0) {
       _campanada(ac, 1046.5, 0, 0.5, 0.13);   // Do6, un toque discreto
       return;
     }
-    // Do5 · Mi5 · Sol5 · Do6 — arpegio de mayor, alegre y breve.
-    [523.25, 659.25, 783.99, 1046.5].forEach(function (hz, i) {
-      _campanada(ac, hz, i * 0.085, i === 3 ? 0.9 : 0.4, i === 3 ? 0.17 : 0.13);
+    var arp = ARPEGIOS_DIF[dificultad] || ARPEGIOS_DIF.plata;
+    var ultimo = arp.notas.length - 1;
+    arp.notas.forEach(function (hz, i) {
+      var esUltimo = i === ultimo;
+      _campanada(ac, hz, i * arp.paso, esUltimo ? 0.9 : 0.4, esUltimo ? arp.vol + 0.04 : arp.vol, arp.brillo);
     });
   }
 
@@ -562,14 +597,17 @@ window.Logros = (function () {
     var reduce = false;
     try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
+    var dif = l.dificultad || 'bronce';
+    var difNombre = l.dificultadNombre || NOMBRE_DIF[dif] || NOMBRE_DIF.bronce;
+
     var el = document.createElement('button');
     el.type = 'button';
-    el.className = 'logro-toast';
+    el.className = 'logro-toast logro-toast--' + dif;
     el.innerHTML =
       '<span class="logro-toast__glow" aria-hidden="true"></span>' +
       '<span class="logro-toast__medalla">' + icono(l.icono) + '</span>' +
       '<span class="logro-toast__txt">' +
-        '<span class="logro-toast__eyebrow">' + TROFEO_MINI + 'Logro conseguido</span>' +
+        '<span class="logro-toast__eyebrow">' + TROFEO_MINI + 'Logro ' + difNombre + '</span>' +
         '<span class="logro-toast__titulo"></span>' +
       '</span>' +
       '<span class="logro-toast__sweep" aria-hidden="true"></span>' +
@@ -579,10 +617,17 @@ window.Logros = (function () {
 
     void el.offsetWidth;
     el.classList.add('is-visible');
-    try { _sonido(indice || 0); } catch (e) {}
-    // El primero de la tanda vibra como celebración; los siguientes, un toque.
+    try { _sonido(indice || 0, dif); } catch (e) {}
+    // El primero de la tanda vibra como celebración (más larga cuanto más
+    // difícil el logro); los siguientes, solo un toque.
     try {
-      if (window.Vibra) (indice ? window.Vibra.toque : window.Vibra.logro)();
+      if (window.Vibra) {
+        if (!indice && (dif === 'oro' || dif === 'platino') && window.Vibra.patron) {
+          window.Vibra.patron([0, 16, 40, 16, 40, 16, 60, 30]);
+        } else {
+          (indice ? window.Vibra.toque : window.Vibra.logro)();
+        }
+      }
     } catch (e) {}
 
     var cerrado = false;

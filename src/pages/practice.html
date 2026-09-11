@@ -26,6 +26,14 @@
     </div>
   </div>
 
+  <button class="tarjeta practica__repasar practica__repasar--ensayo stagger" type="button" data-ensayo-hoy hidden>
+    <span class="tarjeta__cuerpo">
+      <span class="tarjeta__titulo" data-ensayo-hoy-titulo>Hoy tienes ensayo</span>
+      <span class="repasar__nota" data-ensayo-hoy-nota></span>
+    </span>
+    <span class="chip chip--progreso">Repasar antes</span>
+  </button>
+
   <button class="tarjeta practica__repasar stagger" type="button" data-repasar hidden>
     <span class="tarjeta__cuerpo">
       <span class="tarjeta__titulo" data-repasar-titulo></span>
@@ -39,6 +47,12 @@
     <div data-calendario></div>
   </div>
 
+  <button class="btn-mes" type="button" data-config-ensayo>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><circle cx="12" cy="15" r="2.5"/></svg>
+    <span data-config-ensayo-texto>Configura tus días de ensayo</span>
+    <svg class="btn-mes__flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+  </button>
+
   <button class="btn-concierto" type="button" data-ir-conciertos>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
     <span data-ir-conciertos-txt>Conciertos del coro</span>
@@ -47,10 +61,36 @@
 
   <ul class="practica__datos" data-datos hidden></ul>
 
-  <button class="btn-mes" type="button" data-resumen-mes hidden>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
-    <span data-resumen-mes-texto>Ver el resumen del mes</span>
-    <svg class="btn-mes__flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+  <button class="tarjeta-resumen" type="button" data-resumen-mes hidden>
+    <span class="tarjeta-resumen__fondo" aria-hidden="true"><span class="tarjeta-resumen__mancha"></span><span class="tarjeta-resumen__mancha"></span></span>
+    <span class="tarjeta-resumen__decor" aria-hidden="true">
+      <svg data-tema-ico="enero" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M12 2v20M4 6l16 12M20 6 4 18M9.6 4.4 12 2l2.4 2.4M9.6 19.6 12 22l2.4-2.4M7 6.4 4 6l.6-3M17 6.4 20 6l-.6-3M7 17.6 4 18l.6 3M17 17.6 20 18l-.6 3"/></svg>
+      <svg data-tema-ico="febrero" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+      <svg data-tema-ico="marzo" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.4 21h1.2V10.8h-1.2z"/><path d="M12 11c-3.3 0-5.5-2.1-6-5 3.6 0 6 2 6 5Z"/><path d="M12 8.4c2.8 0 4.6-1.8 5-4-3 0-5 1.6-5 4Z"/></svg>
+      <svg data-tema-ico="abril" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c3 5 6 8.5 6 12a6 6 0 0 1-12 0c0-3.5 3-7 6-12Z"/></svg>
+      <svg data-tema-ico="mayo" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="6" r="3"/><circle cx="18" cy="12" r="3"/><circle cx="12" cy="18" r="3"/><circle cx="6" cy="12" r="3"/></svg>
+      <svg data-tema-ico="junio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="4.4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+      <svg data-tema-ico="julio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="12" cy="7.5" r="3"/><path d="M12 2.5v1.4M6.9 8h1M16.1 8h1M8.6 4.3l.8.9M15.4 4.3l-.8.9"/><path d="M3 15.5c1.6-1.4 3-1.4 4.5 0s2.9 1.4 4.5 0 3-1.4 4.5 0 2.9 1.4 4.5 0"/><path d="M3 19.5c1.6-1.4 3-1.4 4.5 0s2.9 1.4 4.5 0 3-1.4 4.5 0 2.9 1.4 4.5 0"/></svg>
+      <svg data-tema-ico="agosto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.5 4.5l2.1 2.1M17.4 17.4l2.1 2.1M4.5 19.5l2.1-2.1M17.4 6.6l2.1-2.1"/></svg>
+      <svg data-tema-ico="septiembre" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 12.5c4-5 10-7 16-6-1 6-3 10-8 12-4 1.5-7-1-8-6Z"/></svg>
+      <svg data-tema-ico="octubre" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c4 3 7 7 7 11a7 7 0 0 1-14 0c0-4 3-8 7-11Z"/></svg>
+      <svg data-tema-ico="noviembre" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15.7 3.3a8.6 8.6 0 1 0 4.9 15.2A8.6 8.6 0 0 1 15.7 3.3Z"/><path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" d="M3 18.5h9M1.5 21.3h13"/></svg>
+      <svg data-tema-ico="anual" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.5c.5 3.3 1.6 5.5 3.2 7.1 1.6 1.6 3.8 2.7 7.1 3.2-3.3.5-5.5 1.6-7.1 3.2-1.6 1.6-2.7 3.8-3.2 7.1-.5-3.3-1.6-5.5-3.2-7.1-1.6-1.6-3.8-2.7-7.1-3.2 3.3-.5 5.5-1.6 7.1-3.2 1.6-1.6 2.7-3.8 3.2-7.1Z"/></svg>
+    </span>
+    <span class="tarjeta-resumen__particulas" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    <span class="tarjeta-resumen__brillo" aria-hidden="true"></span>
+    <span class="tarjeta-resumen__chispas" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span class="tarjeta-resumen__ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5c.4 2.6 1.2 4.3 2.4 5.6 1.3 1.2 3 2 5.6 2.4-2.6.4-4.3 1.2-5.6 2.4-1.2 1.3-2 3-2.4 5.6-.4-2.6-1.2-4.3-2.4-5.6-1.3-1.2-3-2-5.6-2.4 2.6-.4 4.3-1.2 5.6-2.4 1.2-1.3 2-3 2.4-5.6Z"/><path d="M19 16.2c.2 1.2.6 2 1.2 2.6.6.6 1.4 1 2.6 1.2-1.2.2-2 .6-2.6 1.2-.6.6-1 1.4-1.2 2.6-.2-1.2-.6-2-1.2-2.6-.6-.6-1.4-1-2.6-1.2 1.2-.2 2-.6 2.6-1.2.6-.6 1-1.4 1.2-2.6Z"/></svg>
+    </span>
+    <span class="tarjeta-resumen__cuerpo">
+      <span class="tarjeta-resumen__eyebrow" data-resumen-mes-eyebrow>Listo para ti</span>
+      <span class="tarjeta-resumen__titulo" data-resumen-mes-texto>Ver el resumen del mes</span>
+      <span class="tarjeta-resumen__pie">Toca para volver a verlo</span>
+    </span>
+    <span class="tarjeta-resumen__flecha" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+    </span>
   </button>
 
   <section class="logros" data-logros hidden>

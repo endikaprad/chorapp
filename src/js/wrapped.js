@@ -65,6 +65,183 @@ window.Wrapped = (function () {
     return h + ' h' + (r ? ' ' + r + ' min' : '');
   }
 
+  // Comparación curiosa para los minutos con la app abierta: cuántas
+  // películas, ensayos, cafés… caben en ese rato. Se elige una al azar
+  // entre las que tengan sentido con la cifra (nada de "0 películas").
+  function curiosidad(mins) {
+    mins = Math.round(mins || 0);
+    if (mins < 20) return null;
+    var op = [];
+
+    var pelis = Math.round(mins / 110);
+    if (pelis >= 1) op.push('Lo mismo que ver ' +
+      (pelis === 1 ? 'una película entera' : pelis + ' películas enteras, una detrás de otra') + '.');
+
+    var ensayos = Math.round(mins / 90);
+    if (ensayos >= 1) op.push('El tiempo de ' +
+      (ensayos === 1 ? 'un ensayo entero del coro' : ensayos + ' ensayos enteros del coro') + '.');
+
+    var partidos = Math.round(mins / 90);
+    if (partidos >= 1) op.push('Ahí te daba tiempo a ver ' +
+      (partidos === 1 ? 'un partido de fútbol entero' : partidos + ' partidos de fútbol enteros') + '.');
+
+    var cafes = Math.round(mins / 20);
+    if (cafes >= 3) op.push(cafes + ' cafés tranquilos con una amiga, sin mirar el reloj.');
+
+    var horasPaseo = Math.round(mins / 60);
+    if (horasPaseo >= 2) op.push(horasPaseo + ' horas seguidas de paseo, sin sentarte ni un momento.');
+
+    var capitulos = Math.round(mins / 45);
+    if (capitulos >= 3) op.push(capitulos + ' capítulos de una serie, del tirón.');
+
+    var duchas = Math.round(mins / 8);
+    if (duchas >= 5) op.push(duchas + ' duchas cantando a pleno pulmón. Ojalá hubieran sido esas.');
+
+    var dias = mins / 1440;
+    if (dias >= 1) {
+      var nDias = dias >= 1.4 ? Math.round(dias * 10) / 10 : 1;
+      op.push('Casi ' + (nDias === 1 ? 'un día entero' : nDias + ' días seguidos') + ', sin dormir.');
+    }
+
+    if (!op.length) return null;
+    return elegir(op);
+  }
+
+  /* ============================================================
+     Temporadas — el Wrapped mensual (no el anual, que ya tiene su
+     propia identidad negro/dorado) viste colores, icono, partículas de
+     fondo y frases DISTINTAS para cada uno de los 11 meses con Wrapped
+     propio (ResumenMes.temaMes) — ningún mes repite el diseño de otro,
+     ni siquiera entre meses de la misma estación. Diciembre no tiene
+     entrada aquí: ese mes no hay Wrapped mensual, solo el ANUAL del 31.
+     Todo lo visual vive en el CSS (bloque "Temporadas del Wrapped
+     mensual"); aquí solo las frases y el icono que se inyecta en el
+     fondo.
+     ============================================================ */
+  var TEMPORADA = {
+    enero: {
+      decorIco: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><path d="M12 2v20M4 6l16 12M20 6 4 18M9.6 4.4 12 2l2.4 2.4M9.6 19.6 12 22l2.4-2.4M7 6.4 4 6l.6-3M17 6.4 20 6l-.6-3M7 17.6 4 18l.6 3M17 17.6 20 18l-.6 3"/></svg>',
+      portadaPie: 'Abrígate bien, que empieza tu resumen →',
+      teaserSub: 'Año nuevo, mismo empeño: cantar casi cada día.',
+      postal: {
+        eyebrow: 'Modo enero',
+        texto: 'Cuesta arriba, con frío y con el año recién empezado, y aun así ahí estabas.',
+        sub: 'Los propósitos de enero se caen solos. Este no se te cayó.',
+      },
+      cierrePie: 'Que el frío no te quite las ganas. Nos vemos el mes que viene 🎶❄️',
+    },
+    febrero: {
+      decorIco: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>',
+      portadaPie: 'Con cariño de por medio, toca para ir viéndolo →',
+      teaserSub: 'Febrero, corto pero intenso. Como un buen estribillo.',
+      postal: {
+        eyebrow: 'Modo febrero',
+        texto: 'Carnaval, algún corazón por ahí y tú, con la app abierta otra vez.',
+        sub: 'El mes más corto del año, pero no el que menos cantaste.',
+      },
+      cierrePie: 'Con cariño, sigue cantando. Nos vemos el mes que viene 🎶💜',
+    },
+    marzo: {
+      decorIco: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.4 21h1.2V10.8h-1.2z"/><path d="M12 11c-3.3 0-5.5-2.1-6-5 3.6 0 6 2 6 5Z"/><path d="M12 8.4c2.8 0 4.6-1.8 5-4-3 0-5 1.6-5 4Z"/></svg>',
+      portadaPie: 'Con el primer brote del año, toca para ir viéndolo →',
+      teaserSub: 'Algo empieza a moverse fuera. Y dentro de la app, también.',
+      postal: {
+        eyebrow: 'Modo marzo',
+        texto: 'El primer brote del año asoma, y tú ya llevas un mes entero cantando.',
+        sub: 'Marzo ventoso — dicen. Tú, constante como siempre.',
+      },
+      cierrePie: 'Que el viento de marzo no te despeine la racha. Nos vemos el mes que viene 🎶🌱',
+    },
+    abril: {
+      decorIco: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c3 5 6 8.5 6 12a6 6 0 0 1-12 0c0-3.5 3-7 6-12Z"/></svg>',
+      portadaPie: 'Aguas mil o no, toca para ir viéndolo →',
+      teaserSub: 'Abril de lluvia y de flores. Y de app abierta, según parece.',
+      postal: {
+        eyebrow: 'Modo abril',
+        texto: 'Ha llovido bastante este mes, dentro y fuera de la app.',
+        sub: 'Un poco de agua no te para. Nunca lo ha hecho.',
+      },
+      cierrePie: 'Lluvia o sol, la voz no se moja. Nos vemos el mes que viene 🎶🌧️',
+    },
+    mayo: {
+      decorIco: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="6" r="3"/><circle cx="18" cy="12" r="3"/><circle cx="12" cy="18" r="3"/><circle cx="6" cy="12" r="3"/></svg>',
+      portadaPie: 'Con las flores ya fuera, toca para ir viéndolo →',
+      teaserSub: 'Todo florece un poco más este mes. Tu voz, también.',
+      postal: {
+        eyebrow: 'Modo mayo',
+        texto: 'Las flores están fuera y tú sigues abriendo la app casi cada día.',
+        sub: 'Algo en el aire anima a cantar más fuerte. O eso, o es la costumbre.',
+      },
+      cierrePie: 'Que no se te escape el buen tiempo sin cantar. Nos vemos el mes que viene 🎶🌸',
+    },
+    junio: {
+      decorIco: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="12" cy="12" r="4.4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>',
+      portadaPie: 'Con las tardes ya largas, toca para ir viéndolo →',
+      teaserSub: 'El día dura más, y tú le sacaste partido cantando.',
+      postal: {
+        eyebrow: 'Modo junio',
+        texto: 'Noches cortas, tardes larguísimas y tú aprovechando cada rato para el coro.',
+        sub: 'Empieza el verano de verdad. Menudo mes te espera.',
+      },
+      cierrePie: 'Aprovecha las tardes largas para cantar más. Nos vemos el mes que viene 🎶🌙',
+    },
+    julio: {
+      decorIco: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><circle cx="12" cy="7.5" r="3"/><path d="M12 2.5v1.4M6.9 8h1M16.1 8h1M8.6 4.3l.8.9M15.4 4.3l-.8.9"/><path d="M3 15.5c1.6-1.4 3-1.4 4.5 0s2.9 1.4 4.5 0 3-1.4 4.5 0 2.9 1.4 4.5 0"/><path d="M3 19.5c1.6-1.4 3-1.4 4.5 0s2.9 1.4 4.5 0 3-1.4 4.5 0 2.9 1.4 4.5 0"/></svg>',
+      portadaPie: 'Con la playa de fondo, toca para ir viéndolo →',
+      teaserSub: 'Con el calor apretando, tú a lo tuyo: cantar.',
+      postal: {
+        eyebrow: 'Modo julio',
+        texto: 'Playa, piscina y tú tarareando la canción del coro sin darte cuenta.',
+        sub: 'El calor aprieta, pero la voz no se toma vacaciones.',
+      },
+      cierrePie: 'Que no te pille el sol sin cantar. Nos vemos el mes que viene 🎶🏖️',
+    },
+    agosto: {
+      decorIco: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.5 4.5l2.1 2.1M17.4 17.4l2.1 2.1M4.5 19.5l2.1-2.1M17.4 6.6l2.1-2.1"/></svg>',
+      portadaPie: 'Con la siesta esperando, toca para ir viéndolo →',
+      teaserSub: 'Calor de verdad, y tú abriendo la app hasta con el ventilador puesto.',
+      postal: {
+        eyebrow: 'Modo agosto',
+        texto: 'Fiestas de pueblo, siesta larga y, en algún rato, la app otra vez abierta.',
+        sub: 'El mes de más calor del año. Y aun así, no lo dejaste.',
+      },
+      cierrePie: 'Refréscate, pero no dejes de cantar. Nos vemos el mes que viene 🎶🌞',
+    },
+    septiembre: {
+      decorIco: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 12.5c4-5 10-7 16-6-1 6-3 10-8 12-4 1.5-7-1-8-6Z"/></svg>',
+      portadaPie: 'Con la vuelta a la rutina, toca para ir viéndolo →',
+      teaserSub: 'Vuelta al coro, vuelta a la app, vuelta a ti.',
+      postal: {
+        eyebrow: 'Modo septiembre',
+        texto: 'Se acaba el verano y arranca la temporada del coro de verdad.',
+        sub: 'La primera hoja cae y tú ya has vuelto a la rutina.',
+      },
+      cierrePie: 'Buena vuelta a la rutina. Nos vemos el mes que viene 🎶📖',
+    },
+    octubre: {
+      decorIco: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c4 3 7 7 7 11a7 7 0 0 1-14 0c0-4 3-8 7-11Z"/></svg>',
+      portadaPie: 'Con las hojas cayendo, toca para ir viéndolo →',
+      teaserSub: 'Otoño de verdad. Manta, taza caliente y la partitura al lado.',
+      postal: {
+        eyebrow: 'Modo octubre',
+        texto: 'Las hojas caen a montones y tú sigues sin faltar a tu cita con la app.',
+        sub: 'Castañas, manta y la voz calentita por dentro.',
+      },
+      cierrePie: 'Abrígate un poco y sigue cantando. Nos vemos el mes que viene 🎶🍂',
+    },
+    noviembre: {
+      decorIco: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15.7 3.3a8.6 8.6 0 1 0 4.9 15.2A8.6 8.6 0 0 1 15.7 3.3Z"/><path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" d="M3 18.5h9M1.5 21.3h13"/></svg>',
+      portadaPie: 'Entre niebla y días cortos, toca para ir viéndolo →',
+      teaserSub: 'Los días se acortan, pero tú no aflojaste.',
+      postal: {
+        eyebrow: 'Modo noviembre',
+        texto: 'Niebla por la mañana, oscuro pronto por la tarde y tú cantando igual.',
+        sub: 'El mes más gris del año se te hizo un poco más llevadero cantando.',
+      },
+      cierrePie: 'Ya casi llega diciembre. Nos vemos el mes que viene 🎶🌫️',
+    },
+  };
+
   var MESES_NOMBRE = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
                       'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   function fmtFecha(iso) {
@@ -73,9 +250,18 @@ window.Wrapped = (function () {
     return (+p[2]) + ' de ' + (MESES_NOMBRE[+p[1] - 1] || '');
   }
 
+  var DIAS_SEMANA_NOMBRE = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  function fmtDiaSemana(iso) {
+    var p = String(iso || '').split('-');
+    if (p.length < 3) return '';
+    var d = new Date(+p[0], (+p[1]) - 1, +p[2]);
+    return DIAS_SEMANA_NOMBRE[d.getDay()] || '';
+  }
+
   // Bloque de cifra grande con cuenta ascendente (la anima mostrar()).
   function cifra(n, label) {
-    return '<p class="w-cifra"><span class="w-cifra__n" data-num="' + n + '">0</span>' +
+    return '<p class="w-cifra"><span class="w-cifra__glow" aria-hidden="true"></span>' +
+      '<span class="w-cifra__n" data-num="' + n + '">0</span>' +
       (label ? '<span class="w-cifra__de">' + esc(label) + '</span>' : '') + '</p>';
   }
 
@@ -102,18 +288,25 @@ window.Wrapped = (function () {
   function slidesMes(d) {
     var out = [];
     var mes = capitaliza(d.nombreMes);
+    var tema = window.ResumenMes && window.ResumenMes.temaMes ? window.ResumenMes.temaMes(d.mes) : '';
+    var T = TEMPORADA[tema] || null;
 
     out.push({ clase: 'w-slide--portada', html:
       '<p class="w-eyebrow">Tu resumen de</p>' +
       '<h2 class="w-titular w-titular--mes">' + esc(mes) + '</h2>' +
-      '<p class="w-pie">Toca para ir viéndolo →</p>'
+      '<p class="w-pie">' + esc((T && T.portadaPie) || 'Toca para ir viéndolo →') + '</p>'
     });
 
     out.push(slideTeaser({
       eyebrow: 'A ver qué tal',
       texto: 'Todo lo que hiciste en ' + mes + ', slide a slide.',
-      sub: 'Sin trampa ni cartón. La app lo apuntó todo.',
+      sub: (T && T.teaserSub) || 'Sin trampa ni cartón. La app lo apuntó todo.',
     }));
+
+    // Postal de temporada: un slide de aire, con la estación del mes de
+    // protagonista (playa en verano, nieve en invierno…) antes de entrar
+    // en los datos.
+    if (T && T.postal) out.push(slideTeaser(T.postal));
 
     var pct = Math.round((d.dias / d.diasDelMes) * 100);
     out.push({ clase: 'w-slide--dato', html:
@@ -135,6 +328,19 @@ window.Wrapped = (function () {
         '<p class="w-nota">' + (d.rachaMaxMes >= 7
           ? 'Una semana entera. Eso ya es vicio del bueno.'
           : 'A ver si el mes que viene la superas.') + '</p>'
+      });
+    }
+
+    if (d.tiempoSeg >= 300) {
+      var minMes = Math.round(d.tiempoSeg / 60);
+      var curiosaMes = curiosidad(minMes);
+      out.push({ clase: 'w-slide--dato', html:
+        '<p class="w-eyebrow">Tiempo estudiando</p>' +
+        cifra(minMes, plural(minMes, 'minuto', 'minutos')) +
+        '<p class="w-frase">Son <strong>' + fmtMin(d.tiempoSeg) + '</strong> con la app abierta este mes.</p>' +
+        '<p class="w-nota">' + (curiosaMes || (minMes >= 300
+          ? 'Eso ya es una asignatura, no una afición.'
+          : 'Minuto a minuto, así se aprende una canción.')) + '</p>'
       });
     }
 
@@ -240,7 +446,7 @@ window.Wrapped = (function () {
 
     out.push(slideCierre(d, {
       eyebrow: esc(mes) + ', en una frase',
-      pie: 'Nos vemos el mes que viene, Ama 🎶',
+      pie: (T && T.cierrePie) || 'Nos vemos el mes que viene, Ama 🎶',
     }));
 
     return out;
@@ -282,10 +488,9 @@ window.Wrapped = (function () {
           '<div class="w-poster__cargando">Preparando tu foto resumen…</div>' +
         '</div>' +
         '<div class="w-cierre__botones">' +
-          '<button type="button" class="w-btn w-btn--ghost" data-descargar>Guardar</button>' +
-          '<button type="button" class="w-btn" data-compartir>Compartir</button>' +
-        '</div>' +
-        '<button type="button" class="w-cerrar-link" data-cerrar>Cerrar</button>'
+          '<button type="button" class="w-btn w-btn--ghost" data-descargar><span class="w-btn__tx">Guardar</span></button>' +
+          '<button type="button" class="w-btn" data-compartir><span class="w-btn__tx">Compartir</span></button>' +
+        '</div>'
     };
   }
 
@@ -331,6 +536,20 @@ window.Wrapped = (function () {
         cifra(d.rachaMaxAno, 'días seguidos') +
         '<p class="w-frase">Tu racha más larga del año.</p>' +
         '<p class="w-nota">Constancia de las que no se ven pero se notan.</p>'
+      });
+    }
+
+    if (d.tiempoSeg >= 900) {
+      var minAno = Math.round(d.tiempoSeg / 60);
+      var hAno = Math.round(d.tiempoSeg / 3600);
+      var curiosaAno = curiosidad(minAno);
+      out.push({ clase: 'w-slide--dato', html:
+        '<p class="w-eyebrow">Un año estudiando</p>' +
+        cifra(minAno, 'minutos en total') +
+        '<p class="w-frase">Son <strong>' + fmtMin(d.tiempoSeg) + '</strong> con la app abierta en todo el año.</p>' +
+        '<p class="w-nota">' + (curiosaAno || (hAno >= 20
+          ? 'Ahí dentro cabe un curso entero de canto. Te lo has hecho tú sola.'
+          : 'Cada minuto ahí sumó. No hace falta que sean muchos de golpe.')) + '</p>'
       });
     }
 
@@ -429,12 +648,52 @@ window.Wrapped = (function () {
         'Todo lo que fuiste consiguiendo, mes a mes.'));
     }
 
+    out.push(slideAnioNuevo(d.anio + 1));
+
     out.push(slideCierre(d, {
       eyebrow: d.anio + ', en una frase',
       pie: 'Feliz año, Ama. Nos vemos en el siguiente 🎶',
     }));
 
     return out;
+  }
+
+  // Slide de campanadas: remate del anual, negro y dorado, con la cuenta
+  // del año que empieza. Va justo antes del cierre — el broche de fin de
+  // año antes de la foto para compartir.
+  function slideAnioNuevo(anioQueViene) {
+    var chispas = '';
+    for (var i = 0; i < 12; i++) chispas += '<span></span>';
+    return {
+      clase: 'w-slide--anionuevo',
+      anioNuevo: true,
+      html:
+        fuegosArtificiales() +
+        '<div class="w-chispas" aria-hidden="true">' + chispas + '</div>' +
+        '<p class="w-eyebrow">Campanadas</p>' +
+        '<h2 class="w-anio">¡Feliz ' + anioQueViene + '!</h2>' +
+        '<p class="w-frase">Que venga cargado de canciones nuevas.</p>' +
+        '<p class="w-nota">Nos vemos en el escenario, Ama. 🥂</p>'
+    };
+  }
+
+  // Cohetes de fondo para las campanadas: suben y estallan en bucle
+  // mientras el slide está en pantalla (la animación se pausa sola al
+  // ocultarse, porque el slide pasa a display:none).
+  function fuegosArtificiales() {
+    var cohetes = [
+      { left: '14%', top: '58%', color: '#FFE9B0', d: '-0.2s' },
+      { left: '78%', top: '44%', color: '#F3B33F', d: '-1.1s' },
+      { left: '46%', top: '66%', color: '#FFF6DF', d: '-2s' },
+      { left: '64%', top: '34%', color: '#FFD98A', d: '-2.8s' },
+      { left: '26%', top: '28%', color: '#F3B33F', d: '-3.3s' },
+    ];
+    return '<div class="w-fuegos" aria-hidden="true">' +
+      cohetes.map(function (c) {
+        return '<span class="w-cohete" style="left:' + c.left + ';top:' + c.top +
+          ';color:' + c.color + ';--d:' + c.d + '"></span>';
+      }).join('') +
+      '</div>';
   }
 
   /* ---------- slides compartidos ---------- */
@@ -460,6 +719,9 @@ window.Wrapped = (function () {
   // Slide de recuerdo de concierto (foto grande + fecha + nota). r viene de
   // datosAnuales().recuerdos. La foto la carga mostrar()/abrir() de forma async.
   function slideRecuerdo(r) {
+    var diaSem = fmtDiaSemana(r.fecha);
+    var cuando = (diaSem ? capitaliza(diaSem) + ', ' : '') + fmtFecha(r.fecha) +
+      (r.hora ? ' · ' + r.hora : '');
     return {
       clase: 'w-slide--recuerdo',
       foto: r.tieneFoto ? r.fotoClave : null,
@@ -469,8 +731,9 @@ window.Wrapped = (function () {
             ? '<div class="w-recuerdo__foto" data-foto="' + esc(r.fotoClave) + '"></div>'
             : '<div class="w-recuerdo__foto w-recuerdo__foto--vacia"></div>') +
           '<div class="w-recuerdo__txt">' +
-            '<p class="w-eyebrow">Un recuerdo · ' + esc(fmtFecha(r.fecha)) + '</p>' +
+            '<p class="w-eyebrow">Un recuerdo</p>' +
             '<h3 class="w-recuerdo__lugar">' + esc(r.titulo) + '</h3>' +
+            '<p class="w-recuerdo__cuando">' + esc(cuando) + '</p>' +
             (r.nota ? '<p class="w-recuerdo__nota">' + esc(r.nota) + '</p>' : '') +
           '</div>' +
         '</div>'
@@ -486,7 +749,8 @@ window.Wrapped = (function () {
     }).join('');
     return {
       clase: 'w-slide--dato w-slide--tops',
-      cancion: items[0] && items[0].titulo,
+      // Suena el top 2, no el top 1: el top 1 ya se ha escuchado en un slide anterior.
+      cancion: (items[1] || items[0]) && (items[1] || items[0]).titulo,
       revela: revela || null,
       html:
         (revela ? '<p class="w-reaccion" data-reaccion></p>' : '') +
@@ -716,6 +980,8 @@ window.Wrapped = (function () {
 
     esAnual = !!d.esAnual;
     datosActuales = d;
+    var tema = !esAnual && window.ResumenMes && window.ResumenMes.temaMes
+      ? window.ResumenMes.temaMes(d.mes) : '';
     var datos = esAnual ? slidesAnual(d) : slidesMes(d);
     idx = 0;
     respuestas = {};
@@ -729,12 +995,14 @@ window.Wrapped = (function () {
         revela: s.revela || null,
         foto: s.foto || null,
         cierre: !!s.cierre,
-        dur: durBase + (s.cancion ? EXTRA_CANCION : 0) + (s.foto ? EXTRA_CANCION : 0),
+        anioNuevo: !!s.anioNuevo,
+        dur: durBase + (s.cancion ? EXTRA_CANCION : 0) + (s.foto ? EXTRA_CANCION : 0) +
+          (s.anioNuevo ? EXTRA_CANCION : 0),
       };
     });
 
     raiz = document.createElement('div');
-    raiz.className = 'wrapped' + (esAnual ? ' wrapped--anual' : '') +
+    raiz.className = 'wrapped' + (esAnual ? ' wrapped--anual' : (tema ? ' wrapped--' + tema : '')) +
       (reducido() ? ' wrapped--sin-motion' : '');
     raiz.setAttribute('role', 'dialog');
     raiz.setAttribute('aria-modal', 'true');
@@ -747,11 +1015,21 @@ window.Wrapped = (function () {
     var mudo = window.WrappedAudio && window.WrappedAudio.silenciado &&
                window.WrappedAudio.silenciado();
 
+    var T = TEMPORADA[tema] || null;
+    var decorHtml = T ? '<div class="w-decor-temporada" aria-hidden="true">' + T.decorIco + '</div>' : '';
+    var particulasHtml = '';
+    if (T) {
+      var pi = '';
+      for (var pn = 0; pn < 12; pn++) pi += '<i></i>';
+      particulasHtml = '<div class="w-particulas" aria-hidden="true">' + pi + '</div>';
+    }
+
     raiz.innerHTML =
       '<div class="w-fondo" aria-hidden="true">' +
         '<span class="w-blob w-blob--1"></span>' +
         '<span class="w-blob w-blob--2"></span>' +
         '<span class="w-blob w-blob--3"></span>' +
+        decorHtml + particulasHtml +
         '<div class="w-notas">' +
           '<span>♪</span><span>♫</span><span>♩</span>' +
           '<span>♬</span><span>♪</span><span>♩</span>' +
@@ -772,7 +1050,7 @@ window.Wrapped = (function () {
       '<button type="button" class="w-zona w-zona--next" data-nav="next" aria-label="Siguiente"></button>' +
       '<div class="w-pasos">' +
         '<button type="button" class="w-paso" data-nav="prev">‹ Atrás</button>' +
-        '<button type="button" class="w-paso w-paso--next" data-nav="next">Siguiente ›</button>' +
+        '<button type="button" class="w-paso w-paso--next" data-nav="next"><span class="w-btn__tx">Siguiente ›</span></button>' +
       '</div>';
 
     var cont = raiz.querySelector('.w-slides');
@@ -783,7 +1061,7 @@ window.Wrapped = (function () {
     var nVar = 0;
     slides = datos.map(function (s) {
       var el = document.createElement('section');
-      var esFijo = /w-slide--(portada|cierre)/.test(s.clase || '');
+      var esFijo = /w-slide--(portada|cierre|anionuevo)/.test(s.clase || '');
       var variante = esFijo ? '' : ' ' + VARIANTES[(nVar++) % VARIANTES.length];
       el.className = 'w-slide ' + (s.clase || '') + variante;
       el.innerHTML = '<div class="w-slide__in">' + s.html + '</div>';
@@ -869,6 +1147,12 @@ window.Wrapped = (function () {
       contarHasta(num, num.getAttribute('data-num'));
     }
 
+    // Campanadas: pequeña celebración háptica al llegar, como el cierre.
+    if (mt.anioNuevo && !slides[n]._vibrado) {
+      slides[n]._vibrado = true;
+      try { if (window.Vibra) window.Vibra.logro(); } catch (e) {}
+    }
+
     // Slide de recuerdo: revela la foto justo al llegar (no antes).
     if (mt.foto) {
       var elFoto = slides[n].querySelector('[data-foto]');
@@ -889,7 +1173,7 @@ window.Wrapped = (function () {
     arrancarTimer();
 
     var ultima = n === slides.length - 1;
-    raiz.querySelector('.w-paso--next').textContent = ultima ? 'Cerrar' : 'Siguiente ›';
+    raiz.querySelector('.w-paso--next .w-btn__tx').textContent = ultima ? 'Cerrar' : 'Siguiente ›';
   }
 
   /* ---------- Foto resumen (se genera al llegar al cierre) ---------- */

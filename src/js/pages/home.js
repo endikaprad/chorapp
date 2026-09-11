@@ -45,6 +45,7 @@ window.Pagina_home = (function () {
     pintarHoy(raiz, hayContenido);
     pintarSemana(raiz);
     pintarRepasar(raiz);
+    pintarResumenMes(raiz);
     mostrarResumenMes();
     if (window.Backup && window.Backup.revisarAutomatica) {
       try { window.Backup.revisarAutomatica(); } catch (e) {}
@@ -328,6 +329,36 @@ window.Pagina_home = (function () {
       lista.appendChild(btn);
     });
     seccion.hidden = false;
+  }
+
+  /* ----------------------------------------------------------
+     Tarjeta "Resumen disponible" — el mismo botón especial que en
+     Práctica (resumenmes.js: disponiblePractica()), para poder
+     reabrir el Wrapped también desde Inicio mientras siga en su
+     ventana (5 días el mensual, 30 el anual).
+     ---------------------------------------------------------- */
+  var TEMAS_MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre'];
+
+  function pintarResumenMes(raiz) {
+    var btn = raiz.querySelector('[data-resumen-mes]');
+    if (!btn || !window.ResumenMes || !window.ResumenMes.disponiblePractica) return;
+
+    var d;
+    try { d = window.ResumenMes.disponiblePractica(); } catch (e) { return; }
+    if (!d) return;
+
+    var elEyebrow = raiz.querySelector('[data-resumen-mes-eyebrow]');
+    if (elEyebrow) elEyebrow.textContent = d.esAnual ? 'Tu Wrapped anual' : 'Wrapped del mes';
+    raiz.querySelector('[data-resumen-mes-texto]').textContent =
+      d.esAnual ? ('¡Feliz ' + (d.anio + 1) + '!') : ('Resumen de ' + d.nombreMes);
+    btn.classList.toggle('tarjeta-resumen--anual', !!d.esAnual);
+    TEMAS_MES.forEach(function (t) { btn.classList.remove('tarjeta-resumen--' + t); });
+    if (!d.esAnual && window.ResumenMes.temaMes) {
+      btn.classList.add('tarjeta-resumen--' + window.ResumenMes.temaMes(d.mes));
+    }
+    btn.addEventListener('click', function () { window.ResumenMes.abrirHoja(d); });
+    btn.hidden = false;
   }
 
   /* ----------------------------------------------------------
