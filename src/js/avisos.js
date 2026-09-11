@@ -208,7 +208,7 @@ window.Avisos = (function () {
 
       notifs.push({
         id: ID_RACHA_MIN + d,
-        title: 'ChorApp',
+        title: urgente ? 'Se te escapa la racha' : 'Racha en juego',
         body: window.Frases.avisoRacha(racha, urgente),
         channelId: CANAL_ID,
         schedule: { at: cuando, allowWhileIdle: true }
@@ -232,7 +232,7 @@ window.Avisos = (function () {
         : 'Ya está el resumen de ' + nombre + '. Ábrelo, que hay lectura.';
       notifs.push({
         id: ID_MES_MIN + k,
-        title: 'ChorApp',
+        title: 'Resumen de ' + nombre,
         body: txt,
         channelId: CANAL_ID,
         schedule: { at: primero, allowWhileIdle: true }
@@ -251,7 +251,7 @@ window.Avisos = (function () {
       : 'Tu año en ChorApp ya está listo. Ábrelo con calma, Ama.';
     notifs.push({
       id: ID_ANUAL,
-      title: 'ChorApp',
+      title: 'Tu año en ChorApp',
       body: txt,
       channelId: CANAL_ID,
       schedule: { at: at, allowWhileIdle: true }
@@ -276,7 +276,7 @@ window.Avisos = (function () {
       var ymd = (+p[1]) * 10000 + (+p[2]) * 100 + (+p[3]);
       notifs.push({
         id: ID_POST_BASE + ymd,
-        title: 'ChorApp',
+        title: '¿Qué tal el concierto?',
         body: textoDe ? textoDe()
           : '¿Qué tal el concierto de ayer? Añade una foto al recuerdo en Práctica.',
         channelId: CANAL_ID,
@@ -303,7 +303,7 @@ window.Avisos = (function () {
       var ymd = (+p[1]) * 10000 + (+p[2]) * 100 + (+p[3]);
       notifs.push({
         id: ID_VISPERA_BASE + ymd,
-        title: 'ChorApp',
+        title: 'Bihotsak canta mañana',
         body: textoDe ? textoDe(c.lugar || '')
           : 'Mañana hay concierto con Bihotsak. Repasa hoy con calma.',
         channelId: CANAL_ID,
@@ -359,7 +359,7 @@ window.Avisos = (function () {
     at.setHours(HORA_TROZO, 0, 0, 0);
     notifs.push({
       id: ID_TROZO,
-      title: 'ChorApp',
+      title: 'Ese trozo sigue ahí',
       body: textoDe ? textoDe(mejor.titulo)
         : 'Ese trozo difícil de «' + mejor.titulo + '» sigue esperándote.',
       channelId: CANAL_ID,
@@ -386,7 +386,7 @@ window.Avisos = (function () {
     at.setHours(HORA_LOGRO, 0, 0, 0);
     notifs.push({
       id: ID_LOGRO,
-      title: 'ChorApp',
+      title: 'Medalla a un paso',
       body: textoDe ? textoDe(sig.titulo)
         : 'Te falta un día de estudio para la medalla «' + sig.titulo + '».',
       channelId: CANAL_ID,
@@ -498,10 +498,15 @@ window.Avisos = (function () {
         return LN.cancel({ notifications: mias.map(function (n) { return { id: n.id }; }) });
       })
       .then(function () {
+        var TITULO_FECHA = {
+          cumpleMaite: '¡Feliz cumpleaños, Maite!',
+          otroCumple: 'Hoy toca felicitar',
+          fiesta: 'Fecha señalada'
+        };
         var notifs = fechas.map(function (f) {
           return {
             id: f.id,
-            title: 'ChorApp',
+            title: TITULO_FECHA[f.categoria] || 'Fecha señalada',
             body: f.texto,
             channelId: CANAL_ID,
             schedule: { at: f.fecha }
@@ -511,7 +516,7 @@ window.Avisos = (function () {
         AVISOS_VAGA.forEach(function (a) {
           notifs.push({
             id: a.id,
-            title: 'ChorApp',
+            title: '¿Sigues ahí?',
             body: a.textos[Math.floor(Math.random() * a.textos.length)],
             channelId: CANAL_ID,
             schedule: { at: horaVagaEn(a.dias), allowWhileIdle: true }
@@ -536,6 +541,10 @@ window.Avisos = (function () {
         agregarAvisoTrozo(notifs);
         agregarAvisoLogro(notifs);
 
+        // Sin "largeBody" Android las corta a una línea (ver LocalNotificationManager):
+        // con él usa BigTextStyle y se ve el texto completo al desplegar.
+        notifs.forEach(function (n) { if (n.body && !n.largeBody) n.largeBody = n.body; });
+
         return LN.schedule({ notifications: notifs });
       });
   }
@@ -556,6 +565,7 @@ window.Avisos = (function () {
             id: 18000000 + (Date.now() % 1000000),
             title: String(titulo || 'ChorApp').trim() || 'ChorApp',
             body: texto,
+            largeBody: texto,
             channelId: CANAL_ID,
             schedule: { at: new Date(Date.now() + 1000), allowWhileIdle: true }
           }] });
@@ -565,9 +575,11 @@ window.Avisos = (function () {
   }
 
   /* ---------- Ayudas para probar (usar desde la consola del WebView) ----------
-     window.Avisos.pendientes()  -> lista lo que hay programado
-     window.Avisos.probar(20)    -> notificación de prueba dentro de 20 s
-     window.Avisos.iniciar()     -> reprograma ahora mismo             */
+     window.Avisos.pendientes()          -> lista lo que hay programado
+     window.Avisos.probar(20)            -> notificación de prueba (genérica) en 20 s
+     window.Avisos.probarProximas()      -> dispara YA las de las próximas 48h, con su texto real
+     window.Avisos.probarProximas(24)    -> solo las de hoy/mañana
+     window.Avisos.iniciar()             -> reprograma ahora mismo             */
   function pendientes() {
     var LN = plugin();
     if (!LN) return Promise.resolve([]);
@@ -599,12 +611,54 @@ window.Avisos = (function () {
       .then(function () { if (window.console) console.log('Aviso de prueba en', segundos, 's'); });
   }
 
+  // Dispara YA (en unos segundos, una detrás de otra) copias de los avisos
+  // ya programados que caigan dentro de las próximas `horas` (48 por
+  // defecto = "las de mañana"), con su título y texto reales — para ver
+  // cómo le va a llegar a Maite sin esperar al día.
+  //   window.Avisos.probarProximas()     -> las de las próximas 48h
+  //   window.Avisos.probarProximas(24)   -> solo las de hoy/mañana (24h)
+  function probarProximas(horas) {
+    var LN = plugin();
+    if (!LN) { if (window.console) console.warn('Avisos: solo en el APK'); return Promise.resolve([]); }
+    horas = horas || 48;
+    var limite = Date.now() + horas * 3600 * 1000;
+    return LN.getPending()
+      .then(function (p) {
+        var candidatas = ((p && p.notifications) || []).filter(function (n) {
+          var at = n.schedule && n.schedule.at ? new Date(n.schedule.at).getTime() : 0;
+          return at > Date.now() && at <= limite;
+        });
+        if (!candidatas.length) {
+          if (window.console) console.log('Avisos: nada programado en las próximas', horas, 'h.');
+          return [];
+        }
+        return crearCanal(LN).then(function () {
+          var notifs = candidatas.map(function (n, i) {
+            return {
+              id: 19900000 + i,
+              title: n.title,
+              body: n.body,
+              largeBody: n.body,
+              channelId: n.channelId || CANAL_ID,
+              schedule: { at: new Date(Date.now() + (i + 1) * 4000), allowWhileIdle: true }
+            };
+          });
+          if (window.console) {
+            console.log('Avisos: probando ' + notifs.length + ' aviso(s) real(es), uno cada 4s:');
+            console.table(notifs.map(function (n) { return { titulo: n.title, texto: n.body }; }));
+          }
+          return LN.schedule({ notifications: notifs }).then(function () { return notifs; });
+        });
+      });
+  }
+
   return {
     iniciar: iniciar,
     crearCanal: crearCanal,
     CANAL_ID: CANAL_ID,
     emitir: emitir,
     pendientes: pendientes,
-    probar: probar
+    probar: probar,
+    probarProximas: probarProximas
   };
 })();

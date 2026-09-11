@@ -48,8 +48,18 @@ window.Tema = (function () {
     return mqOscuro.matches;
   }
 
+  // Fechas con fondo nocturno propio (Navidad, Año Nuevo, Reyes,
+  // Halloween, Txupinazo — ver app.js/styles.css, "fechas señaladas"):
+  // ese día no hay modo claro que ofrecer, es la misma escena siempre.
+  // El interruptor de la cabecera no debe poder sacarla del oscuro.
+  var RE_TEMA_NOCHE = /\btema-(navidad|anyo-nuevo|reyes|halloween|txupinazo)\b/;
+  function temaNocheActivo() {
+    return !!(document.body && RE_TEMA_NOCHE.test(document.body.className));
+  }
+
   function aplicar(modo) {
     var raiz = document.documentElement;
+    if (temaNocheActivo()) modo = 'oscuro';
     // Siempre se escribe data-theme explícito (light|dark), incluso en 'auto'.
     // Antes, 'auto' quitaba el atributo y confiaba en @media
     // (prefers-color-scheme); pero algunos WebView de Android (Samsung) NO
@@ -98,13 +108,16 @@ window.Tema = (function () {
   var ETIQUETA = {
     auto: 'Tema: automático (sigue el móvil). Toca para fijar claro.',
     claro: 'Tema: claro. Toca para fijar oscuro.',
-    oscuro: 'Tema: oscuro. Toca para volver a automático.'
+    oscuro: 'Tema: oscuro. Toca para volver a automático.',
+    // Fecha con fondo nocturno propio: el botón no cambia nada hoy.
+    fiesta: 'Hoy la app va siempre oscura, a juego con la fecha.'
   };
 
   function pintarBoton(btn, modo) {
-    btn.innerHTML = icono(modo);
-    btn.setAttribute('aria-label', ETIQUETA[modo]);
-    btn.setAttribute('title', ETIQUETA[modo]);
+    var mostrado = temaNocheActivo() ? 'fiesta' : modo;
+    btn.innerHTML = icono(mostrado === 'fiesta' ? 'oscuro' : mostrado);
+    btn.setAttribute('aria-label', ETIQUETA[mostrado]);
+    btn.setAttribute('title', ETIQUETA[mostrado]);
   }
 
   var modoActual = leerModo();
@@ -112,6 +125,8 @@ window.Tema = (function () {
   aplicar(modoActual);
 
   function siguiente() {
+    // Nada que alternar: hoy solo hay una escena, y es oscura.
+    if (temaNocheActivo()) return;
     var i = MODOS.indexOf(modoActual);
     modoActual = MODOS[(i + 1) % MODOS.length];
     guardarModo(modoActual);
@@ -140,8 +155,19 @@ window.Tema = (function () {
     conectarBoton();
   }
 
+  // app.js llama a esto justo después de poner body.tema-<fecha>: en ese
+  // instante hay que releer el fondo forzado (aplicar) y repintar el
+  // icono del botón, porque tema.js ya se había pintado antes de que
+  // existiera esa clase en el body.
+  function refrescar() {
+    aplicar(modoActual);
+    var btn = document.getElementById('btn-tema');
+    if (btn) pintarBoton(btn, modoActual);
+  }
+
   return {
     modo: function () { return modoActual; },
-    ciclar: siguiente
+    ciclar: siguiente,
+    refrescar: refrescar
   };
 })();

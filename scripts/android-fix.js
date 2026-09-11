@@ -96,6 +96,19 @@ if (hayFCM) {
       writeFileSync(gradleApp, g);
       console.log('android-fix: apply plugin google-services añadido a android/app/build.gradle.');
     }
+
+    // firebase-messaging: el plugin @capacitor/push-notifications lo trae
+    // como dependencia "implementation" suya, que Gradle NO expone al
+    // módulo :app — así que ChorAppMessagingService.java no compila sin
+    // añadirlo aquí explícitamente.
+    if (!g.includes('com.google.firebase:firebase-messaging')) {
+      g = g.replace(
+        /(implementation project\(':capacitor-cordova-android-plugins'\)\n)/,
+        `$1    implementation platform('com.google.firebase:firebase-bom:33.5.1')\n    implementation 'com.google.firebase:firebase-messaging'\n`
+      );
+      writeFileSync(gradleApp, g);
+      console.log('android-fix: dependencia firebase-messaging añadida a android/app/build.gradle.');
+    }
   }
 } else {
   console.log('android-fix: sin resources/google-services.json — push (FCM) desactivada, APK compila igual.');

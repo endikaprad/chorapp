@@ -13,6 +13,8 @@ window.Pagina_home = (function () {
     if (elAnio) elAnio.textContent = new Date().getFullYear();
 
     cargarCoro(raiz);
+    pintarCumple(raiz);
+    pintarTema(raiz);
     pintarFecha(raiz);
     pintarFrase(raiz);
     pintarConcierto(raiz);
@@ -81,6 +83,56 @@ window.Pagina_home = (function () {
     card.addEventListener('click', function () {
       window.App.ir(destino.ruta, { datos: destino.datos });
     });
+  }
+
+  /* ----------------------------------------------------------
+     Su cumpleaños (12/09, cada año): tarjeta propia arriba del
+     todo en Inicio, con el mismo mensaje que la frase del día
+     pero a la vista de verdad, no como un aviso más.
+     ---------------------------------------------------------- */
+  function pintarCumple(raiz) {
+    var el = raiz.querySelector('[data-cumple-hero]');
+    if (!el || !window.Frases || !window.Frases.esCumpleMaite || !window.Frases.esCumpleMaite()) return;
+    var texto = raiz.querySelector('[data-cumple-hero-texto]');
+    if (texto && window.Frases.delDia) {
+      var f = window.Frases.delDia();
+      if (f && f.texto) texto.textContent = f.texto;
+    }
+    el.hidden = false;
+  }
+
+  /* ----------------------------------------------------------
+     Fechas señaladas con interfaz propia (Navidad, Reyes,
+     Halloween, Txupinazo, día de la madre…): misma idea que la
+     tarjeta de cumpleaños, con el icono y el título que le tocan
+     a cada una. El mensaje es el mismo que ya escribe frases.js.
+     ---------------------------------------------------------- */
+  var TEMAS = {
+    navidad:      { icono: '🎄', titulo: 'Feliz Navidad, Ama' },
+    'anyo-nuevo': { icono: '🎆', titulo: '¡Feliz Año Nuevo, Ama!' },
+    reyes:        { icono: '👑', titulo: 'Feliz día de Reyes' },
+    halloween:    { icono: '🎃', titulo: 'Feliz Halloween' },
+    txupinazo:    { icono: '🚀', titulo: 'Txupinazo en Llodio' },
+    'dia-madre':  { icono: '🌷', titulo: 'Feliz día de la madre' },
+    carnaval:     { icono: '🎭', titulo: 'Feliz Carnaval, Ama' }
+  };
+  function pintarTema(raiz) {
+    var el = raiz.querySelector('[data-tema-hero]');
+    if (!el || !window.Frases || !window.Frases.temaDeHoy) return;
+    var id = window.Frases.temaDeHoy();
+    var datos = id && TEMAS[id];
+    if (!datos) return;
+    el.className = 'tema-hero tema-hero--' + id;
+    var icono = raiz.querySelector('[data-tema-hero-icono]');
+    if (icono) icono.textContent = datos.icono;
+    var titulo = raiz.querySelector('[data-tema-hero-titulo]');
+    if (titulo) titulo.textContent = datos.titulo;
+    var texto = raiz.querySelector('[data-tema-hero-texto]');
+    if (texto && window.Frases.delDia) {
+      var f = window.Frases.delDia();
+      if (f && f.texto) texto.textContent = f.texto;
+    }
+    el.hidden = false;
   }
 
   /* ----------------------------------------------------------
@@ -196,11 +248,12 @@ window.Pagina_home = (function () {
       var hh = Math.floor(s / 3600);
       var mm = Math.floor((s % 3600) / 60);
       var ss = s % 60;
+      function dosDigitos(n) { return n < 10 ? '0' + n : '' + n; }
       var partes = [];
       if (hh) partes.push(hh + ' h');
-      if (hh || mm) partes.push(mm + ' min');
-      partes.push(ss + ' s');
-      elDias.textContent = 'Faltan ' + partes.join(' ') + ' para el concierto';
+      if (hh || mm) partes.push((hh ? dosDigitos(mm) : mm) + ' min');
+      partes.push((hh || mm ? dosDigitos(ss) : ss) + ' s');
+      elDias.textContent = partes.join(' ') + ' para el concierto';
     }
 
     if (momento && momento - Date.now() > 0 && momento - Date.now() < 86400000) {
@@ -208,7 +261,7 @@ window.Pagina_home = (function () {
       _timerConcierto = setInterval(tic, 1000);
     } else if (c.dias === 0) elDias.textContent = '¡Hoy hay concierto!';
     else if (c.dias === 1) elDias.textContent = 'Mañana hay concierto';
-    else elDias.textContent = 'Faltan ' + c.dias + ' días para el concierto';
+    else elDias.textContent = c.dias + ' días para el concierto';
 
     var partes = [];
     var f = /^(\d{4})-(\d{2})-(\d{2})$/.exec(c.fecha);

@@ -220,6 +220,14 @@ window.Frases = (function () {
     '2030-08-31': 'Sábado de morcillas en Llodio. Hoy se canta poco y se come mucho. Permitido.',
     // (a partir de 2031, añadir el último sábado de agosto de cada año)
 
+    // --- Carnaval / Inauteriak (martes de Carnaval, fecha móvil) ---
+    '2026-02-17': 'Feliz Carnaval, Ama. Disfraz puesto, boca cerrada: hoy se hace playback.',
+    '2027-02-09': 'Feliz Carnaval, Ama. Disfraz puesto, boca cerrada: hoy se hace playback.',
+    '2028-02-29': 'Feliz Carnaval, Ama. Disfraz puesto, boca cerrada: hoy se hace playback.',
+    '2029-02-13': 'Feliz Carnaval, Ama. Disfraz puesto, boca cerrada: hoy se hace playback.',
+    '2030-03-05': 'Feliz Carnaval, Ama. Disfraz puesto, boca cerrada: hoy se hace playback.',
+    // (a partir de 2031, añadir el martes de Carnaval de cada año: 47 días antes del Domingo de Resurrección)
+
     // --- Día de la madre (primer domingo de mayo en España) ---
     '2026-05-03': 'Feliz día de la madre, Amatxu.',
     '2027-05-02': 'Feliz día de la madre, Amatxu.',
@@ -267,6 +275,12 @@ window.Frases = (function () {
 
     '08-15': 'Txupinazo en Llodio. Hoy la fiesta, mañana el coro.',
     '10-31': 'Halloween. Sal a asustar, que práctica tienes.',
+
+    '2026-02-17': 'Feliz Carnaval, Ama. Hoy el disfraz habla por ti, menos mal.',
+    '2027-02-09': 'Feliz Carnaval, Ama. Hoy el disfraz habla por ti, menos mal.',
+    '2028-02-29': 'Feliz Carnaval, Ama. Hoy el disfraz habla por ti, menos mal.',
+    '2029-02-13': 'Feliz Carnaval, Ama. Hoy el disfraz habla por ti, menos mal.',
+    '2030-03-05': 'Feliz Carnaval, Ama. Hoy el disfraz habla por ti, menos mal.',
 
     '2026-08-29': 'Sábado de morcillas en Llodio. A comer, que hoy no toca cantar.',
     '2027-08-28': 'Sábado de morcillas en Llodio. A comer, que hoy no toca cantar.',
@@ -696,7 +710,8 @@ window.Frases = (function () {
       salida.push({
         id: d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(),
         fecha: at,
-        texto: avisoTextoDe(d)
+        texto: avisoTextoDe(d),
+        categoria: categoriaFecha(d)
       });
     }
 
@@ -714,9 +729,44 @@ window.Frases = (function () {
     return salida;
   }
 
+  // ¿Hoy es el cumpleaños de Maite (12/09, cualquier año)? Para adornos
+  // visuales (fondo, cabecera…) que deben repetirse cada año sin tocar código.
+  function esCumpleMaite(fecha) {
+    return categoriaFecha(fecha || new Date()) === 'cumpleMaite';
+  }
+
+  /* ---------- Tema visual del día ----------
+     Igual que CUMPLE_MAITE, pero para el resto de fechas con interfaz
+     propia (fondo + tarjeta en Inicio, ver styles.css / home.js). La
+     clave debe existir también en FECHAS (incluida cada fecha concreta
+     del día de la madre) para que coincida con el mensaje que ya se
+     muestra. No confundir con categoriaFecha, que solo distingue
+     cumpleaños de "fiesta" para la hora de la notificación. */
+  var TEMA_FECHA = {
+    '12-24': 'navidad', '12-25': 'navidad',
+    '01-01': 'anyo-nuevo',
+    '01-06': 'reyes',
+    '10-31': 'halloween',
+    '08-15': 'txupinazo',
+    '2026-05-03': 'dia-madre', '2027-05-02': 'dia-madre', '2028-05-07': 'dia-madre',
+    '2029-05-06': 'dia-madre', '2030-05-05': 'dia-madre',
+    '2026-02-17': 'carnaval', '2027-02-09': 'carnaval', '2028-02-29': 'carnaval',
+    '2029-02-13': 'carnaval', '2030-03-05': 'carnaval'
+  };
+  function temaDeHoy(fecha) {
+    var d = fecha || new Date();
+    var claves = clavesFecha(d);
+    for (var i = 0; i < claves.length; i++) {
+      if (TEMA_FECHA[claves[i]]) return TEMA_FECHA[claves[i]];
+    }
+    return null;
+  }
+
   return {
     delDia: delDia,
     especialDeHoy: especialDeHoy,
+    esCumpleMaite: esCumpleMaite,
+    temaDeHoy: temaDeHoy,
     enhorabuena: enhorabuena,
     hito: hito,
     avisoRacha: avisoRacha,

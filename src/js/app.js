@@ -311,6 +311,27 @@
      Arranque
      -------------------------------------------------------- */
   document.addEventListener('DOMContentLoaded', function () {
+    // Su cumpleaños (12/09, cada año): fondo y cabecera se visten de fiesta
+    // todo el día. Un detalle discreto, coherente con el resto de celebraciones.
+    if (window.Frases && window.Frases.esCumpleMaite && window.Frases.esCumpleMaite()) {
+      document.body.classList.add('cumple-maite');
+    }
+    // Otras fechas señaladas con interfaz propia (Navidad, Reyes,
+    // Halloween, Txupinazo, día de la madre…): mismo mecanismo, un tema
+    // exclusivo cada vez porque las fechas no se solapan entre sí.
+    if (window.Frases && window.Frases.temaDeHoy) {
+      var _tema = window.Frases.temaDeHoy();
+      if (_tema) {
+        document.body.classList.add('tema-' + _tema);
+        // Navidad, Año Nuevo, Reyes, Halloween y Txupinazo tienen fondo
+        // oscuro sí o sí: ese día toda la app entra en modo oscuro, gane
+        // lo que gane el interruptor de Maite — tema.js ya sabe mirar esta
+        // clase (temaNocheActivo) y lo fuerza también si lo intenta tocar.
+        // Aquí solo hace falta pedirle que vuelva a aplicar ahora que la
+        // clase ya existe en el body.
+        if (window.Tema && window.Tema.refrescar) window.Tema.refrescar();
+      }
+    }
     // Cuenta el tiempo real que pasa con la app abierta (para el Wrapped).
     if (window.Tiempo && window.Tiempo.iniciar) window.Tiempo.iniciar();
     // Reorganización a "sesiones": convierte las canciones con audio del

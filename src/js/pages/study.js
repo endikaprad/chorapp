@@ -1311,7 +1311,8 @@ window.Pagina_study = (function () {
   // Si son VARIAS imágenes, se muestran en un carrusel horizontal que se
   // desliza con el dedo (con puntitos abajo); PDFs y texto siguen apilados
   // en vertical, cada uno con su botón para abrir a pantalla completa.
-  function renderAdjuntos(metas, etiqueta, doc, pre) {
+  function renderAdjuntos(metas, etiqueta, doc, pre, opts) {
+    opts = opts || {};
     metas = metas || [];
     if (!metas.length) { doc.hidden = true; doc.innerHTML = ''; return; }
     if (pre) pre.hidden = true;
@@ -1368,10 +1369,21 @@ window.Pagina_study = (function () {
           item.querySelector('[data-pdf-abrir]').addEventListener('click', function () { window.VisorPDF.abrir(blob, etq); });
         } else if (esImagen) {
           var ui = URL.createObjectURL(blob); urls.push(ui);
-          item.innerHTML = '<img class="visor-doc__img" alt="' + escapar(etq) + '" />';
-          var im = item.querySelector('img');
-          im.src = ui;
-          im.addEventListener('click', function () { abrirLightbox(ui); });
+          if (opts.anotable) {
+            item.innerHTML = '<div class="visor-doc__lienzo">' +
+              '<img class="visor-doc__img" alt="' + escapar(etq) + '" />' +
+              '<svg class="visor-doc__anot" data-clave="' + escapar(meta.clave) + '"></svg></div>';
+            var imA = item.querySelector('img');
+            imA.src = ui;
+            var svgA = item.querySelector('svg');
+            if (cancion) svgA.innerHTML = marcasAnotSVG(window.Canciones.anotacionesPartitura(cancion, meta.clave), false);
+            imA.addEventListener('click', function () { abrirLightbox(ui, { clave: meta.clave }); });
+          } else {
+            item.innerHTML = '<img class="visor-doc__img" alt="' + escapar(etq) + '" />';
+            var im = item.querySelector('img');
+            im.src = ui;
+            im.addEventListener('click', function () { abrirLightbox(ui); });
+          }
         } else {
           blob.text().then(function (t) {
             var p = document.createElement('pre');
@@ -1920,7 +1932,7 @@ window.Pagina_study = (function () {
     var metas = window.Adjuntos.lista(cancion, 'partitura');
     if (!metas.length) { vacioConAnadir(vacio, 'partitura', 'Aún no hay partitura.'); return; }
     vacio.hidden = true;
-    renderAdjuntos(metas, 'Partitura', doc, null);
+    renderAdjuntos(metas, 'Partitura', doc, null, { anotable: true });
   }
 
   /* ---------- Fragmentos difíciles ---------- */
@@ -2302,11 +2314,23 @@ window.Pagina_study = (function () {
 
   /* ---------- Lightbox ---------- */
 
-  var lb, lbImg, lbZoom;
+  var lb, lbImg, lbZoom, lbLienzo;
+  var anotSvg, anotBarra, anotPista, anotBtnLapiz;
+  var anotClave = null;      // clave del adjunto abierto (null si no admite marcas)
+  var anotEditando = false;
+  var anotModo = 'circulo';  // 'circulo' | 'flecha'
+  var anotColorId = 'cobalto';
+  var anotInicio = null;     // punto de partida {x,y} (fracción 0..1) al arrastrar una flecha
+  var anotLineaTmp = null;   // <line> de previsualización mientras se arrastra
 
   function montarLightbox() {
     lb = q('[data-lightbox]');
     lbImg = lb.querySelector('[data-lightbox-src]');
+    lbLienzo = lb.querySelector('[data-lightbox-lienzo]');
+    anotSvg = lb.querySelector('[data-lightbox-anot]');
+    anotBarra = lb.querySelector('[data-anot-barra]');
+    anotPista = lb.querySelector('[data-anot-pista]');
+    anotBtnLapiz = lb.querySelector('[data-anot-alternar]');
 
     // Portal al <body>: un ancestro con transform (.pantalla anima al navegar)
     // haría que `position: fixed` se posicione respecto a esa pantalla y no
@@ -2317,38 +2341,221 @@ window.Pagina_study = (function () {
     lb.addEventListener('click', function (e) { if (e.target === lb) cerrarLightbox(); });
     document.addEventListener('keydown', cerrarConEsc);
 
-    lbZoom = crearZoom(lb, lbImg);
+    lbZoom = crearZoom(lb, lbLienzo, function () { return anotEditando; });
+
+    montarAnotaciones();
   }
 
   function cerrarConEsc(e) {
     if (e.key === 'Escape' && lb && !lb.hidden) cerrarLightbox();
   }
 
-  function abrirLightbox(u) {
+  // opts.clave = clave del adjunto (window.Adjuntos), solo para páginas de
+  // partitura: habilita el lápiz para dibujar marcas sobre ella.
+  function abrirLightbox(u, opts) {
+    opts = opts || {};
     lbImg.style.transition = 'none';
     lbImg.src = u;
+    anotClave = opts.clave || null;
+    if (anotBtnLapiz) anotBtnLapiz.hidden = !anotClave;
+    fijarEdicionAnot(false);
     lb.hidden = false;
     if (lbZoom) lbZoom.reset();
+    pintarAnotLB();
   }
   function cerrarLightbox() {
     if (!lb) return;
+    fijarEdicionAnot(false);
     lb.hidden = true;
     lbImg.removeAttribute('src');
+    anotClave = null;
+    if (anotSvg) anotSvg.innerHTML = '';
     if (lbZoom) lbZoom.reset();
   }
   function desmontarLightbox() {
     document.removeEventListener('keydown', cerrarConEsc);
     if (lb && lb.parentNode === document.body) lb.parentNode.removeChild(lb);
-    lb = lbImg = lbZoom = null;
+    lb = lbImg = lbZoom = lbLienzo = anotSvg = anotBarra = anotPista = anotBtnLapiz = null;
+  }
+
+  /* ---------- Marcas dibujadas sobre la partitura (círculo / flecha) ---------- */
+
+  // Construye el <defs>+cuerpo SVG de una lista de anotaciones. Coordenadas
+  // en % (fracción del tamaño real de la imagen): valen igual a cualquier
+  // zoom, sin recalcular nada. `editable`: añade el manejador de borrado.
+  function marcasAnotSVG(anots, editable) {
+    var defs = '', cuerpo = '';
+    anots.forEach(function (a) {
+      var color = colorFrag(a);
+      var attr = editable ? ' data-anot-borrar="' + escapar(a.id) + '" tabindex="0" aria-label="Quitar marca"' : '';
+      if (a.tipo === 'flecha' && typeof a.x2 === 'number') {
+        var mid = 'anot-punta-' + a.id;
+        defs += '<marker id="' + mid + '" viewBox="0 0 10 10" refX="7.5" refY="5" ' +
+          'markerWidth="6" markerHeight="6" orient="auto-start-reverse">' +
+          '<path d="M0,0 L10,5 L0,10 z" fill="' + color + '"/></marker>';
+        cuerpo += '<g class="anot-marca"' + attr + '>' +
+          '<line x1="' + (a.x * 100) + '%" y1="' + (a.y * 100) + '%" x2="' + (a.x2 * 100) + '%" y2="' + (a.y2 * 100) + '%" ' +
+          'stroke="' + color + '" stroke-width="4.5" stroke-linecap="round" marker-end="url(#' + mid + ')" /></g>';
+      } else {
+        cuerpo += '<g class="anot-marca"' + attr + '>' +
+          '<circle cx="' + (a.x * 100) + '%" cy="' + (a.y * 100) + '%" r="16" fill="none" stroke="' + color + '" stroke-width="4" /></g>';
+      }
+    });
+    return (defs ? '<defs>' + defs + '</defs>' : '') + cuerpo;
+  }
+
+  // Repinta el visor a pantalla completa con las anotaciones guardadas de
+  // `anotClave`. Si se está editando, cada marca se puede tocar para borrarla.
+  function pintarAnotLB() {
+    if (!anotSvg) return;
+    var anots = (cancion && anotClave) ? window.Canciones.anotacionesPartitura(cancion, anotClave) : [];
+    anotSvg.innerHTML = marcasAnotSVG(anots, anotEditando);
+    if (anotEditando) {
+      anotSvg.querySelectorAll('[data-anot-borrar]').forEach(function (g) {
+        g.addEventListener('click', function (e) {
+          e.stopPropagation();
+          window.Canciones.borrarAnotacionPartitura(cancion.id, anotClave, g.getAttribute('data-anot-borrar'));
+          pintarAnotLB();
+          refrescarAnotInline(anotClave);
+        });
+      });
+    }
+  }
+
+  // Repinta solo el SVG de lectura bajo el visor (sin recrear la imagen ni
+  // pedir de nuevo el blob), para no acumular object URLs en cada trazo.
+  function refrescarAnotInline(clave) {
+    if (!cancion || !clave) return;
+    var doc = q('[data-partitura-doc]');
+    if (!doc || !window.CSS || !CSS.escape) return;
+    var svg = doc.querySelector('svg[data-clave="' + CSS.escape(clave) + '"]');
+    if (svg) svg.innerHTML = marcasAnotSVG(window.Canciones.anotacionesPartitura(cancion, clave), false);
+  }
+
+  function pintarColoresAnot() {
+    var caja = lb.querySelector('[data-anot-colores]');
+    if (!caja) return;
+    caja.innerHTML = Object.keys(COLORES_FRAG).map(function (id) {
+      return '<button type="button" class="anot-color' + (id === anotColorId ? ' is-sel' : '') + '" ' +
+        'data-anot-color="' + id + '" style="--c:' + COLORES_FRAG[id].hex + '" aria-label="' + COLORES_FRAG[id].nombre + '"></button>';
+    }).join('');
+    caja.querySelectorAll('[data-anot-color]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        anotColorId = b.getAttribute('data-anot-color');
+        caja.querySelectorAll('[data-anot-color]').forEach(function (o) { o.classList.toggle('is-sel', o === b); });
+      });
+    });
+  }
+
+  function fijarEdicionAnot(on) {
+    anotEditando = !!on && !!anotClave;
+    if (anotBarra) anotBarra.hidden = !anotEditando;
+    if (anotPista) anotPista.hidden = !anotEditando;
+    if (anotSvg) anotSvg.classList.toggle('is-editando', anotEditando);
+    if (anotBtnLapiz) anotBtnLapiz.classList.toggle('is-activo', anotEditando);
+    anotInicio = null;
+    quitarLineaTmp();
+    pintarAnotLB();
+  }
+
+  function quitarLineaTmp() {
+    if (anotLineaTmp && anotLineaTmp.parentNode) anotLineaTmp.parentNode.removeChild(anotLineaTmp);
+    anotLineaTmp = null;
+  }
+
+  // Convierte un evento de puntero en fracción 0..1 respecto al tamaño real
+  // (post-zoom) del propio SVG: getBoundingClientRect ya tiene en cuenta el
+  // transform de `crearZoom`, así que el cálculo vale a cualquier escala.
+  function fraccionDesde(e) {
+    var r = anotSvg.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)),
+      y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)),
+    };
+  }
+
+  function guardarAnotacion(datos) {
+    if (!cancion || !anotClave) return;
+    window.Canciones.agregarAnotacionPartitura(cancion.id, anotClave, datos);
+    pintarAnotLB();
+    refrescarAnotInline(anotClave);
+  }
+
+  function deshacerAnot() {
+    if (!cancion || !anotClave) return;
+    var lista = window.Canciones.anotacionesPartitura(cancion, anotClave);
+    if (!lista.length) return;
+    window.Canciones.borrarAnotacionPartitura(cancion.id, anotClave, lista[lista.length - 1].id);
+    pintarAnotLB();
+    refrescarAnotInline(anotClave);
+  }
+
+  function montarAnotaciones() {
+    if (!anotBtnLapiz) return;
+    pintarColoresAnot();
+
+    anotBtnLapiz.addEventListener('click', function () { fijarEdicionAnot(!anotEditando); });
+    lb.querySelectorAll('[data-anot-modo]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        anotModo = b.getAttribute('data-anot-modo');
+        lb.querySelectorAll('[data-anot-modo]').forEach(function (o) { o.classList.toggle('is-activo', o === b); });
+      });
+    });
+    lb.querySelector('[data-anot-deshacer]').addEventListener('click', deshacerAnot);
+    lb.querySelector('[data-anot-listo]').addEventListener('click', function () { fijarEdicionAnot(false); });
+
+    var ns = 'http://www.w3.org/2000/svg';
+    anotSvg.addEventListener('pointerdown', function (e) {
+      if (!anotEditando || e.target.closest('[data-anot-borrar]')) return;
+      e.stopPropagation();
+      anotSvg.setPointerCapture(e.pointerId);
+      anotInicio = fraccionDesde(e);
+      if (anotModo === 'flecha') {
+        anotLineaTmp = document.createElementNS(ns, 'line');
+        anotLineaTmp.setAttribute('x1', (anotInicio.x * 100) + '%');
+        anotLineaTmp.setAttribute('y1', (anotInicio.y * 100) + '%');
+        anotLineaTmp.setAttribute('x2', (anotInicio.x * 100) + '%');
+        anotLineaTmp.setAttribute('y2', (anotInicio.y * 100) + '%');
+        anotLineaTmp.setAttribute('class', 'anot-tmp');
+        anotLineaTmp.setAttribute('stroke', COLORES_FRAG[anotColorId].hex);
+        anotSvg.appendChild(anotLineaTmp);
+      }
+    });
+    anotSvg.addEventListener('pointermove', function (e) {
+      if (!anotEditando || !anotInicio || anotModo !== 'flecha' || !anotLineaTmp) return;
+      var f = fraccionDesde(e);
+      anotLineaTmp.setAttribute('x2', (f.x * 100) + '%');
+      anotLineaTmp.setAttribute('y2', (f.y * 100) + '%');
+    });
+    function terminar(e) {
+      if (!anotEditando || !anotInicio) return;
+      if (anotModo === 'flecha') {
+        var fin = fraccionDesde(e);
+        quitarLineaTmp();
+        var dist = Math.hypot(fin.x - anotInicio.x, fin.y - anotInicio.y);
+        if (dist > 0.02) {
+          guardarAnotacion({ tipo: 'flecha', x: anotInicio.x, y: anotInicio.y, x2: fin.x, y2: fin.y, color: anotColorId });
+        } else {
+          guardarAnotacion({ tipo: 'circulo', x: anotInicio.x, y: anotInicio.y, color: anotColorId });
+        }
+      } else {
+        guardarAnotacion({ tipo: 'circulo', x: anotInicio.x, y: anotInicio.y, color: anotColorId });
+      }
+      anotInicio = null;
+    }
+    anotSvg.addEventListener('pointerup', terminar);
+    anotSvg.addEventListener('pointercancel', function () { anotInicio = null; quitarLineaTmp(); });
   }
 
   /* Zoom/desplazamiento del visor: rueda, doble toque y pellizco con dos dedos.
      Solo actúa sobre `transform` (escala + traslado) para mantener 60fps. */
-  function crearZoom(caja, img) {
+  function crearZoom(caja, img, bloqueado) {
     var MIN = 1, MAX = 4;
     var esc = 1, x = 0, y = 0;
     var puntos = new Map();
     var pinchIni = 0, escIni = 1, arrastreIni = null;
+
+    function ocupado() { return !!(bloqueado && bloqueado()); }
 
     function aplicar() {
       img.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + esc + ')';
@@ -2365,6 +2572,7 @@ window.Pagina_study = (function () {
     function suave(on) { img.style.transition = on ? 'transform 160ms var(--curva)' : 'none'; }
 
     caja.addEventListener('wheel', function (e) {
+      if (ocupado()) return;
       e.preventDefault();
       suave(false);
       esc = Math.min(MAX, Math.max(MIN, esc * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
@@ -2372,12 +2580,14 @@ window.Pagina_study = (function () {
     }, { passive: false });
 
     img.addEventListener('dblclick', function () {
+      if (ocupado()) return;
       suave(true);
       if (esc > MIN) { esc = MIN; x = 0; y = 0; } else { esc = 2.4; }
       limitar(); aplicar();
     });
 
     img.addEventListener('pointerdown', function (e) {
+      if (ocupado()) return;
       img.setPointerCapture(e.pointerId);
       suave(false);
       puntos.set(e.pointerId, { x: e.clientX, y: e.clientY });

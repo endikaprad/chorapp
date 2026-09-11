@@ -27,6 +27,20 @@
   --color-concierto: #17805C;        /* día de concierto: verde jade cálido, no chillón */
   --color-concierto-suave: #E1F0E9;
 
+  --color-fiesta-rosa: #C6577A;      /* solo su cumpleaños: confeti de fondo */
+  --color-fiesta-menta: #2E8F72;
+
+  /* --- Colores de fechas señaladas (Navidad, Reyes, Halloween…) --- */
+  --color-navidad-rojo: #B23A48;
+  --color-navidad-verde: #2F6B4F;
+  --color-plata: #B9BEC9;
+  --color-reyes-morado: #6A4C93;
+  --color-halloween-morado: #5C4B8A;
+  --color-halloween-naranja: #D97B3F;
+  --color-txupi-rojo: #D52B1E;    /* rojo ikurriña */
+  --color-txupi-verde: #078930;   /* verde ikurriña */
+  --color-carnaval-magenta: #C23B87;
+
   /* --- Tipografía --- */
   --fuente-titulo: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --fuente-texto: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -73,6 +87,17 @@
     --estado-pendiente: #8E877F;
     --color-concierto: #3FBF93;
     --color-concierto-suave: #16271F;
+    --color-fiesta-rosa: #E48CA5;
+    --color-fiesta-menta: #4FBF9B;
+    --color-navidad-rojo: #D9707D;
+    --color-navidad-verde: #4FAE82;
+    --color-plata: #DADEE6;
+    --color-reyes-morado: #9B7FC9;
+    --color-halloween-morado: #8A76C4;
+    --color-halloween-naranja: #E8934A;
+    --color-txupi-rojo: #E8564A;
+    --color-txupi-verde: #2FBD5C;
+    --color-carnaval-magenta: #E066AA;
     --sombra-sobre-acento: 0 1px 2px rgba(0, 0, 0, 0.35);
   }
 }
@@ -90,11 +115,60 @@
   --estado-pendiente: #8E877F;
   --color-concierto: #3FBF93;
   --color-concierto-suave: #16271F;
+  --color-fiesta-rosa: #E48CA5;
+  --color-fiesta-menta: #4FBF9B;
+  --color-navidad-rojo: #D9707D;
+  --color-navidad-verde: #4FAE82;
+  --color-plata: #DADEE6;
+  --color-reyes-morado: #9B7FC9;
+  --color-halloween-morado: #8A76C4;
+  --color-halloween-naranja: #E8934A;
+  --color-txupi-rojo: #E8564A;
+  --color-txupi-verde: #2FBD5C;
+  --color-carnaval-magenta: #E066AA;
   --sombra-sobre-acento: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"]  { color-scheme: dark; }
+
+/* Fechas con escenografía nocturna (Navidad, Año Nuevo, Reyes,
+   Halloween, Txupinazo — ver "Fechas señaladas" más abajo): el fondo
+   es oscuro sí o sí ese día, así que el resto de la app también entra
+   en modo oscuro, gane lo que gane el interruptor de Maite. Así no
+   hay que mantener una versión clara y otra oscura de cada una: es
+   literalmente la misma, y evita texto oscuro sobre fondo oscuro si
+   ese día tenía elegido el modo claro. Mismos valores que
+   :root[data-theme="dark"], puestos DESPUÉS para ganar el empate de
+   especificidad pase lo que pase con el interruptor. */
+body.tema-navidad, body.tema-anyo-nuevo, body.tema-reyes,
+body.tema-halloween, body.tema-txupinazo {
+  color-scheme: dark;
+  --color-acento: #5A67E8;
+  --color-acento-oscuro: #7C88FF;
+  --color-acento-suave: #1E1E3A;
+  --color-texto: #F2EFEA;
+  --color-texto-2: #A7A099;
+  --color-fondo: #12100E;
+  --color-superficie: #1C1917;
+  --color-borde: #322D28;
+  --estado-aprendida: #7FB98E;
+  --estado-progreso: #E0A857;
+  --estado-pendiente: #8E877F;
+  --color-concierto: #3FBF93;
+  --color-concierto-suave: #16271F;
+  --color-fiesta-rosa: #E48CA5;
+  --color-fiesta-menta: #4FBF9B;
+  --color-navidad-rojo: #D9707D;
+  --color-navidad-verde: #4FAE82;
+  --color-plata: #DADEE6;
+  --color-reyes-morado: #9B7FC9;
+  --color-halloween-morado: #8A76C4;
+  --color-halloween-naranja: #E8934A;
+  --color-txupi-rojo: #E8564A;
+  --color-txupi-verde: #2FBD5C;
+  --sombra-sobre-acento: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -153,6 +227,20 @@ button {
    Android (y algunos WebView) los renderizan flojos o clipados y el fondo
    salía descolorido respecto al navegador. Un degradado suave se ve igual
    en todos lados y encima es más rápido (no hay capa que desenfocar). */
+/* Hermano de .fondo-animado, sin transform propio: aquí viven todos los
+   elementos position:fixed de la escenografía de cada fecha señalada
+   (ver más abajo, "Escenografía de fondo"). .fondo-animado no puede
+   alojarlos porque anima su propio transform, y eso convierte a
+   cualquier ancestro así en el "containing block" de sus fixed
+   descendientes — dejarían de colocarse contra la pantalla real. */
+.fondo-decor {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .fondo-animado {
   position: fixed;
   inset: -14%;
@@ -281,6 +369,993 @@ button {
 }
 :root[data-theme="dark"] .fondo-lineas { opacity: 0.28; }
 :root[data-theme="dark"] .fondo-orbe { opacity: 0.62; }
+
+/* ============================================================
+   Su cumpleaños (12 de septiembre, cada año) — body.cumple-maite
+   Ese día tiene que notarse a la primera mirada: fondo cobalto +
+   dorado bien presente (no un tinte), confeti cayendo de verdad
+   y una tarjeta propia en Inicio. Sigue sin ser agresivo
+   — nada parpadea, todo es lento y en transform/opacity — pero
+   es inequívocamente una fiesta, no un detalle que hay que buscar.
+   ============================================================ */
+:root body.cumple-maite .fondo-animado {
+  background-image:
+    radial-gradient(50% 42% at 8% 2%,
+      color-mix(in srgb, var(--estado-progreso) 62%, var(--color-fondo)) 0%, transparent 74%),
+    radial-gradient(48% 40% at 4% 0%,
+      color-mix(in srgb, var(--color-acento) 62%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(46% 36% at 102% 5%,
+      color-mix(in srgb, var(--estado-progreso) 50%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(54% 44% at 92% 52%,
+      color-mix(in srgb, var(--estado-progreso) 55%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(58% 46% at 100% 102%,
+      color-mix(in srgb, var(--color-acento-oscuro) 58%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(52% 44% at 2% 98%,
+      color-mix(in srgb, var(--color-acento) 52%, var(--color-fondo)) 0%, transparent 72%),
+    radial-gradient(70% 54% at 42% 38%,
+      color-mix(in srgb, var(--estado-progreso) 34%, var(--color-fondo)) 0%, transparent 80%);
+}
+body.cumple-maite .fondo-orbe { opacity: 0.62; }
+:root[data-theme="dark"] body.cumple-maite .fondo-orbe { opacity: 0.75; }
+
+/* Los orbes también cambian de color, despacio y sin saltos: cada
+   uno lleva dos capas (rosa/dorado, menta/cobalto…) que se cruzan
+   con la misma curva suave que la tarjeta de Inicio. El propio orbe
+   sigue moviéndose igual (su animación de transform no se toca);
+   las capas de color son ::before/::after, así que no interfieren. */
+body.cumple-maite .fondo-orbe::before,
+body.cumple-maite .fondo-orbe::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: cumple-color-cruce 20s ease-in-out infinite;
+}
+body.cumple-maite .fondo-orbe--1::before {
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--color-fiesta-rosa) 64%, transparent) 0%,
+    color-mix(in srgb, var(--color-fiesta-rosa) 30%, transparent) 38%, transparent 66%);
+  animation-delay: 0s;
+}
+body.cumple-maite .fondo-orbe--1::after {
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--estado-progreso) 64%, transparent) 0%,
+    color-mix(in srgb, var(--estado-progreso) 30%, transparent) 38%, transparent 66%);
+  animation-delay: -10s;
+}
+body.cumple-maite .fondo-orbe--2::before {
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--color-fiesta-menta) 60%, transparent) 0%,
+    color-mix(in srgb, var(--color-fiesta-menta) 28%, transparent) 38%, transparent 66%);
+  animation-delay: -5s;
+}
+body.cumple-maite .fondo-orbe--2::after {
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--color-acento-oscuro) 58%, transparent) 0%,
+    color-mix(in srgb, var(--color-acento-oscuro) 28%, transparent) 38%, transparent 66%);
+  animation-delay: -15s;
+}
+body.cumple-maite .fondo-orbe--3::before {
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--estado-progreso) 62%, transparent) 0%,
+    color-mix(in srgb, var(--estado-progreso) 28%, transparent) 38%, transparent 66%);
+  animation-delay: -3.5s;
+}
+body.cumple-maite .fondo-orbe--3::after {
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--color-fiesta-menta) 62%, transparent) 0%,
+    color-mix(in srgb, var(--color-fiesta-menta) 28%, transparent) 38%, transparent 66%);
+  animation-delay: -13.5s;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.cumple-maite .fondo-orbe::before,
+  body.cumple-maite .fondo-orbe::after { animation: none; opacity: 0.5; }
+}
+
+/* Confeti cayendo: piezas de papel en los 4 colores de fiesta
+   (cobalto, dorado, rosa y menta), cada una con su propio giro.
+   Cae de arriba a abajo — al revés que los corazones — para que
+   el fondo se lea claramente como algo de cumpleaños, no solo
+   un tinte de color. */
+.fondo-confeti { display: none; }
+body.cumple-maite .fondo-confeti {
+  display: block;
+  position: fixed;
+  inset: 0;
+}
+.fondo-confeti i {
+  position: absolute;
+  top: -8%;
+  width: 8px;
+  height: 13px;
+  border-radius: 1.5px;
+  opacity: 0;
+  background: var(--color-acento);
+  animation: confeti-cae 9s linear infinite;
+}
+@keyframes confeti-cae {
+  0%   { transform: translate3d(0, -10vh, 0) rotate(0deg); opacity: 0; }
+  8%   { opacity: 0.85; }
+  30%  { transform: translate3d(14px, 25vh, 0) rotate(110deg); }
+  60%  { transform: translate3d(-12px, 65vh, 0) rotate(230deg); }
+  88%  { opacity: 0.6; }
+  100% { transform: translate3d(8px, 112vh, 0) rotate(410deg); opacity: 0; }
+}
+.fondo-confeti i:nth-child(1)  { left: 2%;  animation-delay: 0s;    animation-duration: 8.2s; background: var(--estado-progreso); }
+.fondo-confeti i:nth-child(2)  { left: 12%; animation-delay: 1.1s;  animation-duration: 9.4s; background: var(--color-fiesta-rosa); width: 10px; height: 10px; border-radius: 50%; }
+.fondo-confeti i:nth-child(3)  { left: 22%; animation-delay: 3.4s;  animation-duration: 7.6s; background: var(--color-fiesta-menta); }
+.fondo-confeti i:nth-child(4)  { left: 32%; animation-delay: 2.2s;  animation-duration: 10s;  }
+.fondo-confeti i:nth-child(5)  { left: 42%; animation-delay: 5.6s;  animation-duration: 8.8s; background: var(--color-fiesta-rosa); }
+.fondo-confeti i:nth-child(6)  { left: 52%; animation-delay: 0.6s;  animation-duration: 9.9s; background: var(--estado-progreso); width: 9px; height: 9px; border-radius: 50%; }
+.fondo-confeti i:nth-child(7)  { left: 62%; animation-delay: 4.2s;  animation-duration: 7.9s; background: var(--color-fiesta-menta); }
+.fondo-confeti i:nth-child(8)  { left: 72%; animation-delay: 1.8s;  animation-duration: 9.2s; }
+.fondo-confeti i:nth-child(9)  { left: 82%; animation-delay: 6.4s;  animation-duration: 8.4s; background: var(--color-fiesta-rosa); }
+.fondo-confeti i:nth-child(10) { left: 92%; animation-delay: 2.8s;  animation-duration: 10.4s; background: var(--estado-progreso); }
+.fondo-confeti i:nth-child(11) { left: 7%;  animation-delay: 7.2s;  animation-duration: 8.6s; background: var(--color-fiesta-menta); width: 10px; height: 10px; border-radius: 50%; }
+.fondo-confeti i:nth-child(12) { left: 27%; animation-delay: 0.2s;  animation-duration: 9.6s; }
+.fondo-confeti i:nth-child(13) { left: 47%; animation-delay: 3.9s;  animation-duration: 8s;   background: var(--color-fiesta-rosa); }
+.fondo-confeti i:nth-child(14) { left: 67%; animation-delay: 5.1s;  animation-duration: 9.1s; background: var(--estado-progreso); }
+.fondo-confeti i:nth-child(15) { left: 87%; animation-delay: 1.4s;  animation-duration: 7.4s; background: var(--color-fiesta-menta); }
+.fondo-confeti i:nth-child(16) { left: 97%; animation-delay: 4.8s;  animation-duration: 10.2s; }
+@media (prefers-reduced-motion: reduce) {
+  .fondo-confeti i { animation: none; opacity: 0.32; top: 12%; }
+}
+
+/* La cabecera se queda con su fondo normal; el corazón cicla de
+   color y con eso ya se nota que es un día especial. */
+body.cumple-maite .header-titulo .marca-logo {
+  animation: cumple-color-ciclo 8s linear infinite;
+}
+@keyframes cumple-color-ciclo {
+  0%   { color: var(--color-acento); }
+  25%  { color: var(--color-fiesta-rosa); }
+  50%  { color: var(--estado-progreso); }
+  75%  { color: var(--color-fiesta-menta); }
+  100% { color: var(--color-acento); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.cumple-maite .header-titulo .marca-logo { animation: none; color: var(--estado-progreso); }
+}
+
+/* Tarjeta propia arriba de Inicio ese día: lo primero que ve al
+   abrir la app. El fondo no es un color fijo: son 4 degradados con
+   la paleta de fiesta (cobalto, rosa, menta, dorado) superpuestos
+   que se van turnando con un crossfade continuo — solo opacity, así
+   que no cuesta más que una tarjeta normal. Corazones propios
+   subiendo dentro y la tarta con un latido suave. Entra con el
+   mismo fade+slide que el resto de tarjetas. */
+.cumple-hero { display: none; }
+body.cumple-maite .cumple-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  margin-bottom: 18px;
+  padding: 26px 20px 22px;
+  border-radius: 22px;
+  color: #fff;
+  background: var(--color-acento);
+  box-shadow: 0 16px 30px -16px color-mix(in srgb, var(--color-acento) 55%, transparent);
+  animation: entra-item 320ms var(--curva) both;
+}
+.cumple-hero__color {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  animation: cumple-color-cruce 16s ease-in-out infinite;
+}
+.cumple-hero__color--a {
+  background: linear-gradient(155deg, var(--color-acento) 0%, var(--estado-progreso) 100%);
+  animation-delay: 0s;
+}
+.cumple-hero__color--b {
+  background: linear-gradient(155deg, var(--color-fiesta-rosa) 0%, var(--color-acento) 100%);
+  animation-delay: -4s;
+}
+.cumple-hero__color--c {
+  background: linear-gradient(155deg, var(--color-fiesta-menta) 0%, var(--color-fiesta-rosa) 100%);
+  animation-delay: -8s;
+}
+.cumple-hero__color--d {
+  background: linear-gradient(155deg, var(--estado-progreso) 0%, var(--color-fiesta-menta) 100%);
+  animation-delay: -12s;
+}
+/* Curva en forma de onda: empieza y acaba en 0 (bucle sin salto) y
+   sube a 1 en el centro. Con 4 capas espaciadas cada 25% del ciclo
+   siempre hay alguna asomando, así que el cruce entre colores es
+   continuo — nunca un color aparece o desaparece de golpe. */
+@keyframes cumple-color-cruce {
+  0%   { opacity: 0; }
+  25%  { opacity: 0.55; }
+  50%  { opacity: 1; }
+  75%  { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cumple-hero__color { animation: none; opacity: 0; }
+  .cumple-hero__color--a { opacity: 1; }
+}
+.cumple-hero__brillo {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(60% 50% at 20% 0%, rgba(255,255,255,0.4), transparent 72%);
+  animation: cumple-brillo-pulso 4.5s ease-in-out infinite;
+}
+@keyframes cumple-brillo-pulso {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+.cumple-hero__corazones {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+.cumple-hero__corazones i {
+  position: absolute;
+  bottom: -18%;
+  width: 15px;
+  height: 15px;
+  background: rgba(255,255,255,0.85);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 29'%3E%3Cpath d='M16 29 2.6 16.6C-1.8 12.5.6 4.7 6.9 3.4c3.3-.7 6.7.6 9.1 3.6 2.4-3 5.8-4.3 9.1-3.6 6.3 1.3 8.7 9.1 4.3 13.2Z'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 29'%3E%3Cpath d='M16 29 2.6 16.6C-1.8 12.5.6 4.7 6.9 3.4c3.3-.7 6.7.6 9.1 3.6 2.4-3 5.8-4.3 9.1-3.6 6.3 1.3 8.7 9.1 4.3 13.2Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+          mask-size: 100% 100%;
+  animation: cumple-hero-sube 6s ease-in infinite;
+}
+.cumple-hero__corazones i:nth-child(1) { left: 6%;  width: 12px; height: 12px; animation-delay: 0s; }
+.cumple-hero__corazones i:nth-child(2) { left: 26%; width: 18px; height: 18px; animation-delay: 1.1s; }
+.cumple-hero__corazones i:nth-child(3) { left: 50%; width: 13px; height: 13px; animation-delay: 2.2s; }
+.cumple-hero__corazones i:nth-child(4) { left: 72%; width: 16px; height: 16px; animation-delay: 3.3s; }
+.cumple-hero__corazones i:nth-child(5) { left: 90%; width: 11px; height: 11px; animation-delay: 4.4s; }
+@keyframes cumple-hero-sube {
+  0%   { transform: translate3d(0, 0, 0); opacity: 0; }
+  15%  { opacity: 0.9; }
+  80%  { opacity: 0.5; }
+  100% { transform: translate3d(0, -180%, 0); opacity: 0; }
+}
+.cumple-hero__tarta {
+  font-size: 38px;
+  line-height: 1;
+  animation: cumple-tarta-late 2.6s var(--curva) 400ms infinite;
+}
+@keyframes cumple-tarta-late {
+  0%, 44%, 100% { transform: scale(1) rotate(0deg); }
+  22% { transform: scale(1.14) rotate(-4deg); }
+}
+.cumple-hero__titulo {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.cumple-hero__texto {
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: rgba(255,255,255,0.92);
+  max-width: 34ch;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cumple-hero { animation: none; }
+  .cumple-hero__brillo { animation: none; opacity: 0.6; }
+  .cumple-hero__corazones i { animation: none; opacity: 0.4; bottom: 30%; }
+  .cumple-hero__tarta { animation: none; }
+}
+
+/* ============================================================
+   Fechas señaladas con interfaz propia — Navidad, Año Nuevo,
+   Reyes, Halloween, Txupinazo de Llodio, día de la madre.
+   Mismo mecanismo que el cumpleaños (body.tema-<id>, puesto por
+   app.js desde Frases.temaDeHoy()) pero cada una con su propia
+   paleta, sus propias partículas de fondo y su propio icono en
+   la tarjeta .tema-hero de Inicio. Las fechas no se solapan entre
+   sí, así que solo hay un tema activo cada vez.
+   ============================================================ */
+body.cumple-maite .frase-dia,
+body[class*="tema-"] .frase-dia { display: none; }
+
+/* --- Fondo: cada tema tiene SU composición, no la plantilla de 6
+   manchas del resto de la app recoloreada — distinto color base,
+   distinto número de focos y distinta disposición, para que cada
+   fecha se sienta como una escena propia y no como "la app con un
+   filtro de color". --- */
+
+/* Navidad: verde pino suave de fondo (no negro), como el musgo de una
+   corona — con un resplandor cálido abajo (brasas / luces del árbol)
+   y un toque de rojo arriba, nada simétrico. */
+:root body.tema-navidad .fondo-animado {
+  background-color: #050a07;
+  background-image:
+    radial-gradient(85% 60% at 50% 118%,
+      color-mix(in srgb, var(--estado-progreso) 58%, transparent) 0%,
+      color-mix(in srgb, var(--color-navidad-rojo) 30%, transparent) 40%, transparent 76%),
+    radial-gradient(40% 34% at 12% -4%,
+      color-mix(in srgb, var(--color-navidad-rojo) 42%, transparent) 0%, transparent 72%),
+    radial-gradient(50% 44% at 96% 14%,
+      color-mix(in srgb, var(--color-navidad-verde) 62%, transparent) 0%, transparent 76%),
+    radial-gradient(72% 56% at 50% 44%,
+      color-mix(in srgb, var(--color-navidad-verde) 46%, transparent) 0%, transparent 84%);
+}
+body.tema-navidad .fondo-orbe--1 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-navidad-rojo) 62%, transparent) 0%, color-mix(in srgb, var(--color-navidad-rojo) 28%, transparent) 38%, transparent 66%); }
+body.tema-navidad .fondo-orbe--2 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--estado-progreso) 58%, transparent) 0%, color-mix(in srgb, var(--estado-progreso) 26%, transparent) 38%, transparent 66%); }
+body.tema-navidad .fondo-orbe--3 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-navidad-verde) 60%, transparent) 0%, color-mix(in srgb, var(--color-navidad-verde) 28%, transparent) 38%, transparent 66%); }
+
+/* Año Nuevo: negro casi puro (como el cierre del Wrapped anual) con
+   una sola marea dorada subiendo desde abajo — cero cobalto, cero
+   plantilla de manchas repartidas: es la cuenta atrás a medianoche. */
+:root body.tema-anyo-nuevo .fondo-animado {
+  background-color: #08060a;
+  background-image:
+    radial-gradient(95% 70% at 50% 130%,
+      color-mix(in srgb, var(--estado-progreso) 62%, transparent) 0%,
+      color-mix(in srgb, #3a2c06 55%, transparent) 46%, transparent 78%),
+    radial-gradient(30% 24% at 84% 10%,
+      color-mix(in srgb, var(--color-plata) 40%, transparent) 0%, transparent 72%),
+    radial-gradient(24% 20% at 14% 20%,
+      color-mix(in srgb, var(--color-plata) 30%, transparent) 0%, transparent 72%);
+}
+body.tema-anyo-nuevo .fondo-orbe--1 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--estado-progreso) 64%, transparent) 0%, color-mix(in srgb, var(--estado-progreso) 30%, transparent) 38%, transparent 66%); }
+body.tema-anyo-nuevo .fondo-orbe--2 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-plata) 55%, transparent) 0%, color-mix(in srgb, var(--color-plata) 24%, transparent) 38%, transparent 66%); }
+body.tema-anyo-nuevo .fondo-orbe--3 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--estado-progreso) 58%, transparent) 0%, color-mix(in srgb, var(--estado-progreso) 26%, transparent) 38%, transparent 66%); }
+
+/* Reyes: cielo de desierto de madrugada — casi negro azulado arriba,
+   un horizonte cálido abajo (como si amaneciera tras la caravana) y
+   el morado real solo asomando por una esquina. */
+:root body.tema-reyes .fondo-animado {
+  background-color: #0a0716;
+  background-image:
+    radial-gradient(90% 50% at 50% 120%,
+      color-mix(in srgb, var(--estado-progreso) 40%, transparent) 0%,
+      color-mix(in srgb, var(--color-reyes-morado) 30%, transparent) 45%, transparent 78%),
+    radial-gradient(50% 44% at 90% -6%,
+      color-mix(in srgb, var(--color-reyes-morado) 46%, transparent) 0%, transparent 74%),
+    radial-gradient(30% 26% at 8% 12%,
+      color-mix(in srgb, var(--color-reyes-morado) 26%, transparent) 0%, transparent 72%);
+}
+body.tema-reyes .fondo-orbe--1 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-reyes-morado) 62%, transparent) 0%, color-mix(in srgb, var(--color-reyes-morado) 28%, transparent) 38%, transparent 66%); }
+body.tema-reyes .fondo-orbe--2 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--estado-progreso) 56%, transparent) 0%, color-mix(in srgb, var(--estado-progreso) 26%, transparent) 38%, transparent 66%); }
+body.tema-reyes .fondo-orbe--3 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-reyes-morado) 58%, transparent) 0%, color-mix(in srgb, var(--color-reyes-morado) 26%, transparent) 38%, transparent 66%); }
+
+/* Halloween: noche cerrada de verdad (no el crema cálido de siempre)
+   con una luna naranja asomando descentrada y el morado solo en la
+   base, como niebla baja. */
+:root body.tema-halloween .fondo-animado {
+  background-color: #0e0a16;
+  background-image:
+    radial-gradient(36% 30% at 72% 14%,
+      color-mix(in srgb, var(--color-halloween-naranja) 55%, transparent) 0%, transparent 70%),
+    radial-gradient(60% 40% at 20% -8%,
+      color-mix(in srgb, var(--color-halloween-morado) 42%, transparent) 0%, transparent 76%),
+    radial-gradient(85% 50% at 50% 122%,
+      color-mix(in srgb, var(--color-halloween-morado) 48%, transparent) 0%,
+      color-mix(in srgb, var(--color-halloween-naranja) 20%, transparent) 46%, transparent 80%);
+}
+body.tema-halloween .fondo-orbe--1 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-halloween-naranja) 62%, transparent) 0%, color-mix(in srgb, var(--color-halloween-naranja) 28%, transparent) 38%, transparent 66%); }
+body.tema-halloween .fondo-orbe--2 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-halloween-morado) 58%, transparent) 0%, color-mix(in srgb, var(--color-halloween-morado) 26%, transparent) 38%, transparent 66%); }
+body.tema-halloween .fondo-orbe--3 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-halloween-naranja) 58%, transparent) 0%, color-mix(in srgb, var(--color-halloween-naranja) 26%, transparent) 38%, transparent 66%); }
+
+/* Txupinazo: colores de la ikurriña (rojo y verde) sobre el mismo
+   calor de agosto — un único resplandor grande arriba, nada de
+   manchas repartidas por igual. */
+:root body.tema-txupinazo .fondo-animado {
+  background-color: #2c0c08;
+  background-image:
+    radial-gradient(95% 65% at 50% -14%,
+      color-mix(in srgb, var(--color-txupi-rojo) 66%, transparent) 0%,
+      color-mix(in srgb, var(--color-txupi-verde) 34%, transparent) 50%, transparent 80%),
+    radial-gradient(50% 40% at 100% 100%,
+      color-mix(in srgb, var(--color-txupi-verde) 44%, transparent) 0%, transparent 74%),
+    radial-gradient(40% 32% at 0% 90%,
+      color-mix(in srgb, var(--color-txupi-rojo) 36%, transparent) 0%, transparent 72%);
+}
+body.tema-txupinazo .fondo-orbe--1 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-txupi-rojo) 62%, transparent) 0%, color-mix(in srgb, var(--color-txupi-rojo) 28%, transparent) 38%, transparent 66%); }
+body.tema-txupinazo .fondo-orbe--2 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-txupi-verde) 58%, transparent) 0%, color-mix(in srgb, var(--color-txupi-verde) 26%, transparent) 38%, transparent 66%); }
+body.tema-txupinazo .fondo-orbe--3 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-txupi-rojo) 58%, transparent) 0%, color-mix(in srgb, var(--color-txupi-rojo) 26%, transparent) 38%, transparent 66%); }
+
+/* Día de la madre: luz de mañana suave — un degradado casi continuo
+   de arriba a abajo (rosa muy pálido a crema), no manchas discretas;
+   se siente como una mañana tranquila, no como una fiesta de color. */
+:root body.tema-dia-madre .fondo-animado {
+  background-color: color-mix(in srgb, var(--color-fiesta-rosa) 10%, var(--color-fondo));
+  background-image:
+    radial-gradient(120% 70% at 50% -20%,
+      color-mix(in srgb, var(--color-fiesta-rosa) 46%, var(--color-fondo)) 0%, transparent 78%),
+    radial-gradient(60% 46% at 100% 30%,
+      color-mix(in srgb, var(--color-fiesta-menta) 26%, transparent) 0%, transparent 74%),
+    radial-gradient(60% 46% at 0% 88%,
+      color-mix(in srgb, var(--estado-progreso) 22%, transparent) 0%, transparent 74%);
+}
+body.tema-dia-madre .fondo-orbe--1 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-fiesta-rosa) 60%, transparent) 0%, color-mix(in srgb, var(--color-fiesta-rosa) 28%, transparent) 38%, transparent 66%); }
+body.tema-dia-madre .fondo-orbe--2 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-fiesta-menta) 52%, transparent) 0%, color-mix(in srgb, var(--color-fiesta-menta) 24%, transparent) 38%, transparent 66%); }
+body.tema-dia-madre .fondo-orbe--3 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-fiesta-rosa) 56%, transparent) 0%, color-mix(in srgb, var(--color-fiesta-rosa) 26%, transparent) 38%, transparent 66%); }
+
+/* Carnaval / Inauteriak: máscara de mil colores — magenta, morado,
+   dorado y menta en las cuatro esquinas, como confeti recién
+   lanzado. El único tema con cuatro focos de color a la vez: es
+   literalmente la fiesta del disfraz, cuanto más vivo mejor. */
+:root body.tema-carnaval .fondo-animado {
+  background-color: color-mix(in srgb, var(--color-carnaval-magenta) 16%, var(--color-fondo));
+  background-image:
+    radial-gradient(58% 46% at 4% -6%,
+      color-mix(in srgb, var(--color-carnaval-magenta) 52%, var(--color-fondo)) 0%, transparent 76%),
+    radial-gradient(52% 42% at 100% 6%,
+      color-mix(in srgb, var(--color-reyes-morado) 46%, var(--color-fondo)) 0%, transparent 74%),
+    radial-gradient(56% 46% at 96% 100%,
+      color-mix(in srgb, var(--estado-progreso) 42%, var(--color-fondo)) 0%, transparent 74%),
+    radial-gradient(56% 46% at 0% 100%,
+      color-mix(in srgb, var(--color-fiesta-menta) 38%, var(--color-fondo)) 0%, transparent 74%),
+    radial-gradient(70% 56% at 50% 46%,
+      color-mix(in srgb, var(--color-carnaval-magenta) 14%, var(--color-fondo)) 0%, transparent 82%);
+}
+body.tema-carnaval .fondo-orbe--1 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-carnaval-magenta) 62%, transparent) 0%, color-mix(in srgb, var(--color-carnaval-magenta) 28%, transparent) 38%, transparent 66%); }
+body.tema-carnaval .fondo-orbe--2 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--estado-progreso) 58%, transparent) 0%, color-mix(in srgb, var(--estado-progreso) 26%, transparent) 38%, transparent 66%); }
+body.tema-carnaval .fondo-orbe--3 { background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--color-reyes-morado) 58%, transparent) 0%, color-mix(in srgb, var(--color-reyes-morado) 26%, transparent) 38%, transparent 66%); }
+
+body[class*="tema-"] .fondo-orbe { opacity: 0.6; }
+:root[data-theme="dark"] body[class*="tema-"] .fondo-orbe { opacity: 0.72; }
+
+/* La rejilla de líneas finas del fondo (.fondo-lineas) es siempre
+   cobalto por defecto — sin esto, ese azul se nota encima de
+   cualquier tema, aunque el resto del fondo ya no lo sea. */
+body.tema-navidad .fondo-lineas    { background-image: repeating-linear-gradient(0deg, color-mix(in srgb, var(--color-navidad-verde) 30%, transparent) 0 1px, transparent 1px 26px); }
+body.tema-anyo-nuevo .fondo-lineas { background-image: repeating-linear-gradient(0deg, color-mix(in srgb, var(--color-plata) 26%, transparent) 0 1px, transparent 1px 26px); }
+body.tema-reyes .fondo-lineas      { background-image: repeating-linear-gradient(0deg, color-mix(in srgb, var(--color-reyes-morado) 30%, transparent) 0 1px, transparent 1px 26px); }
+body.tema-halloween .fondo-lineas  { background-image: repeating-linear-gradient(0deg, color-mix(in srgb, var(--color-halloween-naranja) 26%, transparent) 0 1px, transparent 1px 26px); }
+body.tema-txupinazo .fondo-lineas  { background-image: repeating-linear-gradient(0deg, color-mix(in srgb, var(--color-txupi-verde) 30%, transparent) 0 1px, transparent 1px 26px); }
+body.tema-dia-madre .fondo-lineas  { background-image: repeating-linear-gradient(0deg, color-mix(in srgb, var(--color-fiesta-rosa) 26%, transparent) 0 1px, transparent 1px 26px); }
+body.cumple-maite .fondo-lineas    { background-image: repeating-linear-gradient(0deg, color-mix(in srgb, var(--estado-progreso) 26%, transparent) 0 1px, transparent 1px 26px); }
+body.tema-carnaval .fondo-lineas   { background-image: repeating-linear-gradient(0deg, color-mix(in srgb, var(--color-carnaval-magenta) 28%, transparent) 0 1px, transparent 1px 26px); }
+
+/* --- Partículas de fondo: reutilizan .fondo-confeti (posición y ritmo
+   base en --x/--y/--d/--t, puestos en el HTML), cada tema pone encima
+   forma, color y el tipo de movimiento que le pega. --- */
+body[class*="tema-"] .fondo-confeti { display: block; position: fixed; inset: 0; }
+
+/* Navidad: nieve — cae recta, se balancea un poco, casi no gira. */
+body.tema-navidad .fondo-confeti i {
+  top: -8%; left: var(--x); width: 7px; height: 7px; border-radius: 50%;
+  background: color-mix(in srgb, #fff 88%, var(--estado-progreso));
+  animation: nieve-cae var(--d, 9s) ease-in infinite;
+  animation-delay: var(--t, 0s);
+}
+body.tema-navidad .fondo-confeti i:nth-child(3n)   { width: 10px; height: 10px; background: #fff; }
+body.tema-navidad .fondo-confeti i:nth-child(4n+1) { width: 5px;  height: 5px; }
+@keyframes nieve-cae {
+  0%   { transform: translate3d(0, -10vh, 0); opacity: 0; }
+  10%  { opacity: 0.9; }
+  50%  { transform: translate3d(10px, 55vh, 0); }
+  90%  { opacity: 0.7; }
+  100% { transform: translate3d(-6px, 112vh, 0); opacity: 0; }
+}
+
+/* Año Nuevo y Reyes: cielo estrellado — no caen, titilan en su sitio. */
+body.tema-anyo-nuevo .fondo-confeti i,
+body.tema-reyes .fondo-confeti i {
+  top: var(--y); left: var(--x); width: 6px; height: 6px;
+  background: var(--estado-progreso);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 14.9 9.1 22.5 9.5 16.5 14.3 18.6 21.8 12 17.3 5.4 21.8 7.5 14.3 1.5 9.5 9.1 9.1Z'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2 14.9 9.1 22.5 9.5 16.5 14.3 18.6 21.8 12 17.3 5.4 21.8 7.5 14.3 1.5 9.5 9.1 9.1Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+  animation: estrella-titila var(--d, 4s) ease-in-out infinite;
+  animation-delay: var(--t, 0s);
+}
+body.tema-anyo-nuevo .fondo-confeti i:nth-child(3n) { background: var(--color-plata); width: 8px; height: 8px; }
+body.tema-reyes .fondo-confeti i:nth-child(3n) { background: var(--color-reyes-morado); width: 8px; height: 8px; }
+body.tema-anyo-nuevo .fondo-confeti i:nth-child(4n+1),
+body.tema-reyes .fondo-confeti i:nth-child(4n+1) { width: 4px; height: 4px; }
+@keyframes estrella-titila {
+  0%, 100% { opacity: 0.15; transform: scale(0.7); }
+  50%      { opacity: 0.9;  transform: scale(1.15); }
+}
+
+/* Halloween: murciélagos — vuelan de lado a lado, no caen. */
+body.tema-halloween .fondo-confeti i {
+  top: var(--y); left: var(--x); width: 16px; height: 10px;
+  background: var(--color-halloween-morado);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 20'%3E%3Cpath d='M16 10c-3-6-10-8-14-4 4 2 7 4 9 6-5 0-9 3-10 7 5-1 10-4 15-1 5-3 10 0 15 1-1-4-5-7-10-7 2-2 5-4 9-6-4-4-11-2-14 4Z'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 20'%3E%3Cpath d='M16 10c-3-6-10-8-14-4 4 2 7 4 9 6-5 0-9 3-10 7 5-1 10-4 15-1 5-3 10 0 15 1-1-4-5-7-10-7 2-2 5-4 9-6-4-4-11-2-14 4Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+  animation: murcielago-vuela var(--d, 10s) ease-in-out infinite;
+  animation-delay: var(--t, 0s);
+}
+body.tema-halloween .fondo-confeti i:nth-child(3n) { background: var(--color-halloween-naranja); width: 12px; height: 8px; }
+@keyframes murcielago-vuela {
+  0%, 100% { opacity: 0; transform: translate3d(0, 0, 0); }
+  12%      { opacity: 0.75; }
+  50%      { transform: translate3d(70px, -18px, 0); opacity: 0.6; }
+  88%      { opacity: 0.75; }
+  100%     { transform: translate3d(140px, 0, 0); opacity: 0; }
+}
+
+/* Txupinazo: confeti de fiesta (reutiliza la caída del cumpleaños). */
+body.tema-txupinazo .fondo-confeti i {
+  top: -8%; left: var(--x); width: 8px; height: 13px; border-radius: 1.5px;
+  background: var(--color-txupi-rojo);
+  animation: confeti-cae var(--d, 9s) linear infinite;
+  animation-delay: var(--t, 0s);
+}
+body.tema-txupinazo .fondo-confeti i:nth-child(3n)   { background: #fff; }
+body.tema-txupinazo .fondo-confeti i:nth-child(4n+1) { background: var(--color-txupi-verde); width: 9px; height: 9px; border-radius: 50%; }
+
+/* Día de la madre: pétalos cayendo, girando como al viento. */
+body.tema-dia-madre .fondo-confeti i {
+  top: -8%; left: var(--x); width: 11px; height: 11px;
+  background: var(--color-fiesta-rosa);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2c6 6 6 14 0 20-6-6-6-14 0-20Z'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2c6 6 6 14 0 20-6-6-6-14 0-20Z'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+  animation: confeti-cae var(--d, 9s) ease-in-out infinite;
+  animation-delay: var(--t, 0s);
+}
+body.tema-dia-madre .fondo-confeti i:nth-child(3n) { background: #fff; width: 8px; height: 8px; }
+body.tema-dia-madre .fondo-confeti i:nth-child(4n+1) { background: var(--estado-progreso); width: 7px; height: 7px; }
+
+/* Carnaval: confeti de mil colores — magenta, morado, dorado y
+   menta, cayendo con más vueltas que ningún otro tema (es literalmente
+   confeti de fiesta de disfraces). */
+body.tema-carnaval .fondo-confeti i {
+  top: -8%; left: var(--x); width: 8px; height: 8px; border-radius: 50%;
+  background: var(--color-carnaval-magenta);
+  animation: confeti-cae var(--d, 8s) linear infinite;
+  animation-delay: var(--t, 0s);
+}
+body.tema-carnaval .fondo-confeti i:nth-child(4n+1) { background: var(--color-carnaval-magenta); border-radius: 1.5px; width: 7px; height: 12px; }
+body.tema-carnaval .fondo-confeti i:nth-child(4n+2) { background: var(--color-reyes-morado); }
+body.tema-carnaval .fondo-confeti i:nth-child(4n+3) { background: var(--estado-progreso); border-radius: 1.5px; width: 7px; height: 12px; }
+body.tema-carnaval .fondo-confeti i:nth-child(4n)   { background: var(--color-fiesta-menta); }
+
+@media (prefers-reduced-motion: reduce) {
+  body.tema-navidad .fondo-confeti i,
+  body.tema-txupinazo .fondo-confeti i,
+  body.tema-carnaval .fondo-confeti i,
+  body.tema-dia-madre .fondo-confeti i { animation: none; opacity: 0.3; top: 12%; }
+  body.tema-anyo-nuevo .fondo-confeti i,
+  body.tema-reyes .fondo-confeti i { animation: none; opacity: 0.45; }
+  body.tema-halloween .fondo-confeti i { animation: none; opacity: 0.35; }
+}
+
+/* --- Cabecera: el corazón toma el color del tema, quieto (sin ciclo:
+   eso es la firma exclusiva del cumpleaños). --- */
+body.tema-navidad .header-titulo .marca-logo    { color: var(--color-navidad-rojo); }
+body.tema-anyo-nuevo .header-titulo .marca-logo { color: var(--estado-progreso); }
+body.tema-reyes .header-titulo .marca-logo      { color: var(--color-reyes-morado); }
+body.tema-halloween .header-titulo .marca-logo  { color: var(--color-halloween-naranja); }
+body.tema-txupinazo .header-titulo .marca-logo  { color: var(--color-txupi-rojo); }
+body.tema-dia-madre .header-titulo .marca-logo  { color: var(--color-fiesta-rosa); }
+body.tema-carnaval .header-titulo .marca-logo   { color: var(--color-carnaval-magenta); }
+
+/* --- Tarjeta .tema-hero en Inicio: mismo lenguaje que .cumple-hero
+   (tarjeta-resumen de la app), con brillo de aparición, chispas y un
+   icono con su propio pequeño gesto. Cada tema solo pone el degradado,
+   el color de las chispas/partículas y qué keyframe usa el icono. --- */
+.tema-hero { display: none; }
+[data-tema-hero].tema-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  margin-bottom: 18px;
+  padding: 26px 20px 22px;
+  border-radius: 22px;
+  color: #fff;
+  box-shadow: 0 16px 30px -16px rgba(0, 0, 0, 0.35);
+  animation: entra-item 320ms var(--curva) both;
+}
+.tema-hero__brillo {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(60% 50% at 20% 0%, rgba(255,255,255,0.4), transparent 72%);
+  animation: cumple-brillo-pulso 4.5s ease-in-out infinite;
+}
+.tema-hero__chispas { position: absolute; inset: 0; pointer-events: none; z-index: -1; }
+.tema-hero__chispas i {
+  position: absolute; width: 4px; height: 4px; border-radius: 50%;
+  background: #fff; opacity: 0;
+  animation: tr-chispa 2.6s ease-in-out infinite;
+}
+.tema-hero__chispas i:nth-child(1) { top: 14%; left: 78%; animation-delay: .2s; }
+.tema-hero__chispas i:nth-child(2) { top: 68%; left: 88%; animation-delay: 1.1s; }
+.tema-hero__chispas i:nth-child(3) { top: 30%; left: 92%; animation-delay: 1.9s; }
+.tema-hero__particulas { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: -1; }
+.tema-hero__particulas i {
+  position: absolute; width: 12px; height: 12px; opacity: 0; background: rgba(255,255,255,0.85);
+}
+.tema-hero__particulas i:nth-child(1) { left: 6%;  animation-delay: 0s; }
+.tema-hero__particulas i:nth-child(2) { left: 22%; animation-delay: .9s; }
+.tema-hero__particulas i:nth-child(3) { left: 38%; animation-delay: 1.8s; }
+.tema-hero__particulas i:nth-child(4) { left: 58%; animation-delay: .4s; }
+.tema-hero__particulas i:nth-child(5) { left: 76%; animation-delay: 1.3s; }
+.tema-hero__particulas i:nth-child(6) { left: 92%; animation-delay: 2.2s; }
+.tema-hero__icono { font-size: 38px; line-height: 1; }
+.tema-hero__titulo { font-size: 20px; font-weight: 700; margin-top: 2px; }
+.tema-hero__texto { font-size: 14.5px; line-height: 1.45; color: rgba(255,255,255,0.92); max-width: 34ch; }
+
+@keyframes tema-hero-cae {
+  0%   { transform: translate3d(0, -20%, 0) rotate(0deg); opacity: 0; }
+  15%  { opacity: 0.9; }
+  80%  { opacity: 0.5; }
+  100% { transform: translate3d(0, 480%, 0) rotate(140deg); opacity: 0; }
+}
+@keyframes tema-hero-titila {
+  0%, 100% { opacity: 0.15; transform: scale(0.7); }
+  50%      { opacity: 0.9;  transform: scale(1.2); }
+}
+@keyframes tema-icono-vive {
+  0%, 44%, 100% { transform: scale(1) rotate(0deg); }
+  22%           { transform: scale(1.12) rotate(-6deg); }
+}
+@keyframes tema-icono-brinca {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-7px) scale(1.08); }
+}
+.tema-hero__icono { animation: tema-icono-vive 2.6s var(--curva) 400ms infinite; }
+
+/* Navidad: rojo → verde, nieve cayendo dentro de la tarjeta. */
+.tema-hero--navidad {
+  background: linear-gradient(155deg, var(--color-navidad-rojo) 0%, var(--color-navidad-verde) 100%);
+}
+.tema-hero--navidad .tema-hero__particulas i {
+  bottom: auto; top: -10%; width: 6px; height: 6px; border-radius: 50%;
+  animation: tema-hero-cae 5.5s ease-in infinite;
+}
+
+/* Año Nuevo: negro-dorado, como el cierre de año, con chispas subiendo. */
+.tema-hero--anyo-nuevo {
+  background: linear-gradient(155deg, #1c1400 0%, #3a2c06 55%, var(--estado-progreso) 130%);
+}
+.tema-hero--anyo-nuevo .tema-hero__particulas i {
+  bottom: -18%; top: auto; width: 4px; height: 4px; border-radius: 50%;
+  background: #FFE9B0;
+  animation: cumple-hero-sube 3.6s ease-in infinite;
+}
+.tema-hero--anyo-nuevo .tema-hero__icono { animation: tema-icono-brinca 1.8s var(--curva) 400ms infinite; }
+
+/* Reyes: morado-noche a dorado, estrellas titilando. */
+.tema-hero--reyes {
+  background: linear-gradient(155deg, var(--color-reyes-morado) 0%, #241634 60%, #120a1c 100%);
+}
+.tema-hero--reyes .tema-hero__particulas i {
+  bottom: auto; top: 10%; width: 5px; height: 5px; border-radius: 50%;
+  background: #FFE9B0;
+  animation: tema-hero-titila 3.2s ease-in-out infinite;
+}
+
+/* Halloween: naranja a morado, mismo tono que la tarjeta de octubre. */
+.tema-hero--halloween {
+  background: linear-gradient(155deg, var(--color-halloween-naranja) 0%, var(--color-halloween-morado) 100%);
+}
+.tema-hero--halloween .tema-hero__particulas i {
+  bottom: auto; top: 20%; width: 5px; height: 5px; border-radius: 50%;
+  animation: tema-hero-titila 3s ease-in-out infinite;
+}
+
+/* Txupinazo: rojo y verde de la ikurriña, confeti de fiesta cayendo. */
+.tema-hero--txupinazo {
+  background: linear-gradient(155deg, var(--color-txupi-rojo) 0%, var(--color-txupi-verde) 100%);
+}
+.tema-hero--txupinazo .tema-hero__particulas i {
+  bottom: auto; top: -10%; width: 6px; height: 9px; border-radius: 1px;
+  animation: tema-hero-cae 4.4s ease-in infinite;
+}
+.tema-hero--txupinazo .tema-hero__icono { animation: tema-icono-brinca 1.7s var(--curva) 400ms infinite; }
+
+/* Día de la madre: rosa a crema, pétalos cayendo despacio. */
+.tema-hero--dia-madre {
+  background: linear-gradient(155deg, var(--color-fiesta-rosa) 0%, color-mix(in srgb, var(--color-fiesta-rosa) 35%, var(--estado-progreso)) 100%);
+}
+.tema-hero--dia-madre .tema-hero__particulas i {
+  bottom: auto; top: -10%; width: 7px; height: 7px; border-radius: 50% 0;
+  animation: tema-hero-cae 6.2s ease-in infinite;
+}
+
+/* Carnaval: magenta a morado con un toque dorado, confeti de mil
+   colores cayendo dentro de la tarjeta también. */
+.tema-hero--carnaval {
+  background: linear-gradient(155deg, var(--color-carnaval-magenta) 0%, var(--color-reyes-morado) 65%, var(--estado-progreso) 130%);
+}
+.tema-hero--carnaval .tema-hero__particulas i {
+  bottom: auto; top: -10%; width: 6px; height: 6px; border-radius: 50%;
+  animation: tema-hero-cae 4.8s ease-in infinite;
+}
+.tema-hero--carnaval .tema-hero__particulas i:nth-child(3n) { border-radius: 1px; background: #FFE9B0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tema-hero { animation: none; }
+  .tema-hero__brillo { animation: none; opacity: 0.6; }
+  .tema-hero__chispas i,
+  .tema-hero__particulas i { animation: none; opacity: 0.35; }
+  .tema-hero__icono { animation: none; }
+}
+
+/* ============================================================
+   Escenografía de fondo — el detalle de cada fecha señalada no es
+   solo un tinte de color: cada una decora la pantalla entera con
+   sus propios elementos (luces, telarañas, globos…). Todo vive
+   dentro de .fondo-animado (fixed, detrás de todo) y está oculto
+   por defecto; cada body.tema-* / body.cumple-maite enciende solo
+   lo suyo. Solo transform/opacity, como el resto del fondo.
+   ============================================================ */
+.fondo-marca, .fondo-guirnalda, .fondo-telaranas, .fondo-niebla,
+.fondo-cometa, .fondo-globos, .fondo-mariposas, .fondo-fuegos { display: none; }
+
+/* --- Marca de esquina: un icono grande y muy tenue (árbol, corona,
+   telaraña de iglesia, corazón del coro…), como el decor de las
+   tarjetas-resumen mensuales pero a tamaño de pantalla entera. --- */
+.fondo-marca {
+  position: fixed;
+  width: 230px; height: 230px;
+  bottom: -18px; left: -22px;
+  opacity: 0.14;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-size: contain; mask-size: contain;
+  -webkit-mask-position: center; mask-position: center;
+  pointer-events: none;
+}
+:root[data-theme="dark"] .fondo-marca { opacity: 0.2; }
+
+body.tema-navidad .fondo-marca {
+  display: block; background: var(--color-navidad-verde);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 110'%3E%3Cpath d='M50 4 L32 30 L68 30 Z M50 24 L26 54 L74 54 Z M50 46 L20 82 L80 82 Z M44 82 H56 V102 H44 Z'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 110'%3E%3Cpath d='M50 4 L32 30 L68 30 Z M50 24 L26 54 L74 54 Z M50 46 L20 82 L80 82 Z M44 82 H56 V102 H44 Z'/%3E%3C/svg%3E");
+}
+body.tema-reyes .fondo-marca {
+  display: block; background: var(--estado-progreso);
+  bottom: auto; top: 64px; right: -26px; left: auto; width: 190px; height: 130px;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 60'%3E%3Cpath d='M8 52 H92 V60 H8 Z M10 50 L10 26 L30 42 L50 14 L70 42 L90 26 L90 50 Z'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 60'%3E%3Cpath d='M8 52 H92 V60 H8 Z M10 50 L10 26 L30 42 L50 14 L70 42 L90 26 L90 50 Z'/%3E%3C/svg%3E");
+}
+body.tema-txupinazo .fondo-marca {
+  display: block; background: var(--color-txupi-rojo);
+  bottom: -6px; left: -10px; width: 240px; height: 110px;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 70'%3E%3Cpath d='M0 70V40H14V70Z M20 70V20H34V70Z M40 70V46H62V70Z M40 46L51 30L62 46Z M49 16H53V24H61V28H53V34H49V28H41V24H49Z M70 70V50H86V70Z M92 70V34H106V70Z'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 70'%3E%3Cpath d='M0 70V40H14V70Z M20 70V20H34V70Z M40 70V46H62V70Z M40 46L51 30L62 46Z M49 16H53V24H61V28H53V34H49V28H41V24H49Z M70 70V50H86V70Z M92 70V34H106V70Z'/%3E%3C/svg%3E");
+}
+body.tema-dia-madre .fondo-marca {
+  display: block; background: var(--color-fiesta-rosa);
+  bottom: -20px; left: auto; right: -20px;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill-rule='evenodd' d='M50 8a42 42 0 1 0 .1 0Z M50 28a22 22 0 1 0 .1 0Z M40 92 L50 78 L60 92 L50 84 Z'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill-rule='evenodd' d='M50 8a42 42 0 1 0 .1 0Z M50 28a22 22 0 1 0 .1 0Z M40 92 L50 78 L60 92 L50 84 Z'/%3E%3C/svg%3E");
+}
+body.tema-carnaval .fondo-marca {
+  display: block; background: var(--color-carnaval-magenta);
+  bottom: -14px; left: -18px; width: 200px; height: 160px;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 80'%3E%3Cpath fill-rule='evenodd' d='M10 30C10 10 30 4 50 10C70 4 90 10 90 30C90 46 76 54 62 50C58 60 42 60 38 50C24 54 10 46 10 30Z M30 24C36 16 44 16 50 24C44 32 36 32 30 24Z M50 24C56 16 64 16 70 24C64 32 56 32 50 24Z'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 80'%3E%3Cpath fill-rule='evenodd' d='M10 30C10 10 30 4 50 10C70 4 90 10 90 30C90 46 76 54 62 50C58 60 42 60 38 50C24 54 10 46 10 30Z M30 24C36 16 44 16 50 24C44 32 36 32 30 24Z M50 24C56 16 64 16 70 24C64 32 56 32 50 24Z'/%3E%3C/svg%3E");
+}
+body.tema-anyo-nuevo .fondo-marca {
+  display: block; background: var(--color-plata);
+  bottom: auto; top: 90px; left: -24px; width: 170px; height: 170px;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='none' stroke='%23000' stroke-width='7' stroke-linecap='round' d='M50 6V34M50 66V94M6 50H34M66 50H94M18 18L38 38M62 62L82 82M82 18L62 38M38 62L18 82'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='none' stroke='%23000' stroke-width='7' stroke-linecap='round' d='M50 6V34M50 66V94M6 50H34M66 50H94M18 18L38 38M62 62L82 82M82 18L62 38M38 62L18 82'/%3E%3C/svg%3E");
+}
+body.cumple-maite .fondo-marca {
+  display: block; background: var(--estado-progreso);
+  bottom: -16px; left: auto; right: -18px; width: 210px; height: 210px;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cg fill='none' stroke='%23000' stroke-width='36' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M256 168C232 112 178 92 138 118C92 148 88 214 128 262L256 398L300 354'/%3E%3Cpath d='M256 168C280 112 334 92 374 118C420 148 424 214 384 262L330 316'/%3E%3Cpath d='M300 354C344 330 356 388 322 408C292 426 262 402 274 366C282 344 312 340 322 362'/%3E%3C/g%3E%3Ccircle cx='410' cy='150' r='21'/%3E%3Ccircle cx='410' cy='206' r='21'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cg fill='none' stroke='%23000' stroke-width='36' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M256 168C232 112 178 92 138 118C92 148 88 214 128 262L256 398L300 354'/%3E%3Cpath d='M256 168C280 112 334 92 374 118C420 148 424 214 384 262L330 316'/%3E%3Cpath d='M300 354C344 330 356 388 322 408C292 426 262 402 274 366C282 344 312 340 322 362'/%3E%3C/g%3E%3Ccircle cx='410' cy='150' r='21'/%3E%3Ccircle cx='410' cy='206' r='21'/%3E%3C/svg%3E");
+}
+
+/* --- Guirnalda superior: luces de Navidad o banderines de fiesta
+   (Txupinazo / cumpleaños), colgando en 3 combas a lo ancho de la
+   pantalla. --gx/--gy fijan la posición de cada bombilla/banderín,
+   puestos en el HTML. --- */
+.fondo-guirnalda { position: fixed; top: 58px; left: 0; right: 0; height: 70px; z-index: 1; }
+.fondo-guirnalda i {
+  position: absolute; left: var(--gx); top: var(--gy);
+  transform: translateX(-50%);
+}
+body.tema-navidad .fondo-guirnalda,
+body.tema-txupinazo .fondo-guirnalda,
+body.cumple-maite .fondo-guirnalda { display: block; }
+
+/* Navidad: bombillas redondas que parpadean, 4 colores alternos. */
+body.tema-navidad .fondo-guirnalda i {
+  width: 9px; height: 9px; border-radius: 50%;
+  opacity: 0.85;
+  animation: luz-parpadea 2.4s ease-in-out infinite;
+  animation-delay: var(--gt);
+}
+body.tema-navidad .fondo-guirnalda i:nth-child(4n+1) { background: var(--color-navidad-rojo); box-shadow: 0 0 7px 2px color-mix(in srgb, var(--color-navidad-rojo) 70%, transparent); }
+body.tema-navidad .fondo-guirnalda i:nth-child(4n+2) { background: var(--color-navidad-verde); box-shadow: 0 0 7px 2px color-mix(in srgb, var(--color-navidad-verde) 70%, transparent); }
+body.tema-navidad .fondo-guirnalda i:nth-child(4n+3) { background: var(--estado-progreso); box-shadow: 0 0 7px 2px color-mix(in srgb, var(--estado-progreso) 70%, transparent); }
+body.tema-navidad .fondo-guirnalda i:nth-child(4n)   { background: var(--color-acento); box-shadow: 0 0 7px 2px color-mix(in srgb, var(--color-acento) 70%, transparent); }
+@keyframes luz-parpadea { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+
+/* Txupinazo y cumpleaños: banderines triangulares de tela, ondeando. */
+body.tema-txupinazo .fondo-guirnalda i,
+body.cumple-maite .fondo-guirnalda i {
+  width: 15px; height: 19px;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  transform-origin: top center;
+  opacity: 0.9;
+  animation: bandera-ondea 3s ease-in-out infinite;
+  animation-delay: var(--gt);
+}
+@keyframes bandera-ondea {
+  0%, 100% { transform: translateX(-50%) rotate(-5deg); }
+  50%      { transform: translateX(-50%) rotate(5deg); }
+}
+body.tema-txupinazo .fondo-guirnalda i:nth-child(3n+1) { background: var(--color-txupi-rojo); }
+body.tema-txupinazo .fondo-guirnalda i:nth-child(3n+2) { background: #fff; }
+body.tema-txupinazo .fondo-guirnalda i:nth-child(3n)   { background: var(--color-txupi-verde); }
+body.cumple-maite .fondo-guirnalda i:nth-child(4n+1) { background: var(--color-acento); }
+body.cumple-maite .fondo-guirnalda i:nth-child(4n+2) { background: var(--color-fiesta-rosa); }
+body.cumple-maite .fondo-guirnalda i:nth-child(4n+3) { background: var(--color-fiesta-menta); }
+body.cumple-maite .fondo-guirnalda i:nth-child(4n)   { background: var(--estado-progreso); }
+
+/* --- Halloween: telarañas en las dos esquinas superiores, con una
+   arañita colgando de un hilo que se balancea, y niebla baja. --- */
+body.tema-halloween .fondo-telaranas { display: block; position: fixed; inset: 0; pointer-events: none; }
+.telarana {
+  position: absolute; top: 42px; width: 112px; height: 112px;
+  fill: none; opacity: 0.5;
+}
+:root[data-theme="dark"] .telarana { opacity: 0.6; }
+.telarana path { stroke: color-mix(in srgb, #fff 70%, var(--color-halloween-morado)); stroke-width: 1.4; }
+.telarana--izq { left: 0; }
+.telarana--der { right: 0; transform: scaleX(-1); }
+.arana {
+  position: absolute; top: 66px; right: 38px;
+  width: 11px; height: 9px; border-radius: 50%;
+  background: #1a1420;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-halloween-naranja) 55%, transparent);
+  animation: arana-baja 3.2s ease-in-out infinite;
+}
+.arana::before {
+  content: ""; position: absolute; left: 50%; bottom: 100%; width: 1px; height: 60px;
+  background: color-mix(in srgb, #fff 55%, transparent); transform: translateX(-50%);
+}
+@keyframes arana-baja {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(7px); }
+}
+
+body.tema-halloween .fondo-niebla { display: block; position: fixed; left: 0; right: 0; bottom: 0; height: 200px; overflow: hidden; pointer-events: none; }
+.fondo-niebla i {
+  position: absolute; width: 260px; height: 100px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, #fff 45%, transparent) 0%,
+    color-mix(in srgb, #fff 16%, transparent) 48%, transparent 76%);
+  animation: niebla-deriva 15s ease-in-out infinite;
+}
+.fondo-niebla i:nth-child(1) { left: -60px; bottom: 0px;  animation-delay: 0s; }
+.fondo-niebla i:nth-child(2) { left: 32%;   bottom: 46px; animation-delay: 3.5s; animation-duration: 18s; }
+.fondo-niebla i:nth-child(3) { right: -80px; bottom: 14px; animation-delay: 7s; animation-duration: 13s; }
+@keyframes niebla-deriva {
+  0%, 100% { transform: translate3d(0, 0, 0); opacity: 0.5; }
+  50%      { transform: translate3d(34px, 0, 0); opacity: 0.75; }
+}
+
+/* --- Reyes: alguna estrella fugaz cruzando el cielo, de vez en
+   cuando — no es lluvia de estrellas, es un guiño ocasional. --- */
+body.tema-reyes .fondo-cometa { display: block; position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+.fondo-cometa i {
+  position: absolute; top: 10%; left: -12%; width: 90px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #fff 65%, #FFE9B0);
+  opacity: 0;
+  animation: cometa-cruza 12s ease-in infinite;
+}
+.fondo-cometa i:nth-child(2) { top: 26%; animation-delay: 6s; animation-duration: 15s; }
+@keyframes cometa-cruza {
+  0%   { transform: translate3d(0, 0, 0) rotate(20deg); opacity: 0; }
+  3%   { opacity: 1; }
+  20%  { transform: translate3d(240px, 100px, 0) rotate(20deg); opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* --- Cumpleaños: dos o tres globos subiendo despacio desde abajo,
+   con su nudo y su cuerda, meciéndose. --- */
+body.cumple-maite .fondo-globos { display: block; position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+.globo {
+  position: absolute; bottom: -22%; width: 46px; height: 58px;
+  border-radius: 50% 50% 46% 46% / 56% 56% 44% 44%;
+  opacity: 0;
+  animation: globo-sube 17s ease-in infinite;
+}
+.globo::before {
+  content: ""; position: absolute; left: 50%; bottom: -6px;
+  width: 0; height: 0; transform: translateX(-50%);
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 7px solid currentColor;
+}
+.globo::after {
+  content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 74px;
+  background: color-mix(in srgb, currentColor 40%, transparent); transform: translateX(-50%);
+}
+.globo--1 { left: 8%;  background: var(--color-acento);       color: var(--color-acento);       animation-delay: 0s; }
+.globo--2 { left: 50%; background: var(--color-fiesta-rosa);  color: var(--color-fiesta-rosa);  animation-delay: 5.5s; animation-duration: 15s; }
+.globo--3 { left: 80%; background: var(--estado-progreso);    color: var(--estado-progreso);    animation-delay: 10s; animation-duration: 19s; }
+@keyframes globo-sube {
+  0%   { transform: translate3d(0, 0, 0) rotate(-3deg); opacity: 0; }
+  8%   { opacity: 0.9; }
+  50%  { transform: translate3d(16px, -62vh, 0) rotate(3deg); }
+  92%  { opacity: 0.7; }
+  100% { transform: translate3d(-12px, -128vh, 0) rotate(-3deg); opacity: 0; }
+}
+
+/* --- Día de la madre: un par de mariposas revoloteando despacio. --- */
+body.tema-dia-madre .fondo-mariposas { display: block; position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+.fondo-mariposas i {
+  position: absolute; width: 16px; height: 12px; opacity: 0;
+  animation: mariposa-vuela 14s ease-in-out infinite;
+}
+.fondo-mariposas i::before,
+.fondo-mariposas i::after {
+  content: ""; position: absolute; top: 0; width: 8px; height: 12px;
+  border-radius: 60%; background: var(--color-fiesta-rosa);
+  animation: mariposa-aleteo 0.5s ease-in-out infinite alternate;
+}
+.fondo-mariposas i::before { left: 0; transform-origin: right center; }
+.fondo-mariposas i::after  { right: 0; transform-origin: left center; background: color-mix(in srgb, var(--color-fiesta-rosa) 55%, #fff); }
+@keyframes mariposa-aleteo { from { transform: scaleX(1); } to { transform: scaleX(0.35); } }
+.fondo-mariposas i:nth-child(1) { left: 12%; top: 74%; animation-delay: 0s; }
+.fondo-mariposas i:nth-child(2) { left: 72%; top: 32%; animation-delay: 4.5s; animation-duration: 16s; }
+.fondo-mariposas i:nth-child(3) { left: 40%; top: 88%; animation-delay: 9s; animation-duration: 12s; }
+@keyframes mariposa-vuela {
+  0%   { transform: translate3d(0, 0, 0); opacity: 0; }
+  10%  { opacity: 0.85; }
+  30%  { transform: translate3d(38px, -60px, 0); }
+  50%  { transform: translate3d(8px, -130px, 0); }
+  70%  { transform: translate3d(46px, -190px, 0); }
+  90%  { opacity: 0.6; }
+  100% { transform: translate3d(18px, -260px, 0); opacity: 0; }
+}
+
+/* --- Año Nuevo y Txupinazo: un par de fuegos artificiales que
+   estallan de vez en cuando (8 chispas radiales por estallido). --- */
+body.tema-anyo-nuevo .fondo-fuegos,
+body.tema-txupinazo .fondo-fuegos { display: block; position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+.fuego { position: absolute; width: 4px; height: 4px; }
+.fuego--1 { top: 9%;  left: 6%; }
+.fuego--2 { top: 46%; left: 90%; }
+.fuego i {
+  position: absolute; top: 0; left: 0; width: 3px; height: 3px; border-radius: 50%;
+  opacity: 0;
+  transform: rotate(var(--ang, 0deg)) translateY(0) scale(1);
+  animation: chispa-estalla 3.6s ease-out infinite;
+}
+.fuego i:nth-child(1) { --ang: 0deg; }
+.fuego i:nth-child(2) { --ang: 45deg; }
+.fuego i:nth-child(3) { --ang: 90deg; }
+.fuego i:nth-child(4) { --ang: 135deg; }
+.fuego i:nth-child(5) { --ang: 180deg; }
+.fuego i:nth-child(6) { --ang: 225deg; }
+.fuego i:nth-child(7) { --ang: 270deg; }
+.fuego i:nth-child(8) { --ang: 315deg; }
+.fuego--2 i { animation-delay: 1.8s; }
+@keyframes chispa-estalla {
+  0%   { transform: rotate(var(--ang, 0deg)) translateY(0) scale(1); opacity: 0; }
+  8%   { opacity: 1; }
+  55%  { transform: rotate(var(--ang, 0deg)) translateY(-46px) scale(0.6); opacity: 0.75; }
+  100% { transform: rotate(var(--ang, 0deg)) translateY(-64px) scale(0.15); opacity: 0; }
+}
+body.tema-anyo-nuevo .fuego i:nth-child(odd)  { background: var(--estado-progreso); }
+body.tema-anyo-nuevo .fuego i:nth-child(even) { background: var(--color-plata); }
+body.tema-txupinazo .fuego i:nth-child(odd)  { background: var(--color-txupi-verde); }
+body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-rojo); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fondo-guirnalda i,
+  .arana,
+  .fondo-niebla i,
+  .fondo-cometa i,
+  .globo,
+  .fondo-mariposas i,
+  .fondo-mariposas i::before,
+  .fondo-mariposas i::after,
+  .fuego i { animation: none !important; }
+  .fondo-cometa i { opacity: 0; }
+  .globo, .fuego i { opacity: 0.4; }
+  .fondo-mariposas i { opacity: 0.4; }
+}
 
 /* ============================================================
    Cabecera contextual
@@ -567,6 +1642,10 @@ button {
   font-weight: 700;
   font-size: 1rem;
   color: color-mix(in srgb, var(--color-concierto) 82%, var(--color-texto));
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .cuenta-concierto__detalle {
   display: block;
@@ -4381,28 +5460,189 @@ body.sin-scroll { overflow: hidden; }
   touch-action: none;
   animation: fundido 160ms var(--curva) both;
 }
+/* .lightbox__lienzo apila la imagen y el SVG de marcas en la misma celda
+   de grid: así el overlay queda pixel a pixel sobre la imagen sin calcular
+   nada, y el zoom/pan de crearZoom se aplica a los dos a la vez. */
+.lightbox__lienzo {
+  display: grid;
+  max-width: 100%;
+  max-height: 100%;
+  transform-origin: center center;
+  will-change: transform;
+}
+.lightbox__lienzo > * { grid-area: 1 / 1; }
 .lightbox img {
   max-width: 100%;
   max-height: 100%;
   border-radius: 8px;
   object-fit: contain;
-  transform-origin: center center;
   user-select: none;
   -webkit-user-select: none;
   -webkit-user-drag: none;
   cursor: zoom-in;
-  will-change: transform;
 }
-.lightbox__cerrar {
+.lightbox__anot {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.lightbox__anot.is-editando {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+.lightbox__cerrar,
+.lightbox__lapiz {
   position: absolute;
   top: calc(env(safe-area-inset-top) + 12px);
-  right: 16px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.16);
   color: #fff;
   font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--dur-micro) var(--curva), background var(--dur-micro) var(--curva);
+}
+.lightbox__cerrar { right: 16px; }
+.lightbox__lapiz { right: 66px; }
+.lightbox__lapiz svg { width: 19px; height: 19px; }
+.lightbox__lapiz:active,
+.lightbox__cerrar:active { transform: scale(0.88); }
+.lightbox__lapiz.is-activo {
+  background: var(--color-acento);
+  color: #fff;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--color-acento) 55%, transparent);
+}
+
+/* Marcas sobre la partitura (círculo / flecha a mano) */
+.anot-marca circle,
+.anot-marca line {
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+}
+.anot-marca circle { animation: anot-aparece 220ms var(--curva) both; }
+.anot-marca line { animation: anot-traza 220ms var(--curva) both; }
+@keyframes anot-aparece {
+  0%   { opacity: 0; transform: scale(0.4); transform-box: fill-box; transform-origin: center; }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes anot-traza {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+.lightbox__anot.is-editando .anot-marca { cursor: pointer; }
+.lightbox__anot.is-editando .anot-marca:active circle,
+.lightbox__anot.is-editando .anot-marca:active line { opacity: 0.4; }
+.anot-tmp { stroke-width: 4.5; stroke-linecap: round; opacity: 0.85; }
+
+/* Barra flotante de herramientas mientras se dibuja */
+.anot-barra {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 18px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-fondo) 82%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.4), inset 0 0 0 1px color-mix(in srgb, #fff 12%, transparent);
+  animation: anot-barra-entra 200ms var(--curva) both;
+}
+@keyframes anot-barra-entra {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.anot-barra__modos { display: flex; gap: 2px; background: color-mix(in srgb, var(--color-texto) 8%, transparent); border-radius: 999px; padding: 2px; }
+.anot-barra__modo {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-texto-2);
+  transition: background var(--dur-micro) var(--curva), color var(--dur-micro) var(--curva), transform var(--dur-micro) var(--curva);
+}
+.anot-barra__modo svg { width: 19px; height: 19px; }
+.anot-barra__modo.is-activo { background: var(--color-acento); color: #fff; }
+.anot-barra__modo:active { transform: scale(0.9); }
+.anot-barra__colores { display: flex; gap: 5px; padding-inline: 4px; }
+.anot-color {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-fondo) 70%, transparent);
+  transition: transform var(--dur-micro) var(--curva), box-shadow var(--dur-micro) var(--curva);
+}
+.anot-color.is-sel {
+  transform: scale(1.18);
+  box-shadow: 0 0 0 2px var(--color-fondo), 0 0 0 4px var(--c);
+}
+.anot-color:active { transform: scale(0.9); }
+.anot-barra__deshacer,
+.anot-barra__listo {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--color-texto);
+  transition: transform var(--dur-micro) var(--curva), background var(--dur-micro) var(--curva);
+}
+.anot-barra__deshacer { width: 38px; }
+.anot-barra__deshacer svg { width: 18px; height: 18px; }
+.anot-barra__listo {
+  padding-inline: 16px;
+  font-weight: 700;
+  font-size: 14px;
+  background: var(--color-acento);
+  color: #fff;
+}
+.anot-barra__deshacer:active,
+.anot-barra__listo:active { transform: scale(0.94); }
+.anot-pista {
+  position: absolute;
+  left: 50%;
+  top: calc(env(safe-area-inset-top) + 16px);
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: color-mix(in srgb, var(--color-texto) 55%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  animation: anot-barra-entra 200ms var(--curva) both;
+  pointer-events: none;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .anot-marca circle, .anot-marca line, .anot-barra, .anot-pista { animation: none; }
+}
+
+/* Miniatura de partitura bajo el visor: mismas marcas, solo lectura */
+.visor-doc__lienzo,
+.visor-partitura__lienzo {
+  display: grid;
+  position: relative;
+}
+.visor-doc__lienzo > *,
+.visor-partitura__lienzo > * { grid-area: 1 / 1; }
+.visor-doc__anot {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
 }
 
 /* ============================================================

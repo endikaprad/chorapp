@@ -23,6 +23,9 @@
                      partitura: null | { … }
                    },
        notasVoz:   [ { id, creado } ],         // OBSOLETO: solo para migrar notas antiguas a window.Grabaciones
+       anotacionesPartitura: {                 // dibujos a mano sobre una página de partitura (Fase 5+)
+                     '<clave-adjunto>': [ { id, tipo:'circulo'|'flecha', x, y, x2?, y2?, color, creado } ]
+                   },                          // x/y/x2/y2 son fracciones 0..1 del tamaño de la imagen
        creada:     number (timestamp),
        actualizada:number (timestamp)
      }
@@ -145,6 +148,7 @@ window.Canciones = (function () {
       fragmentos: [],
       archivos: { audio: null, letra: null, fonetica: null, partitura: null },
       notasVoz: [],
+      anotacionesPartitura: {},
       creada: ahora,
       actualizada: ahora,
     };
@@ -172,6 +176,7 @@ window.Canciones = (function () {
       if (!Array.isArray(copia.fragmentos)) copia.fragmentos = [];
       if (!Array.isArray(copia.notasVoz)) copia.notasVoz = [];
       if (!Array.isArray(copia.etiquetas)) copia.etiquetas = [];
+      if (!copia.anotacionesPartitura || typeof copia.anotacionesPartitura !== 'object') copia.anotacionesPartitura = {};
       fn(copia);
       if (marcarActualizada !== false) copia.actualizada = Date.now();
       res = copia;
@@ -251,6 +256,45 @@ window.Canciones = (function () {
     return _mutar(id, function (c) { c.fragmentos = []; });
   }
 
+  // --- Anotaciones dibujadas a mano sobre una página de partitura.
+  //     clave = la del adjunto (window.Adjuntos), para que cada página
+  //     tenga las suyas. x/y/x2/y2 son fracciones 0..1 del tamaño de la
+  //     imagen, así valen igual en la miniatura y en el visor a pantalla
+  //     completa, con cualquier zoom.
+  function nuevoIdAnotacion() {
+    return 'an-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+  function agregarAnotacionPartitura(id, clave, datos) {
+    var a = {
+      id: nuevoIdAnotacion(),
+      tipo: datos.tipo === 'flecha' ? 'flecha' : 'circulo',
+      x: Math.max(0, Math.min(1, Number(datos.x) || 0)),
+      y: Math.max(0, Math.min(1, Number(datos.y) || 0)),
+      color: datos.color || 'cobalto',
+      creado: Date.now(),
+    };
+    if (a.tipo === 'flecha') {
+      a.x2 = Math.max(0, Math.min(1, Number(datos.x2) || 0));
+      a.y2 = Math.max(0, Math.min(1, Number(datos.y2) || 0));
+    }
+    _mutar(id, function (c) {
+      if (!Array.isArray(c.anotacionesPartitura[clave])) c.anotacionesPartitura[clave] = [];
+      c.anotacionesPartitura[clave].push(a);
+    }, false);   // cambio de fondo: no reordena la biblioteca
+    return a;
+  }
+  function borrarAnotacionPartitura(id, clave, anotId) {
+    return _mutar(id, function (c) {
+      if (Array.isArray(c.anotacionesPartitura[clave])) {
+        c.anotacionesPartitura[clave] = c.anotacionesPartitura[clave].filter(function (a) { return a.id !== anotId; });
+      }
+    }, false);
+  }
+  function anotacionesPartitura(cancion, clave) {
+    var arr = cancion && cancion.anotacionesPartitura && cancion.anotacionesPartitura[clave];
+    return Array.isArray(arr) ? arr : [];
+  }
+
   // --- Plantilla de sincronía: "así va esta canción".
   //
   // Cuando Maite ajusta a mano los tiempos de un verso en el visor de la
@@ -324,6 +368,9 @@ window.Canciones = (function () {
     vaciarFragmentos: vaciarFragmentos,
     fijarPlantillaSincro: fijarPlantillaSincro,
     plantillaSincro: plantillaSincro,
+    agregarAnotacionPartitura: agregarAnotacionPartitura,
+    borrarAnotacionPartitura: borrarAnotacionPartitura,
+    anotacionesPartitura: anotacionesPartitura,
     borrarNotaVoz: borrarNotaVoz,
     borrar: borrar,
   };
