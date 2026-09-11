@@ -170,7 +170,8 @@
 
     <section>
       <h2>Notificación al móvil</h2>
-      <input type="text" id="notif-titulo" placeholder="Título (por defecto: ChorApp)" />
+      <div class="lista-avisos" id="notis-rapidas" style="margin-bottom:12px"></div>
+      <input type="text" id="notif-titulo" placeholder="Título (vacío = se saca del texto)" />
       <textarea id="notif-texto" placeholder="Texto de la notificación…" style="margin-top:8px"></textarea>
       <div class="fila">
         <button class="primario" id="btn-notif" style="flex:1">Enviar notificación</button>
@@ -257,6 +258,27 @@ var AVISOS = [
 ];
 
 var BLOQUEOS_MIN = [5, 10, 15, 30, 45, 60];
+
+/* ---------- notificaciones al móvil: plantillas con tono cabrón ---------- */
+// title + body ya emparejados (tono cercano, de coña, sin pasarse). Un toque
+// y se envían tal cual; se pueden editar antes en los campos de abajo.
+var NOTIS_RAPIDAS = [
+  { t: 'Alerta de gallo 🐓', b: 'Se te ha escapado un gallo que se ha oído en Llodio entero. Repásalo.' },
+  { t: 'SOS afinación', b: 'Las notas altas te están ganando la partida. Un repaso no te vendría mal, campeona.' },
+  { t: 'Bihotsak te necesita', b: 'El coro suena mejor cuando tú también te lo sabes. Va, cinco minutitos.' },
+  { t: 'Racha en peligro ⚠️', b: 'Como no abras la app hoy, tu racha se va a morir de pena. Sálvala.' },
+  { t: 'Toque de atención', b: 'Hoy tocaba estudiar y lo sabes. Deja el móvil en la app buena un rato.' },
+  { t: 'Directo desde la sala', b: 'Aquí se nota quién ha practicado y quién no. Tú decides en qué grupo estás.' }
+];
+
+function tituloDesdeTexto(texto) {
+  var t = (texto || '').trim().replace(/\s+/g, ' ');
+  if (!t) return 'ChorApp';
+  var palabras = t.split(' ').slice(0, 5).join(' ');
+  if (palabras.length > 32) palabras = palabras.slice(0, 32).trim();
+  if (palabras.length < t.length) palabras += '…';
+  return palabras.charAt(0).toUpperCase() + palabras.slice(1);
+}
 
 /* ============================================================ */
 
@@ -350,7 +372,7 @@ function enviarAviso(texto) {
 function enviarNotif(titulo, texto) {
   texto = (texto || '').trim();
   if (!texto) { flash('Escribe el texto de la notificación', true); return; }
-  titulo = (titulo || '').trim();
+  titulo = (titulo || '').trim() || tituloDesdeTexto(texto);
 
   // Con Worker configurado: push real (le llega con la app cerrada).
   if (PUSH.workerUrl && PUSH.secret) {
@@ -360,7 +382,7 @@ function enviarNotif(titulo, texto) {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + PUSH.secret
       },
-      body: JSON.stringify({ title: titulo || 'ChorApp', body: texto })
+      body: JSON.stringify({ title: titulo, body: texto })
     })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
@@ -599,6 +621,16 @@ function pintarBotones() {
     b.textContent = t;
     b.addEventListener('click', function () { enviarAviso(t); });
     cont.appendChild(b);
+  });
+
+  var cn = $('notis-rapidas');
+  cn.innerHTML = '';
+  NOTIS_RAPIDAS.forEach(function (n) {
+    var b = document.createElement('button');
+    b.textContent = n.t;
+    b.title = n.b;
+    b.addEventListener('click', function () { enviarNotif(n.t, n.b); });
+    cn.appendChild(b);
   });
 
   var cb = $('bloqueos');

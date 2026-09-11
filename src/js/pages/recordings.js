@@ -15,6 +15,7 @@ window.Pagina_recordings = (function () {
   // que en el modo estudio.
   var recSesion = null, recOffset = null;
   var obs = null, vacioP = null, vacioTxt = '';
+  var obsInfinito = null;    // IntersectionObserver del centinela de scroll (ver pintarLista)
   var calibrando = false;
   var primeraLista = true;   // 1ª pintada = aparición escalonada; luego, fundido
   var selEscucha = null;   // { refrescar } del selector Altavoz/Auriculares
@@ -75,6 +76,7 @@ window.Pagina_recordings = (function () {
 
   function destruir() {
     if (obs) { obs.disconnect(); obs = null; }
+    if (obsInfinito) { obsInfinito.disconnect(); obsInfinito = null; }
     cerrarTour(false);
     selEscucha = null;
     var ov = document.querySelector('.calib-overlay');
@@ -425,13 +427,29 @@ window.Pagina_recordings = (function () {
       vacioP.innerHTML = vacioTxt;
     }
     lista.innerHTML = '';
+    if (obsInfinito) { obsInfinito.disconnect(); obsInfinito = null; }
     if (!grabs.length) return;
 
     var cont = document.createElement('div');
     cont.className = 'lista ' + (primeraLista ? 'stagger' : 'lista--refresca');
     primeraLista = false;
-    var tareasAudio = [];
-    grabs.forEach(function (g) {
+
+    // Con repertorios grandes (100+ grabaciones) construir TODAS las filas de
+    // golpe —cada una con su <audio>, su onda de barras y, si compara con el
+    // ensayo, un segundo reproductor entero con sus propios listeners—
+    // bloqueaba el hilo principal tanto al ENTRAR como al SALIR de esta
+    // pantalla: destruir de golpe cientos de nodos al navegar a otra pestaña
+    // cuenta dentro del mismo "long task" de ese toque (INP). Se construyen
+    // de LOTE en LOTE; el resto se añade solo si Maite hace scroll hasta
+    // ahí, así que normalmente solo vive en el DOM lo que ha llegado a ver.
+    var LOTE = 20;
+    var idxLote = 0;
+    var centinela = null;
+
+    function construirLote() {
+      var fin = Math.min(grabs.length, idxLote + LOTE);
+      var tareasAudio = [];
+      grabs.slice(idxLote, fin).forEach(function (g) {
       var fila = document.createElement('div');
       fila.className = 'grabacion';
       fila.innerHTML =
@@ -715,9 +733,31 @@ window.Pagina_recordings = (function () {
         });
       });
       cont.appendChild(fila);
-    });
+      });
+      idxLote = fin;
+      _cargarEnCola(tareasAudio);
+    }
+
+    construirLote();
     lista.appendChild(cont);
-    _cargarEnCola(tareasAudio);
+
+    if (idxLote < grabs.length) {
+      centinela = document.createElement('div');
+      centinela.className = 'lista__centinela';
+      cont.appendChild(centinela);
+      obsInfinito = new IntersectionObserver(function (entries) {
+        if (!entries[0].isIntersecting) return;
+        cont.removeChild(centinela);
+        construirLote();
+        if (idxLote < grabs.length) {
+          cont.appendChild(centinela);
+        } else if (obsInfinito) {
+          obsInfinito.disconnect();
+          obsInfinito = null;
+        }
+      }, { rootMargin: '600px' });
+      obsInfinito.observe(centinela);
+    }
   }
 
   /* Enlaza la pista original a la grabación de voz: cuando Maite da al play

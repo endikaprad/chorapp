@@ -113,23 +113,16 @@ export default {
       }
 
       // 4. Enviar
+      // "data" en vez de "notification": así, con la app cerrada o en
+      // segundo plano, SIEMPRE la pinta ChorAppMessagingService (con
+      // BigTextStyle, para que se vea el texto completo al desplegarla) en
+      // vez del estilo de una sola línea que pone Android por defecto.
       const msg = {
         message: {
           token: fcmToken,
-          notification: { title, body },
+          data: { title, body },
           android: {
             priority: 'high',
-            notification: {
-              icon: 'ic_stat_bihotsak',
-              color: '#1512D6',
-              // Canal "chorapp" (lo crea la app): SIN sonido, CON vibración.
-              // En Android 8+ manda el patrón del canal; esto es el respaldo
-              // para cuando la push llega antes de que la app cree el canal:
-              // una única vibración corta, nada de zumbido largo.
-              channel_id: 'chorapp',
-              default_vibrate_timings: false,
-              vibrate_timings: ['0s', '0.4s'],
-            },
           },
         },
       };
@@ -259,17 +252,11 @@ async function enviarPush(sa, accessToken, { title, body, data }, dbUrl) {
   const msg = {
     message: {
       token: fcmToken,
-      notification: { title, body },
-      data: data || {},
+      // "data" (no "notification"): así con la app cerrada la pinta
+      // ChorAppMessagingService, con el texto completo (BigTextStyle).
+      data: Object.assign({}, data || {}, { title, body }),
       android: {
         priority: 'high',
-        notification: {
-          icon: 'ic_stat_bihotsak',
-          color: '#1512D6',
-          channel_id: 'chorapp',
-          default_vibrate_timings: false,
-          vibrate_timings: ['0s', '0.4s'],
-        },
       },
     },
   };

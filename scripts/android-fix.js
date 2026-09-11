@@ -110,7 +110,7 @@ if (hayFCM) {
 // Intent. Ver src/js/compartido.js.
 {
   const javaDir = resolve(raiz, 'android/app/src/main/java/com/chorapp/ama');
-  const archivos = ['CompartidoPlugin.java', 'MainActivity.java'];
+  const archivos = ['CompartidoPlugin.java', 'MainActivity.java', 'ChorAppMessagingService.java'];
   for (const nombre of archivos) {
     const src = resolve(raiz, 'native/plantillas-android', nombre);
     const dst = resolve(javaDir, nombre);
@@ -214,6 +214,26 @@ if (!xml.includes('compartir-whatsapp')) {
     '            </intent-filter>\n' +
     '        ';
   xml = xml.replace(/(\s*)(<\/activity>)/, filtroCompartir + '$2');
+  cambiado = true;
+}
+
+// --- Notificación completa (BigTextStyle) con la app cerrada -----------
+// El SDK de FCM solo pinta una línea sin este servicio (ver
+// ChorAppMessagingService.java / worker/src/index.js, que manda "data" en
+// vez de "notification" para que siempre pase por aquí).
+if (hayFCM && !xml.includes('ChorAppMessagingService')) {
+  const servicio =
+    '\n        <!-- Notificación completa (BigTextStyle) también con la app cerrada:\n' +
+    '             ver ChorAppMessagingService. -->\n' +
+    '        <service\n' +
+    '            android:name=".ChorAppMessagingService"\n' +
+    '            android:exported="false">\n' +
+    '            <intent-filter>\n' +
+    '                <action android:name="com.google.firebase.MESSAGING_EVENT" />\n' +
+    '            </intent-filter>\n' +
+    '        </service>\n' +
+    '    ';
+  xml = xml.replace(/(\s*)(<\/application>)/, `$1${servicio}$2`);
   cambiado = true;
 }
 
