@@ -214,13 +214,21 @@ window.Canciones = (function () {
       if (cambios.letraTraduccion != null) c.letraTraduccion = String(cambios.letraTraduccion);
     });
     if (res && ESTADOS[cambios.estado]) _anotarEstado(res, previo, res.estado);
+    // El título de la marca de cada sesión es una copia: propágalo.
+    if (res && cambios.titulo != null && window.Sesiones && window.Sesiones.renombrarMarcasDeCancion) {
+      window.Sesiones.renombrarMarcasDeCancion(res.id, res.titulo);
+    }
     return res;
   }
 
-  // --- Archivos (metadatos). tipo: 'audio' | 'letra' | 'partitura'.
-  //     meta = objeto de Archivos.guardar(), o null para quitarlo.
+  // --- Archivos (metadatos). tipo: 'audio' | 'letra' | 'fonetica' | 'partitura'.
+  //     meta = objeto de Archivos.guardar(), un ARRAY de ellos (varias
+  //     páginas: ver adjuntos.js), o null para quitarlo.
   function fijarArchivo(id, tipo, meta) {
-    return _mutar(id, function (c) { c.archivos[tipo] = meta || null; });
+    return _mutar(id, function (c) {
+      if (Array.isArray(meta)) c.archivos[tipo] = meta.length ? meta : null;
+      else c.archivos[tipo] = meta || null;
+    });
   }
 
   // --- Fragmentos difíciles
@@ -241,6 +249,35 @@ window.Canciones = (function () {
   // (ver sesiones.js). Esto solo se usa al migrar el modelo antiguo.
   function vaciarFragmentos(id) {
     return _mutar(id, function (c) { c.fragmentos = []; });
+  }
+
+  // --- Plantilla de sincronía: "así va esta canción".
+  //
+  // Cuando Maite ajusta a mano los tiempos de un verso en el visor de la
+  // letra (LetraLive), esos tiempos son los BUENOS — vienen de que ella los
+  // ha fijado con la canción sonando. Se guardan por marca (cada grabación
+  // tiene la suya), pero el PATRÓN — en qué fracción de la canción entra cada
+  // verso — es prácticamente el mismo de un ensayo a otro (el coro no cambia
+  // el orden de la letra). Guardar esa fracción en la CANCIÓN sirve de guía
+  // para sincronizar automáticamente futuras grabaciones de la misma pieza:
+  // no es "entrenar a la IA" (Whisper/Gemini son modelos ajenos, no se les
+  // puede reeducar), pero la app sí aprende cómo va SU repertorio.
+  //
+  // plantilla = { fracciones: [0..1, …] (1 por verso, relativo a la duración
+  //              de la canción de origen), versos, fecha }
+  function fijarPlantillaSincro(id, tiempos, dur) {
+    if (!Array.isArray(tiempos) || !tiempos.length || !(dur > 0)) return null;
+    var fracciones = tiempos.map(function (t) {
+      return Math.max(0, Math.min(1, (Number(t) || 0) / dur));
+    });
+    return _mutar(id, function (c) {
+      c.plantillaSincro = { fracciones: fracciones, versos: fracciones.length, fecha: Date.now() };
+    }, false);   // cambio de fondo: no toca "actualizada" ni el orden de la biblioteca
+  }
+  function plantillaSincro(id) {
+    var c = obtener(id);
+    var p = c && c.plantillaSincro;
+    return (p && Array.isArray(p.fracciones) && p.fracciones.length) ? p : null;
   }
 
   // --- Notas de voz: función retirada. Las grabaciones del modo estudio
@@ -285,6 +322,8 @@ window.Canciones = (function () {
     agregarFragmento: agregarFragmento,
     borrarFragmento: borrarFragmento,
     vaciarFragmentos: vaciarFragmentos,
+    fijarPlantillaSincro: fijarPlantillaSincro,
+    plantillaSincro: plantillaSincro,
     borrarNotaVoz: borrarNotaVoz,
     borrar: borrar,
   };

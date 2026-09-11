@@ -375,6 +375,29 @@ window.Pagina_recordings = (function () {
 
   /* ---------- Lista ---------- */
 
+  // Carga los audios de la lista EN LOTES pequeños, no todos de golpe.
+  // Antes, entrar en Grabaciones con muchas tomas creaba de golpe una URL
+  // blob + <audio preload="metadata"> por cada una: el navegador se ponía
+  // a decodificar decenas de audios a la vez justo al entrar, y si se salía
+  // de la pantalla antes de que terminaran, la limpieza revocaba esas URLs
+  // a medio cargar (la tormenta de "ERR_FILE_NOT_FOUND" en la consola).
+  // Aquí se procesan de 4 en 4 y cada tarea comprueba que su fila siga en
+  // pantalla antes de tocarla, así que salir a mitad simplemente detiene
+  // el resto sin dejar peticiones a medias.
+  function _cargarEnCola(tareas) {
+    var i = 0;
+    function siguiente() {
+      if (i >= tareas.length || !document.body.contains(raiz)) return;
+      var lote = tareas.slice(i, i + 4);
+      i += lote.length;
+      Promise.all(lote.map(function (t) { return t(); })).then(function () {
+        if (window.requestIdleCallback) window.requestIdleCallback(siguiente, { timeout: 200 });
+        else setTimeout(siguiente, 0);
+      });
+    }
+    siguiente();
+  }
+
   function pintarLista() {
     urls.forEach(function (u) { window.Archivos.liberar(u); });
     urls = [];
@@ -407,6 +430,7 @@ window.Pagina_recordings = (function () {
     var cont = document.createElement('div');
     cont.className = 'lista ' + (primeraLista ? 'stagger' : 'lista--refresca');
     primeraLista = false;
+    var tareasAudio = [];
     grabs.forEach(function (g) {
       var fila = document.createElement('div');
       fila.className = 'grabacion';
@@ -435,8 +459,11 @@ window.Pagina_recordings = (function () {
 
       var audio = fila.querySelector('audio');
       window.MiniPlayer.montar(fila.querySelector('[data-mp]'), g.dur || 0, g.picos);
-      window.Grabaciones.url(g.id).then(function (u) {
-        if (u) { urls.push(u); audio.src = u; }
+      tareasAudio.push(function () {
+        return window.Grabaciones.url(g.id).then(function (u) {
+          if (u && document.body.contains(fila)) { urls.push(u); audio.src = u; }
+          else if (u) window.Archivos.liberar(u); // la fila ya no está: no dejarla huérfana
+        });
       });
 
       // Comparación: debajo de tu grabación, el trozo de la sesión del coro
@@ -690,6 +717,7 @@ window.Pagina_recordings = (function () {
       cont.appendChild(fila);
     });
     lista.appendChild(cont);
+    _cargarEnCola(tareasAudio);
   }
 
   /* Enlaza la pista original a la grabación de voz: cuando Maite da al play

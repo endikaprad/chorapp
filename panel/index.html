@@ -214,6 +214,14 @@
     </section>
 
     <section>
+      <h2>Copia de seguridad</h2>
+      <p class="pista" id="backup-texto">Consultando…</p>
+      <div class="fila">
+        <button id="btn-backup-descargar" style="flex:1">Descargar última copia (.json)</button>
+      </div>
+    </section>
+
+    <section>
       <h2>Estado de la app de Maite</h2>
       <p class="estado" id="estado-texto">Consultando…</p>
       <div class="fila">
@@ -458,6 +466,45 @@ function revertirOTA() {
   }).catch(function (e) { flash('No se pudo revertir: ' + e.message, true); });
 }
 
+/* ---------- copia de seguridad (/backups/ultima) ---------- */
+var ULTIMA_COPIA = null;
+
+function consultarBackup() {
+  $('backup-texto').textContent = 'Consultando…';
+  tokenValido().then(function (token) {
+    return fetch(FIREBASE.dbUrl + '/backups/ultima.json?auth=' + token).then(function (r) { return r.json(); });
+  }).then(function (b) {
+    ULTIMA_COPIA = b;
+    if (!b || !b.datos) {
+      $('backup-texto').textContent = 'Todavía no hay ninguna copia subida desde el móvil de Maite.';
+      return;
+    }
+    var n = Object.keys(b.datos).length;
+    $('backup-texto').innerHTML =
+      'Última copia automática: <b>' + (b.fecha ? haceCuanto(new Date(b.fecha).getTime()) : '?') + '</b>' +
+      ' (' + n + ' claves). Se sube sola 1 vez por semana desde el móvil de Maite.';
+  }).catch(function (e) {
+    $('backup-texto').textContent = 'No se pudo consultar (' + e.message + ')';
+  });
+}
+
+$('btn-backup-descargar').addEventListener('click', function () {
+  if (!ULTIMA_COPIA || !ULTIMA_COPIA.datos) {
+    flash('Todavía no hay ninguna copia que descargar', true);
+    return;
+  }
+  var blob = new Blob([JSON.stringify(ULTIMA_COPIA)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  var fecha = (ULTIMA_COPIA.fecha || '').slice(0, 10) || 'copia';
+  a.href = url;
+  a.download = 'chorapp-copia-' + fecha + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+});
+
 /* ---------- lectura de /status ---------- */
 function consultarEstado() {
   $('estado-texto').textContent = 'Consultando…';
@@ -572,6 +619,7 @@ function mostrarPanel() {
   pintarBotones();
   consultarEstado();
   consultarOTA();
+  consultarBackup();
 }
 
 /* ---------- eventos ---------- */

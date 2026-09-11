@@ -186,6 +186,33 @@ Debe devolver `{"texto":"kírie eléison\nkríste eléison"}` (aprox.).
 > Si `data/coro.json` no tiene `worker`, o el Worker no responde, el botón
 > simplemente muestra un aviso y la app sigue funcionando igual que antes.
 
+### Sincronía de la letra con el audio (opcional pero MUY recomendable): Groq Whisper
+
+La tarea `sincronia` (botón *"Ver la letra a pantalla completa" → "Sincronizar
+con el audio"*) coloca cada verso en su segundo. Antes lo hacía **Gemini
+escuchando el tema entero** y fallaba mucho (amontonaba los versos al principio).
+
+Ahora, si el Worker tiene `GROQ_API_KEY`, lo hace primero **Whisper
+`whisper-large-v3-turbo` en Groq**: transcribe el audio con marca de tiempo por
+palabra y el Worker alinea los versos que ya conoce contra esas palabras
+reales. Es mucho más preciso. Si Whisper no transcribe lo suficiente (latín,
+pistas de práctica con sílabas repetidas…) se cae solo a Gemini y, en último
+caso, al reparto aproximado de siempre. La cabecera `X-Via` de la respuesta dice
+qué se usó (`whisper` / `gemini` / `aprox`).
+
+Montarlo (gratis, sin tarjeta):
+
+1. Entra en <https://console.groq.com/keys> con Google/GitHub → *Create API Key*.
+2. Dásela al Worker:
+   ```bash
+   cd worker
+   npx wrangler secret put GROQ_API_KEY
+   npx wrangler deploy
+   ```
+
+No hace falta tocar nada en la app. El nivel gratuito de Groq (audio) sobra de
+largo para un uso de una persona.
+
 ---
 
 ## Ojo con el ahorro de batería (Xiaomi, Huawei, Samsung, Oppo…)

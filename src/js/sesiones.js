@@ -73,6 +73,23 @@ window.Sesiones = (function () {
     return { octava: oct, semi: semi };
   }
 
+  // Sincronía de la letra con el audio de esta toma (ver study.js):
+  //   { fuente: 'orig'|'fon'|'trad', tiempos: [seg…], base: 'whisper'|'ia'|'mano'|'aprox', fecha }
+  // `tiempos` = un segundo por cada línea NO vacía de la letra elegida,
+  // relativo al inicio de la canción, y siempre no decreciente.
+  function _saneaSincro(s) {
+    if (!s || typeof s !== 'object' || !Array.isArray(s.tiempos)) return null;
+    var t = s.tiempos.map(Number).filter(function (n) { return isFinite(n) && n >= 0; });
+    if (t.length < 2) return null;
+    for (var i = 1; i < t.length; i++) if (t[i] < t[i - 1]) t[i] = t[i - 1];
+    return {
+      fuente: (['orig', 'fon', 'trad'].indexOf(s.fuente) >= 0) ? s.fuente : 'orig',
+      tiempos: t.map(function (n) { return Math.round(n * 10) / 10; }),
+      base: (s.base === 'mano' || s.base === 'aprox' || s.base === 'whisper') ? s.base : 'ia',
+      fecha: isFinite(s.fecha) ? s.fecha : Date.now(),
+    };
+  }
+
   // Normaliza una sesión que venga de disco (rellena campos que falten).
   function _sanear(s) {
     if (!s || typeof s !== 'object') return null;
@@ -91,6 +108,7 @@ window.Sesiones = (function () {
       m.segundo = typeof m.segundo === 'number' && isFinite(m.segundo) ? Math.max(0, m.segundo) : 0;
       m.finSegundo = (typeof m.finSegundo === 'number' && isFinite(m.finSegundo)) ? m.finSegundo : null;
       m.nota = m.nota || '';
+      m.sincro = _saneaSincro(m.sincro);
       if (!Array.isArray(m.fragmentos)) m.fragmentos = [];
       m.fragmentos.forEach(function (f) {
         f.nota = _saneaNota(f.nota);
@@ -151,6 +169,26 @@ window.Sesiones = (function () {
       if (!(s.marcas || []).some(function (m) { return m.cancionId === cancionId; })) return;
       _mutar(s.id, function (cop) {
         cop.marcas = cop.marcas.filter(function (m) { return m.cancionId !== cancionId; });
+      });
+    });
+  }
+
+  // Al renombrar una canción del repertorio: propaga el nuevo título a
+  // todas las marcas que la referencian (el título de la marca es una
+  // copia del de la canción). Sin esto, el Modo estudio seguiría
+  // mostrando el nombre viejo.
+  function renombrarMarcasDeCancion(cancionId, titulo) {
+    if (!cancionId) return;
+    var nuevo = String(titulo || '').trim();
+    if (!nuevo) return;
+    _leer().forEach(function (s) {
+      if (!(s.marcas || []).some(function (m) {
+        return m.cancionId === cancionId && m.titulo !== nuevo;
+      })) return;
+      _mutar(s.id, function (cop) {
+        cop.marcas.forEach(function (m) {
+          if (m.cancionId === cancionId) m.titulo = nuevo;
+        });
       });
     });
   }
@@ -257,6 +295,15 @@ window.Sesiones = (function () {
         }
       });
       s.marcas.sort(function (a, b) { return a.segundo - b.segundo; });
+    });
+  }
+
+  // Guarda (o borra, con sincro = null) la sincronía de la letra de una toma.
+  function fijarSincro(sesionId, marcaId, sincro) {
+    return _mutar(sesionId, function (s) {
+      s.marcas.forEach(function (m) {
+        if (m.id === marcaId) m.sincro = sincro ? _saneaSincro(sincro) : null;
+      });
     });
   }
 
@@ -372,9 +419,12 @@ window.Sesiones = (function () {
 
   // Todas las marcas con algún fragmento difícil, agrupadas por canción.
   // [{ cancionId, titulo, trozos, ref: {sesion, marca} }]
-  function repasoPendiente() {
+  // `listaYaCalculada`: si quien llama ya tiene listar() (p. ej. Práctica,
+  // que la usa también para otras cosas), se la pasa para no repetir el
+  // saneado + orden de todas las sesiones.
+  function repasoPendiente(listaYaCalculada) {
     var porCancion = {};
-    listar().forEach(function (s) {
+    (listaYaCalculada || listar()).forEach(function (s) {
       s.marcas.forEach(function (m) {
         if (!m.fragmentos.length) return;
         var clave = m.cancionId || ('marca:' + m.id);
@@ -468,12 +518,14 @@ window.Sesiones = (function () {
     var tareas = [window.Archivos.guardar(sesion.id + ':audio', audio).then(function (meta) {
       fijarAudio(sesion.id, meta);
     })];
+    // archivos[tipo] puede ser un File o un array de File (varias páginas).
     ['letra', 'fonetica', 'partitura'].forEach(function (tipo) {
-      var f = archivos[tipo];
-      if (!f) return;
-      tareas.push(window.Archivos.guardar(cancion.id + ':' + tipo, f).then(function (meta) {
-        window.Canciones.fijarArchivo(cancion.id, tipo, meta);
-      }));
+      var v = archivos[tipo];
+      if (!v) return;
+      var files = Array.isArray(v) ? v : [v];
+      if (!files.length) return;
+      tareas.push(window.Adjuntos.aplicar(
+        cancion.id, tipo, { anadir: files, quitar: [] }, []));
     });
 
     return Promise.all(tareas).then(function () {
@@ -495,6 +547,7 @@ window.Sesiones = (function () {
     borrarSueltaDeCancion: borrarSueltaDeCancion,
     contarMarcasDeCancion: contarMarcasDeCancion,
     borrarMarcasDeCancion: borrarMarcasDeCancion,
+    renombrarMarcasDeCancion: renombrarMarcasDeCancion,
     obtener: obtener,
     crear: crear,
     actualizar: actualizar,
@@ -502,6 +555,7 @@ window.Sesiones = (function () {
     borrar: borrar,
     agregarMarca: agregarMarca,
     actualizarMarca: actualizarMarca,
+    fijarSincro: fijarSincro,
     borrarMarca: borrarMarca,
     obtenerMarca: obtenerMarca,
     agregarFragmento: agregarFragmento,

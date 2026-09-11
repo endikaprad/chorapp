@@ -1,13 +1,21 @@
 <!-- Canciones — biblioteca del repertorio (Fase 3) -->
 <div class="canciones" data-modulo="songs">
 
-  <!-- Buscador (oculto mientras no haya canciones) -->
-  <label class="buscador" hidden data-buscador>
-    <svg class="buscador__lupa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
-    </svg>
-    <input type="search" placeholder="Buscar por título o compositor" aria-label="Buscar canción" data-input-buscar />
-  </label>
+  <!-- Barra: buscador + botón "Filtrar y ordenar" (oculta si no hay canciones) -->
+  <div class="rep-barra" hidden data-barra>
+    <label class="buscador buscador--inline" data-buscador>
+      <svg class="buscador__lupa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+      </svg>
+      <input type="search" placeholder="Buscar por título o compositor" aria-label="Buscar canción" data-input-buscar />
+    </label>
+    <button class="rep-filtrar" type="button" data-abrir-filtros aria-haspopup="dialog" aria-label="Filtrar y ordenar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 6h16M7 12h10M10 18h4"/>
+      </svg>
+      <span class="rep-filtrar__badge" hidden data-badge></span>
+    </button>
+  </div>
 
   <!-- Aquí se pinta la lista o el estado vacío -->
   <div data-contenido></div>
@@ -18,6 +26,41 @@
       <path d="M12 5v14M5 12h14"/>
     </svg>
   </button>
+
+  <!-- Hoja: filtrar y ordenar el repertorio -->
+  <div class="hoja hoja--filtros" hidden data-hoja-filtros>
+    <div class="hoja__fondo" data-cerrar-filtros></div>
+    <div class="hoja__panel filtros-panel" role="dialog" aria-label="Filtrar y ordenar">
+      <div class="hoja__asa" aria-hidden="true"></div>
+
+      <div class="filtros-cab">
+        <h2 class="hoja__titulo">Filtrar y ordenar</h2>
+        <button type="button" class="filtros-limpiar" data-limpiar-filtros hidden>Quitar todo</button>
+      </div>
+
+      <div class="filtro-seccion">
+        <span class="filtro-seccion__label">Ordenar</span>
+        <div class="segmento" data-orden></div>
+      </div>
+
+      <div class="filtro-seccion">
+        <span class="filtro-seccion__label">Estado</span>
+        <div class="filtro-opciones" data-estado></div>
+      </div>
+
+      <div class="filtro-seccion" data-sec="idioma" hidden>
+        <span class="filtro-seccion__label">Idioma</span>
+        <div class="filtro-opciones" data-idiomas></div>
+      </div>
+
+      <div class="filtro-seccion" data-sec="etiqueta" hidden>
+        <span class="filtro-seccion__label">Etiquetas</span>
+        <div class="filtro-opciones" data-etiquetas></div>
+      </div>
+
+      <button type="button" class="btn btn--primario filtros-ver" data-aplicar-filtros>Ver canciones</button>
+    </div>
+  </div>
 
   <!-- El alta / edición usa la hoja compartida window.HojaCancion. -->
 

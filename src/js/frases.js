@@ -374,6 +374,51 @@ window.Frases = (function () {
     return AVISOS_POSTCONCIERTO[Math.floor(Math.random() * AVISOS_POSTCONCIERTO.length)];
   }
 
+  /* ---------- La VÍSPERA del concierto (tarde) ----------
+     Aviso de "mañana cantáis": empujarla a repasar hoy. § = lugar (o ''). */
+  var AVISOS_VISPERA = [
+    'Mañana concierto con Bihotsak§. Repasa hoy lo justo y a dormir pronto, que la voz lo nota.',
+    'Concierto mañana§. Última tarde para pelearte con el estribillo. Aprovéchala.',
+    'Mañana os subís al escenario§. Un repaso tranquilo hoy y mañana solo disfrutar.',
+    'Bihotsak canta mañana§. Hoy: calienta un poco, repasa las entradas y descansa la garganta.',
+    'Concierto a la vista, mañana§. Esta noche repaso suave, agua y a la cama. Nada de agudos a las once.',
+    'Mañana es el día§. Dale un último repaso a tu parte y confía en el coro para el resto.',
+  ];
+  function avisoVispera(lugar) {
+    var t = AVISOS_VISPERA[Math.floor(Math.random() * AVISOS_VISPERA.length)];
+    return t.replace('§', lugar ? ' en ' + lugar : '');
+  }
+
+  /* ---------- Trozo difícil olvidado ----------
+     Una canción con fragmentos marcados difíciles que Maite lleva días
+     sin tocar. § = título de la canción. Tono cabrón de siempre. */
+  var AVISOS_TROZO = [
+    'Ese trozo difícil de «§» sigue ahí, esperándote. No se arregla solo, guapa.',
+    '«§» tiene un fragmento que marcaste como difícil y llevas días sin mirarlo. Cinco minutos y a por él.',
+    'Recordatorio: el trozo chungo de «§» no ha mejorado desde la última vez. Sorpresa.',
+    'Llevas una temporada sin tocar «§», y justo esa tiene un fragmento difícil pendiente. Vuelve.',
+    'El compás que se te atragantaba en «§» sigue atragantándose. Repásalo hoy, aunque sea solo eso.',
+    'Marcaste un trozo difícil en «§» por algo. Hoy sería buen día para volver a él.',
+  ];
+  function avisoTrozo(titulo) {
+    var t = AVISOS_TROZO[Math.floor(Math.random() * AVISOS_TROZO.length)];
+    return t.replace('§', String(titulo || 'una canción'));
+  }
+
+  /* ---------- Medalla a un paso ----------
+     Le falta 1 día de estudio para un logro. § = título del logro. */
+  var AVISOS_LOGRO = [
+    'Te falta UN día para la medalla «§». Estudia hoy y es tuya. No la dejes escapar por vaga.',
+    'Un día más de estudio y desbloqueas «§». Uno. Ni tú tienes excusa para eso.',
+    'La medalla «§» está a un ensayo de distancia. Ponte hoy y cae.',
+    'Estás a un día de «§». Sería una pena quedarse tan cerca, ¿no?',
+    'Hoy puedes cerrar la medalla «§»: solo tienes que estudiar un rato. Venga.',
+  ];
+  function avisoLogroCerca(titulo) {
+    var t = AVISOS_LOGRO[Math.floor(Math.random() * AVISOS_LOGRO.length)];
+    return t.replace('§', String(titulo || 'un logro'));
+  }
+
   /* ---------- Días con la notificación pospuesta ----------
      Días en los que Maite no va a tener el móvil con la app por la mañana
      (p. ej. trabajando). Toda notificación nuestra de ese día que caiga
@@ -680,6 +725,9 @@ window.Frases = (function () {
     fraseConcierto: fraseConcierto,
     avisoConcierto: avisoConcierto,
     avisoPostConcierto: avisoPostConcierto,
+    avisoVispera: avisoVispera,
+    avisoTrozo: avisoTrozo,
+    avisoLogroCerca: avisoLogroCerca,
     proximasFechas: proximasFechas
   };
 })();

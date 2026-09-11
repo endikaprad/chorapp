@@ -46,6 +46,9 @@ window.Pagina_home = (function () {
     pintarSemana(raiz);
     pintarRepasar(raiz);
     mostrarResumenMes();
+    if (window.Backup && window.Backup.revisarAutomatica) {
+      try { window.Backup.revisarAutomatica(); } catch (e) {}
+    }
 
     var card = raiz.querySelector('[data-continuar]');
     var eyebrow = raiz.querySelector('[data-continuar-eyebrow]');

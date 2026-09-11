@@ -1,16 +1,13 @@
 Audio de la app.
 
-inner-light.mp3  ->  instrumental de fondo de la pantalla de bienvenida
-                     (js/bienvenida.js). Debe romper ("drop") a los 47,5 s:
-                     ahí termina la bienvenida y entra la app.
-                     Si cambias ese momento, ajusta DROP y BORDES en
-                     src/js/bienvenida.js.
+instrumental/    ->  música de la pantalla de bienvenida (js/bienvenida.js).
+   inner-light.mp3   Instrumental de fondo. Debe romper ("drop") a los 47,5 s:
+                     ahí acaba el acto 1 y empieza el "cómo funciona".
+                     Si cambias ese momento, ajusta DROP y BORDES.
+   kassandra.mp3     Segunda pieza. Entra sola cuando inner-light termina,
+                     subiendo el volumen muy poco a poco (AUDIO2_FADE) y
+                     empezando desde el segundo 28 (AUDIO2_DESDE).
 
-wrapped/          ->  instrumental de fondo del resumen mensual (Wrapped).
-                      Un MP3 por mes (mes-00…mes-11) y anual.mp3. Cortes de
-                      ~80 s en bucle. Música de Scott Buckley, CC-BY 4.0.
-                      Ver wrapped/CREDITOS.txt. Si un archivo no carga,
-                      js/wrapped-music.js cae a música sintetizada.
 
 Los archivos de esta carpeta se copian tal cual a www/ en `npm run build`
 y viajan dentro del APK.

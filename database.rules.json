@@ -7,6 +7,10 @@
     "status": {
       ".read": "auth != null",
       ".write": true
+    },
+    "backups": {
+      ".read": "auth != null",
+      ".write": true
     }
   }
 }

@@ -212,6 +212,9 @@ window.Pagina_study = (function () {
     desmontarLightbox();
     cerrarTour();
     cerrarCompartirCancion();
+    if (window.LetraLive && window.LetraLive.abierta && window.LetraLive.abierta()) {
+      window.LetraLive.cerrar();
+    }
   }
 
   /* ----------------------------------------------------------
@@ -365,14 +368,13 @@ window.Pagina_study = (function () {
                  (typeof f.segundo === 'number' && isFinite(f.segundo));
         })
       : [];
-    var arch = cancion.archivos || {};
     // Con que haya una canción del repertorio ya se puede compartir (aunque
     // sea solo el título y el compositor). El resumen crece con lo que tenga.
     return {
       frags: frags,
-      archPartitura: !!arch.partitura,
-      archLetra: !!arch.letra,
-      archFonetica: !!arch.fonetica,
+      metasPartitura: window.Adjuntos.lista(cancion, 'partitura'),
+      metasLetra: window.Adjuntos.lista(cancion, 'letra'),
+      metasFonetica: window.Adjuntos.lista(cancion, 'fonetica'),
     };
   }
 
@@ -450,10 +452,12 @@ window.Pagina_study = (function () {
 
     // Genera el resumen una sola vez y lo cachea en compGen.
     var A = window.Archivos;
-    function pedir(clave, cond) {
-      return (cond && A)
-        ? A.obtener(cancion.id + ':' + clave).catch(function () { return null; })
-        : Promise.resolve(null);
+    // Devuelve un array de blobs (una entrada por página), o [] si no toca.
+    function pedir(metas, cond) {
+      if (!cond || !A || !metas || !metas.length) return Promise.resolve([]);
+      return Promise.all(metas.map(function (m) {
+        return A.obtener(m.clave).catch(function () { return null; });
+      })).then(function (bs) { return bs.filter(Boolean); });
     }
     var sinLetraTexto = !(cancion.letraTexto || '').trim();
     var sinFonTexto = !(cancion.letraFonetica || '').trim();
@@ -463,9 +467,9 @@ window.Pagina_study = (function () {
     } catch (e) {}
 
     compGen = Promise.all([
-      pedir('partitura', cont2.archPartitura),
-      pedir('letra', cont2.archLetra && sinLetraTexto),
-      pedir('fonetica', cont2.archFonetica && sinFonTexto),
+      pedir(cont2.metasPartitura, cont2.metasPartitura.length),
+      pedir(cont2.metasLetra, cont2.metasLetra.length && sinLetraTexto),
+      pedir(cont2.metasFonetica, cont2.metasFonetica.length && sinFonTexto),
     ]).then(function (bs) {
       return window.CompartirCancion.generar(cancion, {
         fragmentos: cont2.frags,
@@ -608,7 +612,7 @@ window.Pagina_study = (function () {
   /* ---------- Cabecera ---------- */
 
   function pintarCabecera() {
-    q('[data-titulo]').textContent = marca.titulo;
+    q('[data-titulo]').textContent = (cancion && cancion.titulo) || marca.titulo;
     var meta = q('[data-meta]');
     var sub = cancion && cancion.compositor ? cancion.compositor : '';
     if (sub) { meta.textContent = sub; meta.hidden = false; } else { meta.hidden = true; }
@@ -1177,9 +1181,11 @@ window.Pagina_study = (function () {
     var ambasCaja = q('[data-letra-ambas]');
     var modos = q('[data-letra-modos]');
     var accion = q('[data-letra-accion]');
+    var sincAcc = q('[data-letra-sync-acc]');
     pre.hidden = true; doc.hidden = true; doc.innerHTML = '';
     ambasCaja.hidden = true; modos.hidden = true;
     if (accion) { accion.hidden = true; accion.innerHTML = ''; }
+    if (sincAcc) { sincAcc.hidden = true; sincAcc.innerHTML = ''; }
 
     if (!cancion) {
       vacio.hidden = false;
@@ -1187,23 +1193,34 @@ window.Pagina_study = (function () {
       return;
     }
 
-    var arch = cancion.archivos || {};
-    // Cada "vista" de la letra puede venir de texto o de un archivo (PDF/imagen).
+    // Cada "vista" de la letra puede venir de texto o de una o varias
+    // páginas (PDF/imagen), gestionadas por window.Adjuntos.
     var vistas = {
-      orig: { texto: (cancion.letraTexto || '').trim(),      archivo: arch.letra || null,    clave: 'letra',    etq: 'Letra' },
-      fon:  { texto: (cancion.letraFonetica || '').trim(),   archivo: arch.fonetica || null, clave: 'fonetica', etq: 'Pronunciación' },
-      trad: { texto: (cancion.letraTraduccion || '').trim(), archivo: null,                  clave: null,       etq: 'Traducción' },
+      orig: { texto: (cancion.letraTexto || '').trim(),      metas: window.Adjuntos.lista(cancion, 'letra'),    etq: 'Letra' },
+      fon:  { texto: (cancion.letraFonetica || '').trim(),   metas: window.Adjuntos.lista(cancion, 'fonetica'), etq: 'Pronunciación' },
+      trad: { texto: (cancion.letraTraduccion || '').trim(), metas: [],                                        etq: 'Traducción' },
     };
     var disponibles = ['orig', 'fon', 'trad'].filter(function (k) {
-      return vistas[k].texto || vistas[k].archivo;
+      return vistas[k].texto || vistas[k].metas.length;
     });
 
-    // "Traducir sola": solo si hay letra original en texto y aún no hay traducción.
-    var puedeTraducir = !!(window.Traductor && vistas.orig.texto && !vistas.trad.texto);
-    // "Cómo se pronuncia": si hay letra original en texto y aún no hay fonética
-    // (ni escrita ni en archivo). La genera la IA vía el Worker.
-    var puedeFonetica = !!(window.IA && vistas.orig.texto &&
-      !vistas.fon.texto && !vistas.fon.archivo);
+    // Una versión "descuadrada" = tiene distinto nº de versos que la original,
+    // así que no encaja en "Todo junto" ni en la letra a pantalla completa.
+    // En ese caso se ofrece REHACERLA (ahora la IA la alinea verso a verso).
+    function descuadrada(txt) {
+      return !!txt && !!vistas.orig.texto && nLineas(txt) !== nLineas(vistas.orig.texto);
+    }
+    var tradMal = descuadrada(vistas.trad.texto);
+    var fonMal = descuadrada(vistas.fon.texto);
+
+    // "Traducir sola": si hay letra original en texto y no hay traducción (o la
+    // que hay no encaja).
+    var puedeTraducir = !!(window.Traductor && vistas.orig.texto &&
+      (!vistas.trad.texto || tradMal));
+    // "Cómo se pronuncia": si hay letra original en texto y no hay fonética en
+    // texto (ni archivo), o la que hay no encaja.
+    var puedeFonetica = !!(window.IA && vistas.orig.texto && !vistas.fon.metas.length &&
+      (!vistas.fon.texto || fonMal));
 
     if (!disponibles.length) {
       vacioConAnadir(vacio, 'letra', 'Aún no hay letra.');
@@ -1211,7 +1228,8 @@ window.Pagina_study = (function () {
     }
 
     vacio.hidden = true;
-    montarVistasLetra(vistas, disponibles, { modos: modos, pre: pre, doc: doc, ambasCaja: ambasCaja });
+    montarVistasLetra(vistas, disponibles, { modos: modos, pre: pre, doc: doc, ambasCaja: ambasCaja },
+      function alRenderVista(modo) { pintarAccionSincro(modo, vistas); });
     // Practicar de memoria: con que haya alguna vista de la letra en texto
     // ya se puede jugar a taparse versos. Qué se practica se decide al pulsar,
     // según la vista que Maite tenga elegida (Original / Cómo suena / Traducción).
@@ -1219,15 +1237,16 @@ window.Pagina_study = (function () {
         (vistas.orig.texto || vistas.fon.texto || vistas.trad.texto)) {
       montarBotonMemoria(accion);
     }
-    if (puedeFonetica && accion) montarBotonFonetica(accion);
-    if (puedeTraducir && accion) montarBotonTraducir(accion);
+    if (puedeFonetica && accion) montarBotonFonetica(accion, fonMal);
+    if (puedeTraducir && accion) montarBotonTraducir(accion, tradMal);
   }
 
   // Conmutador de la letra: un botón por vista disponible (Original / Cómo
   // suena / Traducción) y, si hay 2+ en texto, "Todo junto" alineado línea a
   // línea. Cada vista muestra su texto o su PDF/imagen. Recuerda la elegida.
-  function montarVistasLetra(vistas, disponibles, els) {
+  function montarVistasLetra(vistas, disponibles, els, alRender) {
     var modos = els.modos, pre = els.pre, doc = els.doc, ambasCaja = els.ambasCaja;
+    alRender = alRender || function () {};
     modos.innerHTML = '';
 
     var conTexto = disponibles.filter(function (k) { return vistas[k].texto; });
@@ -1258,6 +1277,7 @@ window.Pagina_study = (function () {
       pre.hidden = true; ambasCaja.hidden = true; doc.hidden = true; doc.innerHTML = '';
 
       if (modo === 'todo') {
+        alRender(modo);
         var cols = conTexto.map(function (k) { return { k: k, lineas: vistas[k].texto.split('\n') }; });
         var n = cols.reduce(function (mx, c) { return Math.max(mx, c.lineas.length); }, 0);
         var html = '';
@@ -1267,7 +1287,7 @@ window.Pagina_study = (function () {
           html += '<div class="visor-letra__par">';
           cols.forEach(function (c) {
             html += '<span class="visor-letra__linea visor-letra__linea--' + c.k + '">' +
-              escapar((c.lineas[i] || '').trim()) + '</span>';
+              escapar(capFrase((c.lineas[i] || '').trim())) + '</span>';
           });
           html += '</div>';
         }
@@ -1277,36 +1297,90 @@ window.Pagina_study = (function () {
       }
 
       var v = vistas[modo];
-      if (v.texto) { pre.textContent = v.texto; pre.hidden = false; }
-      else if (v.archivo) { renderArchivoLetra(v.archivo, v.clave, v.etq, doc, pre); }
+      if (v.texto) {
+        pre.textContent = v.texto.split('\n').map(capFrase).join('\n');
+        pre.hidden = false;
+      }
+      else if (v.metas.length) { renderAdjuntos(v.metas, v.etq, doc, pre); }
+      alRender(modo);
     }
     render();
   }
 
-  // Renderiza un archivo (PDF / imagen / texto) de la letra en `doc`.
-  function renderArchivoLetra(meta, claveArchivo, etiqueta, doc, pre) {
-    var esPdf = /pdf/i.test(meta.mime) || /\.pdf$/i.test(meta.nombre || '');
-    var esImagen = /^image\//i.test(meta.mime) || /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(meta.nombre || '');
-    window.Archivos.obtener(cancion.id + ':' + claveArchivo).then(function (blob) {
-      if (!blob) return;
-      if (esPdf) {
-        doc.innerHTML = '<div class="visor-pdf" data-pdf-caja></div>' +
-          '<button type="button" class="visor-doc__abrir" data-pdf-abrir>Abrir a pantalla completa</button>';
-        var caja = doc.querySelector('[data-pdf-caja]');
-        window.VisorPDF.render(caja, blob, { paginas: 3 }).catch(function () {});
-        caja.addEventListener('click', function () { window.VisorPDF.abrir(blob, etiqueta); });
-        doc.querySelector('[data-pdf-abrir]').addEventListener('click', function () { window.VisorPDF.abrir(blob, etiqueta); });
-        doc.hidden = false;
-      } else if (esImagen) {
-        var ui = URL.createObjectURL(blob); urls.push(ui);
-        doc.innerHTML = '<img class="visor-doc__img" alt="' + escapar(etiqueta) + '" />';
-        var im = doc.querySelector('img');
-        im.src = ui;
-        im.addEventListener('click', function () { abrirLightbox(ui); });
-        doc.hidden = false;
-      } else {
-        blob.text().then(function (t) { pre.textContent = t; pre.hidden = false; });
-      }
+  // Renderiza UNA o VARIAS páginas (PDF / imagen / texto) en `doc`.
+  // Si son VARIAS imágenes, se muestran en un carrusel horizontal que se
+  // desliza con el dedo (con puntitos abajo); PDFs y texto siguen apilados
+  // en vertical, cada uno con su botón para abrir a pantalla completa.
+  function renderAdjuntos(metas, etiqueta, doc, pre) {
+    metas = metas || [];
+    if (!metas.length) { doc.hidden = true; doc.innerHTML = ''; return; }
+    if (pre) pre.hidden = true;
+    doc.innerHTML = '';
+    doc.hidden = false;
+
+    function esImagenMeta(m) {
+      return /^image\//i.test(m.mime) || /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(m.nombre || '');
+    }
+
+    var carrusel = metas.length > 1 && metas.every(esImagenMeta);
+    var pista = doc;
+    var puntos = null;
+    if (carrusel) {
+      doc.classList.add('visor-doc--carrusel');
+      pista = document.createElement('div');
+      pista.className = 'visor-doc__pista';
+      doc.appendChild(pista);
+      puntos = document.createElement('div');
+      puntos.className = 'visor-doc__puntos';
+      metas.forEach(function (_, i) {
+        var pt = document.createElement('span');
+        pt.className = 'visor-doc__punto' + (i === 0 ? ' is-activo' : '');
+        puntos.appendChild(pt);
+      });
+      doc.appendChild(puntos);
+      pista.addEventListener('scroll', function () {
+        var i = Math.round(pista.scrollLeft / Math.max(1, pista.clientWidth));
+        Array.prototype.forEach.call(puntos.children, function (pt, j) {
+          pt.classList.toggle('is-activo', j === i);
+        });
+      });
+    } else {
+      doc.classList.remove('visor-doc--carrusel');
+    }
+
+    metas.forEach(function (meta, idx) {
+      var item = document.createElement('div');
+      item.className = 'visor-doc__item';
+      pista.appendChild(item);
+
+      var esPdf = /pdf/i.test(meta.mime) || /\.pdf$/i.test(meta.nombre || '');
+      var esImagen = esImagenMeta(meta);
+      var etq = metas.length > 1 ? (etiqueta + ' · ' + (idx + 1)) : etiqueta;
+
+      window.Archivos.obtener(meta.clave).then(function (blob) {
+        if (!blob) return;
+        if (esPdf) {
+          item.innerHTML = '<div class="visor-pdf" data-pdf-caja></div>' +
+            '<button type="button" class="visor-doc__abrir" data-pdf-abrir>Abrir a pantalla completa</button>';
+          var caja = item.querySelector('[data-pdf-caja]');
+          window.VisorPDF.render(caja, blob, { paginas: 3 }).catch(function () {});
+          caja.addEventListener('click', function () { window.VisorPDF.abrir(blob, etq); });
+          item.querySelector('[data-pdf-abrir]').addEventListener('click', function () { window.VisorPDF.abrir(blob, etq); });
+        } else if (esImagen) {
+          var ui = URL.createObjectURL(blob); urls.push(ui);
+          item.innerHTML = '<img class="visor-doc__img" alt="' + escapar(etq) + '" />';
+          var im = item.querySelector('img');
+          im.src = ui;
+          im.addEventListener('click', function () { abrirLightbox(ui); });
+        } else {
+          blob.text().then(function (t) {
+            var p = document.createElement('pre');
+            p.className = 'visor-doc__pre';
+            p.textContent = t;
+            item.appendChild(p);
+          });
+        }
+      });
     });
   }
 
@@ -1354,12 +1428,13 @@ window.Pagina_study = (function () {
 
   // Botón "Generar cómo se pronuncia" (bajo el visor). La IA (vía el Worker)
   // escribe la transcripción para cantar, se guarda en la canción y repinta.
-  function montarBotonFonetica(accion) {
+  function montarBotonFonetica(accion, rehacer) {
+    var etqBase = rehacer ? 'Rehacer cómo se pronuncia (no encaja)' : 'Generar cómo se pronuncia';
     accion.hidden = false;
     accion.insertAdjacentHTML('beforeend',
       '<button type="button" class="visor-letra__traducir" data-btn-fonetica>' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>' +
-        '<span>Generar cómo se pronuncia</span>' +
+        '<span>' + etqBase + '</span>' +
       '</button>');
     var btn = accion.querySelector('[data-btn-fonetica]');
     var etq = btn.querySelector('span');
@@ -1368,51 +1443,104 @@ window.Pagina_study = (function () {
       if (!texto) return;
       var idioma = window.Canciones.nombreIdioma(cancion.idioma || '');
       btn.disabled = true;
-      btn.classList.add('is-cargando');
-      etq.textContent = 'Generando…';
-      window.IA.fonetica(texto, { idioma: idioma }).then(function (res) {
+      btn.hidden = true;
+      var barra = window.BarraProgreso.crear(accion, { etiqueta: 'Escribiendo cómo se pronuncia…' });
+      var versos = nLineas(texto);
+      // sin trocear (letra corta) no hay progreso real: estimamos por el nº de versos
+      if (versos < 12) barra.estimar(Math.max(6000, versos * 900));
+
+      var gen = window.IA.foneticaPorBloques
+        ? window.IA.foneticaPorBloques(texto, { idioma: idioma, onProgreso: function (f) { barra.fijar(f); } })
+        : window.IA.fonetica(texto, { idioma: idioma });
+
+      gen.then(function (res) {
+        barra.completar('Lista');
         window.Canciones.actualizar(cancion.id, { letraFonetica: res });
         window.Almacen.guardar('estudio:letraModo', 'fon');
-        refrescar();
-        pintarLetra();
-        if (window.UI) window.UI.aviso('Ya tienes cómo se pronuncia. Puedes retocarla a mano en ✎ Editar.', { tipo: 'ok' });
+        setTimeout(function () {
+          barra.quitar();
+          refrescar();
+          pintarLetra();
+          if (window.UI) window.UI.aviso('Ya tienes cómo se pronuncia. Puedes retocarla a mano en ✎ Editar.', { tipo: 'ok' });
+        }, 420);
       }).catch(function () {
-        btn.disabled = false;
-        btn.classList.remove('is-cargando');
-        etq.textContent = 'Generar cómo se pronuncia';
+        barra.fallar(function () {
+          btn.disabled = false;
+          btn.hidden = false;
+          etq.textContent = etqBase;
+        });
         if (window.UI) window.UI.aviso('No se ha podido generar ahora mismo. Prueba dentro de un rato.', { tipo: 'error' });
       });
     });
   }
 
+  // Normaliza un verso para comparar original y traducción: sin acentos, sin
+  // puntuación, minúsculas y espacios colapsados.
+  function normVerso(s) {
+    return String(s || '').toLowerCase()
+      .normalize('NFD').replace(new RegExp('[\\u0300-\\u036f]', 'g'), '')
+      .replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  // true si la traducción es prácticamente igual al original (>= 75% de los
+  // versos idénticos): no había nada que traducir.
+  function traduccionVacia(orig, trad) {
+    var a = orig.split('\n').map(normVerso).filter(Boolean);
+    var b = trad.split('\n').map(normVerso).filter(Boolean);
+    if (a.length < 2 || !b.length) return false;
+    var setB = {};
+    b.forEach(function (l) { setB[l] = true; });
+    var iguales = a.filter(function (l) { return setB[l]; }).length;
+    return iguales / a.length >= 0.75;
+  }
+
   // Botón "Traducir la letra al español" (bajo el visor). Traduce con
   // window.Traductor, guarda la traducción en la canción y repinta.
-  function montarBotonTraducir(accion) {
+  function montarBotonTraducir(accion, rehacer) {
+    var etqBase = rehacer ? 'Rehacer la traducción (no encaja)' : 'Traducir la letra al español';
     accion.hidden = false;
     accion.insertAdjacentHTML('beforeend',
       '<button type="button" class="visor-letra__traducir" data-btn-traducir>' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20"/></svg>' +
-        '<span>Traducir la letra al español</span>' +
+        '<span>' + etqBase + '</span>' +
       '</button>');
     var btn = accion.querySelector('[data-btn-traducir]');
     var etq = btn.querySelector('span');
     btn.addEventListener('click', function () {
       var texto = (cancion.letraTexto || '').trim();
       if (!texto) return;
+      // Si la canción ya está en español no hay nada que traducir: se avisa y
+      // no se llama a ningún traductor.
+      if ((cancion.idioma || '') === 'es') {
+        if (window.UI) window.UI.aviso('Esta letra ya está en español, no hace falta traducirla.', { tipo: 'info', duracion: 4200 });
+        return;
+      }
       var de = window.Traductor.codigoGoogle(cancion.idioma || '');
       btn.disabled = true;
-      btn.classList.add('is-cargando');
-      etq.textContent = 'Traduciendo…';
-      window.Traductor.traducir(texto, { de: de, a: 'es' }).then(function (res) {
+      btn.hidden = true;
+      var barra = window.BarraProgreso.crear(accion, { etiqueta: 'Traduciendo la letra…' });
+      function prog(f) { barra.fijar(f); }
+      // Google Translate, troceada por versos y en paralelo (rápida, sin IA).
+      var pTrad = window.Traductor.traducir(texto, { de: de, a: 'es', onProgreso: prog });
+      pTrad.then(function (res) {
+        // Si la "traducción" es casi calcada al original, no hay nada que
+        // traducir (p. ej. konnakol y otras letras de sílabas rítmicas). No la
+        // guardamos: dejaría una copia inútil y descuadraría el conmutador.
+        if (traduccionVacia(texto, res)) {
+          barra.fallar(function () { btn.disabled = false; btn.hidden = false; etq.textContent = etqBase; });
+          if (window.UI) window.UI.aviso('Esta letra no parece traducible (son sílabas para cantar, no un idioma).', { tipo: 'info', duracion: 4600 });
+          return;
+        }
+        barra.completar('Lista');
         window.Canciones.actualizar(cancion.id, { letraTraduccion: res });
         window.Almacen.guardar('estudio:letraModo', 'trad');
-        refrescar();
-        pintarLetra();
-        if (window.UI) window.UI.aviso('Traducción lista. Puedes retocarla a mano en ✎ Editar.', { tipo: 'ok' });
+        setTimeout(function () {
+          barra.quitar();
+          refrescar();
+          pintarLetra();
+          if (window.UI) window.UI.aviso('Traducción lista. Puedes retocarla a mano en ✎ Editar.', { tipo: 'ok' });
+        }, 420);
       }).catch(function (err) {
-        btn.disabled = false;
-        btn.classList.remove('is-cargando');
-        etq.textContent = 'Traducir la letra al español';
+        barra.fallar(function () { btn.disabled = false; btn.hidden = false; etq.textContent = etqBase; });
         var msg;
         if (de === 'auto') {
           // Sin idioma no hay traductor de repuesto: Google es la única vía.
@@ -1425,47 +1553,374 @@ window.Pagina_study = (function () {
     });
   }
 
+  /* ----------------------------------------------------------
+     Letra a pantalla completa (window.LetraLive).
+
+     Bajo la letra sale "Ver la letra": abre el visor estilo
+     reproductor (Apple Music / Spotify). Allí, si la versión aún
+     no está sincronizada, un botón "Sincronizar con el audio"
+     manda un recorte del audio + los versos al Worker; la IA
+     devuelve el segundo de entrada de cada verso y a partir de
+     ahí la línea que suena se ilumina sola. Se puede "Ajustar los
+     tiempos" a mano desde el menú ⋯.
+     ---------------------------------------------------------- */
+
+  var CAMPO_LETRA = { orig: 'letraTexto', fon: 'letraFonetica', trad: 'letraTraduccion' };
+  var SVG_LETRA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h12"/><circle cx="18.5" cy="6" r="2.2"/></svg>';
+
+  // La canción solo se sincroniza UNA vez (sobre la letra Original, que es la
+  // que de verdad se canta). El resultado es una línea de tiempo: el segundo
+  // en que entra cada verso. "Cómo suena" y "Traducción" van verso a verso en
+  // paralelo con el Original, así que si tienen el mismo nº de versos comparten
+  // esa misma línea de tiempo sin volver a escuchar el audio.
+  function nLineas(texto) {
+    return String(texto || '').split('\n').filter(function (l) { return l.trim(); }).length;
+  }
+
+  // Primera letra de cada verso en mayúscula (respeta «, ¿, ¡, comillas).
+  function capFrase(s) {
+    s = String(s == null ? '' : s);
+    try {
+      return s.replace(/^([^\p{L}]*)(\p{L})/u, function (m, pre, ch) {
+        return pre + ch.toLocaleUpperCase('es');
+      });
+    } catch (e) {
+      return s.replace(/^([^A-Za-zÀ-ÿ]*)([a-zà-ÿ])/, function (m, pre, ch) {
+        return pre + ch.toUpperCase();
+      });
+    }
+  }
+
+  function versosDe(texto) {
+    return String(texto || '').split('\n')
+      .map(function (l) { return l.trim(); })
+      .filter(Boolean);
+  }
+
+  // Texto de una versión con EXACTAMENTE tantos versos como el Original, para
+  // que la línea de tiempo (que se ancla al Original y se calcula una sola vez)
+  // encaje también en "Cómo suena" y "Traducción". Si ya coinciden, se deja
+  // igual; si no, se reparten los versos de forma proporcional (la fonética y
+  // la traducción van casi verso a verso con el Original, así que el reparto
+  // cae bien; Maite puede afinar con "Ajustar los tiempos").
+  function textoAlineado(modo) {
+    var t = (cancion && cancion[CAMPO_LETRA[modo]]) || '';
+    if (modo === 'orig' || !cancion) return t;
+    var O = versosDe(cancion.letraTexto);
+    var S = versosDe(t);
+    if (O.length < 2 || S.length < 2 || S.length === O.length) return t;
+    var out = [];
+    for (var i = 0; i < O.length; i++) {
+      var a = Math.round(i * S.length / O.length);
+      var b = Math.round((i + 1) * S.length / O.length);
+      if (b <= a) b = a + 1;
+      out.push(S.slice(a, Math.min(b, S.length)).join(' '));
+    }
+    return out.join('\n');
+  }
+
+  function sincroDe(modo, texto) {
+    var s = marca && marca.sincro;
+    if (!s || !Array.isArray(s.tiempos) || s.tiempos.length < 2) return null;
+    // Sirve para esta versión si tiene tantos versos como tiempos guardados
+    // (los versos van emparejados uno a uno con el Original).
+    if (nLineas(texto) !== s.tiempos.length) return null;
+    return s;
+  }
+
+  // Botón "Ver la letra" bajo el visor (solo si hay audio y letra en texto).
+  function pintarAccionSincro(modo, vistas) {
+    var acc = q('[data-letra-sync-acc]');
+    if (!acc) return;
+    acc.innerHTML = ''; acc.hidden = true;
+    if (!window.LetraLive || !sesion || !sesion.archivo || !cancion) return;
+
+    var conTexto = ['orig', 'fon', 'trad'].filter(function (k) {
+      return vistas[k] && vistas[k].texto &&
+        vistas[k].texto.split('\n').filter(function (l) { return l.trim(); }).length >= 2;
+    });
+    if (!conTexto.length) return;
+
+    var sinc = CAMPO_LETRA[modo] && sincroDe(modo, cancion[CAMPO_LETRA[modo]] || '');
+    acc.hidden = false;
+    acc.innerHTML =
+      '<button type="button" class="visor-letra__traducir visor-letra__verletra" data-ver-letra>' +
+        SVG_LETRA +
+        '<span>' + (sinc ? 'Ver la letra a pantalla completa' : 'Ver la letra a pantalla completa') + '</span>' +
+      '</button>';
+    acc.querySelector('[data-ver-letra]').addEventListener('click', function () {
+      abrirLetraLive(conTexto);
+    });
+  }
+
+  function abrirLetraLive(conTexto) {
+    var guardado = window.Almacen.leer('estudio:letraModo', conTexto[0]);
+    var modoIni = conTexto.indexOf(guardado) !== -1 ? guardado : conTexto[0];
+
+    window.LetraLive.abrir({
+      titulo: marca.titulo,
+      compositor: (cancion && cancion.compositor) || sesion.lugar || '',
+      modoInicial: modoIni,
+      vistas: conTexto.map(function (id) { return { id: id, etq: ETIQ_LETRA[id] }; }),
+      dur: segTotal(),
+      textoDe: function (id) { return textoAlineado(id); },
+      sincroDe: function (id) {
+        var s = sincroDe(id, textoAlineado(id));
+        return s ? s.tiempos.slice() : null;
+      },
+      relDe: function (abs) { return rel(abs || 0); },
+      irA: function (r) {
+        window.CancionActiva.irA(segIni + Math.max(0, Math.min(segTotal(), r || 0)));
+      },
+      guardarTiempos: function (id, tiempos, base) {
+        if (!tiempos) window.Sesiones.fijarSincro(sesion.id, marca.id, null);
+        else {
+          window.Sesiones.fijarSincro(sesion.id, marca.id, {
+            fuente: 'orig', tiempos: tiempos, base: base || 'mano', fecha: Date.now(),
+          });
+          // Un ajuste A MANO es un dato bueno de verdad: Maite lo ha fijado
+          // con la canción sonando. Se guarda como "plantilla" de la canción
+          // (en qué fracción de la pieza entra cada verso) para que futuras
+          // grabaciones de la MISMA canción se sincronicen mejor solas — el
+          // patrón de la letra no cambia de un ensayo a otro aunque el audio
+          // sea distinto. Ver Canciones.fijarPlantillaSincro / prepararSincro.
+          if ((base || 'mano') === 'mano' && cancion && segTotal() > 5) {
+            window.Canciones.fijarPlantillaSincro(cancion.id, tiempos, segTotal());
+          }
+        }
+        refrescar();
+      },
+      sincronizar: function (id) { return prepararSincro(id); },
+      sincroAprox: function () { return !!(marca && marca.sincro && marca.sincro.base === 'aprox'); },
+      // Sincronía FIABLE (Whisper alinea palabras reales, o ajuste a mano): la
+      // letra pasa al verso siguiente justo en su segundo, sin adelantarse.
+      sincroFiable: function () {
+        var b = marca && marca.sincro && marca.sincro.base;
+        return b === 'whisper' || b === 'mano';
+      },
+      // Grabar la voz sin salir de la letra a pantalla completa: reutiliza
+      // la misma toma que el botón "Grabar" de la página (window.Grabadora).
+      grabar: function () { alternarGrabacion(); },
+      grabando: function () { return !!(grabadora && grabadora.grabando); },
+      alCerrar: function () { if (cont && document.body.contains(cont)) pintarLetra(); },
+    });
+  }
+
+  // Prepara la sincronía de una versión con la IA. Devuelve los tiempos
+  // (relativos a la canción) ya guardados en la marca. Sin UI: LetraLive
+  // muestra su propio progreso.
+  function prepararSincro(modo) {
+    // Siempre se escucha el audio contra la letra ORIGINAL (es la que se
+    // canta de verdad; con la fonética o la traducción la IA se pierde).
+    // El resultado vale para las demás versiones por emparejamiento de versos.
+    var texto = (cancion && cancion.letraTexto || '').trim();
+    var lineas = texto.split('\n').filter(function (l) { return l.trim(); });
+    if (lineas.length < 2) return Promise.reject(new Error('pocas líneas'));
+    if (!window.IA || !window.IA.sincronizar) return Promise.reject(new Error('sin IA'));
+
+    var idioma = window.Canciones.nombreIdioma(cancion.idioma || '');
+
+    // Plantilla: si Maite ya ajustó a mano la sincronía de esta canción
+    // alguna vez (en cualquier ensayo), esa "forma" de la canción (en qué
+    // fracción entra cada verso) es un dato de verdad que ayuda a que el
+    // Worker acierte con la grabación de HOY. Solo vale si tiene el mismo
+    // nº de versos (si la letra ha cambiado, no se manda).
+    var plant = window.Canciones.plantillaSincro(cancion.id);
+    var plantilla = (plant && plant.fracciones.length === lineas.length) ? plant.fracciones : null;
+
+    // Duración TOTAL del audio de la sesión. Si `duracionAudio` aún no se ha
+    // cargado (metadatos del <audio> sin llegar), se pregunta al reproductor
+    // ya en marcha. Sin una duración fiable NO se puede recortar y NO se manda
+    // nada (antes se colaba el ensayo entero de 1 h -> Groq: rate limit).
+    var durAudio = duracionAudio;
+    if (!(durAudio > 0)) {
+      try { durAudio = (window.CancionActiva.estado() || {}).total || 0; } catch (e) {}
+    }
+    if (!(durAudio > 0)) return Promise.reject(new Error('audio sin cargar del todo'));
+
+    // Ventana DURA: solo el trozo de esta canción. Aunque la marca no tenga
+    // fin, se manda como mucho VENTANA segundos desde su inicio.
+    var VENTANA = 300;
+    var iniR = Math.max(0, segIni);
+    var finR = Math.min(segFin(), iniR + VENTANA);
+    if (!(finR > iniR + 5)) finR = Math.min(durAudio, iniR + VENTANA);
+    var dur = Math.max(0, finR - iniR);
+
+    return window.Archivos.obtener(sesion.id + ':audio').then(function (blob) {
+      if (!blob) throw new Error('sin audio');
+      // Primero se intenta un recorte LIMPIO (decodificado a WAV mono 16 kHz):
+      // así la IA oye el trozo exacto, sin bytes rotos al principio ni
+      // desfases por VBR. Si el audio es enorme o el móvil no puede
+      // decodificarlo, se cae al recorte por bytes (aproximado).
+      return recortarAudioLimpio(blob, durAudio, iniR, finR)
+        .catch(function () { return recortarAudio(blob, durAudio, iniR, finR); })
+        .then(function (rec) {
+      return blobABase64(rec.blob).then(function (b64) {
+        return window.IA.sincronizar(lineas, {
+          idioma: idioma, audioBase64: b64, mime: rec.mime, dur: dur, plantilla: plantilla,
+        });
+      }).then(function (resp) {
+        var tiempos = resp.tiempos || resp;   // compat
+        var aprox = !!resp.aprox;
+        var via = resp.via || (aprox ? 'aprox' : 'ia');
+        // La IA mide desde el principio del recorte: restamos el margen (el
+        // reparto aproximado del Worker ya viene relativo a la canción).
+        var t = tiempos.map(function (x) {
+          return Math.max(0, Math.round((x - (aprox ? 0 : rec.pad)) * 10) / 10);
+        });
+        for (var i = 1; i < t.length; i++) if (t[i] < t[i - 1]) t[i] = t[i - 1];
+
+        // Corrección de "timeline comprimida": SOLO para Gemini, que amontona
+        // los versos en la primera parte del audio. Si el último verso queda
+        // muy lejos del final (< 55% de la canción) y hay varios versos, se
+        // estira linealmente el tramo t[0]..t[n-1] hasta ~88% de la duración.
+        // Whisper mide de verdad: sus tiempos NO se tocan.
+        var n = t.length;
+        if (via !== 'whisper' && !aprox && n >= 4 && dur > 20 && t[n - 1] < dur * 0.55 && t[n - 1] > t[0] + 1) {
+          var desde = t[0];
+          var factor = (dur * 0.88 - desde) / (t[n - 1] - desde);
+          if (factor > 1.15 && factor < 4) {
+            for (var k = 0; k < n; k++) {
+              t[k] = Math.round((desde + (t[k] - desde) * factor) * 10) / 10;
+            }
+          }
+        }
+
+        window.Sesiones.fijarSincro(sesion.id, marca.id, {
+          fuente: 'orig', tiempos: t,
+          base: aprox ? 'aprox' : (via === 'whisper' ? 'whisper' : 'ia'),
+          fecha: Date.now(),
+        });
+        refrescar();
+        if (aprox && window.UI) {
+          window.UI.aviso('La IA está saturada ahora mismo. Te he dejado un reparto aproximado: repásalo con "Ajustar los tiempos" o prueba a sincronizar otra vez más tarde.', { tipo: 'info', duracion: 7000 });
+        }
+        return t;
+      });
+        });
+    });
+  }
+
+  // Recorte LIMPIO: decodifica el audio, se queda con la ventana [ini-pad,
+  // fin+pad], la baja a mono 16 kHz y la vuelve a empaquetar como WAV. La IA
+  // oye exactamente el trozo, sin el ruido de los primeros frames MP3 ni el
+  // desfase del corte por bytes en audio VBR. Rechaza si el audio es demasiado
+  // grande para decodificar o el navegador no puede (entonces se usa el corte
+  // por bytes). `pad` = segundos reales antes del inicio de la canción.
+  function recortarAudioLimpio(blob, durTotal, ini, fin) {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx || !blob) return Promise.reject(new Error('sin AudioContext'));
+    // Decodificar cuesta RAM (~10 MB por minuto estéreo 44 kHz). Por encima de
+    // ~35 MB de fichero no arriesgamos en un móvil de gama media.
+    if (blob.size > 35 * 1024 * 1024) return Promise.reject(new Error('audio grande'));
+
+    // 16 kHz mono: suficiente para que la IA distinga las palabras y ligero
+    // (el WAV va en base64 en el POST; con 22 kHz el Worker se quedaba sin CPU
+    // serializándolo y devolvía un 502). MAX 330 s -> base64 ~14 MB (< 16 del
+    // Worker); cubre casi cualquier canción de coro.
+    var PAD = 2, MAX = 330, RATE = 16000;
+    if (fin == null || !isFinite(fin)) fin = durTotal || 0;
+    return blob.arrayBuffer().then(function (buf) {
+      var ctx = new Ctx();
+      return ctx.decodeAudioData(buf).then(function (audio) {
+        try { ctx.close(); } catch (e) {}
+        var dur = audio.duration;
+        var a = Math.max(0, ini - PAD);
+        var b = Math.min(dur, (fin || dur) + PAD);
+        if (b - a > MAX) b = a + MAX;
+        if (!(b > a)) throw new Error('ventana vacía');
+
+        var n = Math.max(1, Math.round((b - a) * RATE));
+        var src = audio.getChannelData(0);
+        var src2 = audio.numberOfChannels > 1 ? audio.getChannelData(1) : null;
+        var sr = audio.sampleRate;
+        var pcm = new Int16Array(n);
+        for (var i = 0; i < n; i++) {
+          var pos = (a + i / RATE) * sr;
+          var k = pos | 0;
+          var fr = pos - k;
+          var s0 = src[k] || 0, s1 = src[k + 1] || 0;
+          var v = s0 + (s1 - s0) * fr;
+          if (src2) v = (v + (src2[k] || 0) + ((src2[k + 1] || 0) - (src2[k] || 0)) * fr) * 0.5;
+          v = v < -1 ? -1 : v > 1 ? 1 : v;
+          pcm[i] = v < 0 ? v * 0x8000 : v * 0x7FFF;
+        }
+        return {
+          blob: wavDePcm(pcm, RATE),
+          mime: 'audio/wav',
+          pad: ini - a,
+        };
+      });
+    });
+  }
+
+  // Envuelve PCM 16-bit mono en un contenedor WAV mínimo.
+  function wavDePcm(pcm, rate) {
+    var buf = new ArrayBuffer(44 + pcm.length * 2);
+    var v = new DataView(buf);
+    var esc = function (off, s) { for (var i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+    esc(0, 'RIFF'); v.setUint32(4, 36 + pcm.length * 2, true); esc(8, 'WAVE');
+    esc(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+    v.setUint16(22, 1, true); v.setUint32(24, rate, true);
+    v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    esc(36, 'data'); v.setUint32(40, pcm.length * 2, true);
+    for (var i = 0; i < pcm.length; i++) v.setInt16(44 + i * 2, pcm[i], true);
+    return new Blob([buf], { type: 'audio/wav' });
+  }
+
+  // Recorta el audio de la sesión al trozo de esta canción (con 2 s de
+  // margen) para no mandar el ensayo entero. El corte es por bytes,
+  // proporcional al tiempo: aproximado, pero a la IA le vale y Maite
+  // afina luego. `pad` = segundos de audio antes del inicio de la canción.
+  function recortarAudio(blob, durTotal, ini, fin) {
+    var mime = (blob.type || 'audio/mpeg').split(';')[0] || 'audio/mpeg';
+    var MAX = 360;                       // tope de segundos a mandar
+    // Sin duración fiable no se puede cortar por bytes: NO mandamos el fichero
+    // entero (un ensayo son 40-60 min y revienta la cuota de audio de Groq).
+    if (!(durTotal > 0)) throw new Error('duración desconocida');
+    if (fin == null || !isFinite(fin)) fin = durTotal;
+    var pad = 2;
+    var a = Math.max(0, ini - pad);
+    var b = Math.min(durTotal, fin + pad);
+    if (b - a > MAX) b = a + MAX;
+    if (!(b > a)) throw new Error('ventana vacía');
+    var i0 = Math.floor(blob.size * (a / durTotal));
+    var i1 = Math.ceil(blob.size * (b / durTotal));
+    if (i1 - i0 >= blob.size - 8) return { blob: blob, mime: mime, pad: ini - a };
+    return { blob: blob.slice(i0, i1, mime), mime: mime, pad: ini - a };
+  }
+
+  function blobABase64(blob) {
+    return new Promise(function (res, rej) {
+      var fr = new FileReader();
+      fr.onload = function () {
+        var s = String(fr.result || '');
+        var c = s.indexOf(',');
+        res(c >= 0 ? s.slice(c + 1) : s);
+      };
+      fr.onerror = function () { rej(fr.error || new Error('lectura')); };
+      fr.readAsDataURL(blob);
+    });
+  }
+
   /* ---------- Partitura ---------- */
 
   function pintarPartitura() {
     var vacio = q('[data-partitura-vacio]');
     var cajaImg = q('[data-partitura-img]');
-    var img = q('[data-partitura-src]');
     var doc = q('[data-partitura-doc]');
-    cajaImg.hidden = true; doc.hidden = true;
+    if (cajaImg) cajaImg.hidden = true;
+    doc.hidden = true; doc.innerHTML = '';
 
     if (!cancion) {
       vacio.hidden = false;
       vacio.innerHTML = 'Esta marca no tiene ficha. Vincúlala a una canción del repertorio desde la sesión (toca ✎ en su marca).';
       return;
     }
-    var meta = cancion.archivos && cancion.archivos.partitura;
-    if (!meta) { vacioConAnadir(vacio, 'partitura', 'Aún no hay partitura.'); return; }
+    var metas = window.Adjuntos.lista(cancion, 'partitura');
+    if (!metas.length) { vacioConAnadir(vacio, 'partitura', 'Aún no hay partitura.'); return; }
     vacio.hidden = true;
-
-    var esPdf = /pdf/i.test(meta.mime) || /\.pdf$/i.test(meta.nombre || '');
-    if (esPdf) {
-      window.Archivos.obtener(cancion.id + ':partitura').then(function (blob) {
-        if (!blob) { vacioConAnadir(vacio, 'partitura', 'Aún no hay partitura.'); return; }
-        doc.innerHTML = '<div class="visor-pdf" data-pdf-caja></div>' +
-          '<button type="button" class="visor-doc__abrir" data-pdf-abrir>Abrir la partitura a pantalla completa</button>';
-        var caja = doc.querySelector('[data-pdf-caja]');
-        window.VisorPDF.render(caja, blob).catch(function () {});
-        caja.addEventListener('click', function () { window.VisorPDF.abrir(blob, 'Partitura'); });
-        doc.querySelector('[data-pdf-abrir]').addEventListener('click', function () {
-          window.VisorPDF.abrir(blob, 'Partitura');
-        });
-        doc.hidden = false;
-      });
-      return;
-    }
-    window.Archivos.url(cancion.id + ':partitura').then(function (u) {
-      if (!u) { vacioConAnadir(vacio, 'partitura', 'Aún no hay partitura.'); return; }
-      urls.push(u);
-      img.src = u;
-      cajaImg.hidden = false;
-      cajaImg.onclick = function () { abrirLightbox(u); };
-    });
+    renderAdjuntos(metas, 'Partitura', doc, null);
   }
 
   /* ---------- Fragmentos difíciles ---------- */

@@ -38,7 +38,7 @@ window.HojaCancion = (function () {
 
   var idEditando = null;
   var etiquetasActuales = [];
-  var archivosPendientes = {};   // { letra: File|'quitar', ... }
+  var ctrlArchivos = {};         // { letra: ctrlAdjuntos, fonetica: …, partitura: … }
   var audioPendiente = null;     // File del MP3 obligatorio (solo al crear)
   var cbGuardar = null;
   var cbBorrar = null;
@@ -98,7 +98,7 @@ window.HojaCancion = (function () {
             '<svg class="archivo-fila__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' +
             '<span class="archivo-fila__txt" data-nombre-audio>Obligatorio (MP3, M4A…)</span>' +
             '<label class="archivo-fila__accion">Añadir' +
-              '<input type="file" accept="audio/*,.mp3,.m4a,.aac,.ogg,.wav" data-input-audio hidden />' +
+              '<input type="file" accept="audio/*,.mp3,.mpeg,.mpga,.m4a,.aac,.opus,.ogg,.wav" data-input-audio hidden />' +
             '</label>' +
             '<button type="button" class="archivo-fila__quitar" data-quitar-audio hidden>Quitar</button>' +
           '</div>' +
@@ -126,13 +126,23 @@ window.HojaCancion = (function () {
             '<span class="campo__sub-lbl">Letra original</span>' +
             '<textarea name="letraTexto" rows="4" maxlength="8000" placeholder="Pega o escribe aquí la letra tal cual se canta"></textarea>' +
           '</label>' +
+          '<button type="button" class="hoja__buscar-letra" data-buscar-letra hidden>' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>' +
+            '<span data-buscar-letra-txt>Buscar la letra con IA</span>' +
+          '</button>' +
           filaArchivo('letra', 'application/pdf,.pdf,image/*,text/plain,.txt', docIcono()) +
 
-          '<label class="campo__sub">' +
-            '<span class="campo__sub-lbl">Cómo se pronuncia</span>' +
-            '<textarea name="letraFonetica" rows="4" maxlength="8000" placeholder="Cómo suena, línea a línea igual que la letra original"></textarea>' +
-          '</label>' +
-          filaArchivo('fonetica', 'application/pdf,.pdf,image/*,text/plain,.txt', docIcono()) +
+          // "Cómo se pronuncia" no se escribe a mano al crear la canción: se
+          // genera desde el Modo estudio (botón "Generar cómo se pronuncia",
+          // IA). Igual que la traducción, aquí solo aparece al editar una
+          // canción que ya la tiene, para poder retocarla.
+          '<div data-sub-fonetica hidden>' +
+            '<label class="campo__sub">' +
+              '<span class="campo__sub-lbl">Cómo se pronuncia</span>' +
+              '<textarea name="letraFonetica" rows="4" maxlength="8000" placeholder="Cómo suena, línea a línea igual que la letra original"></textarea>' +
+            '</label>' +
+            filaArchivo('fonetica', 'application/pdf,.pdf,image/*,text/plain,.txt', docIcono()) +
+          '</div>' +
 
           '<label class="campo__sub" data-sub-traduccion hidden>' +
             '<span class="campo__sub-lbl">Qué significa <span class="campo__opcional">(traducción)</span></span>' +
@@ -197,21 +207,11 @@ window.HojaCancion = (function () {
       el.addEventListener('click', cerrar);
     });
 
-    // Inputs de archivo (letra / fonetica / partitura)
-    Array.prototype.forEach.call(form.querySelectorAll('[data-input]'), function (inp) {
-      inp.addEventListener('change', function () {
-        var tipo = inp.getAttribute('data-input');
-        var f = inp.files && inp.files[0];
-        if (f) { archivosPendientes[tipo] = f; pintarFilaArchivo(tipo, f.name); }
-        inp.value = '';
-      });
-    });
-    Array.prototype.forEach.call(form.querySelectorAll('[data-quitar]'), function (btn) {
-      btn.addEventListener('click', function () {
-        var tipo = btn.getAttribute('data-quitar');
-        archivosPendientes[tipo] = 'quitar';
-        pintarFilaArchivo(tipo, null);
-      });
+    // Campos de archivo (letra / fonetica / partitura): admiten varias
+    // páginas cada uno. Toda la gestión vive en window.Adjuntos.
+    TIPOS_ARCHIVO.forEach(function (tipo) {
+      var fila = form.querySelector('[data-fila="' + tipo + '"]');
+      if (fila) ctrlArchivos[tipo] = window.Adjuntos.montar(fila);
     });
 
     // Audio obligatorio (solo visible al crear)
@@ -227,6 +227,64 @@ window.HojaCancion = (function () {
     });
 
     conectarEditorEtiquetas();
+    conectarBuscarLetra();
+  }
+
+  /* ---------- Buscar la letra con IA ---------- */
+
+  // El botón solo tiene sentido si no hay letra escrita todavía. Se
+  // muestra/oculta según el textarea y necesita al menos un título.
+  function actualizarBotonBuscarLetra() {
+    var btn = form.querySelector('[data-buscar-letra]');
+    if (!btn) return;
+    var hayIA = !!(window.IA && window.IA.buscarLetra);
+    var hayTexto = !!form.letraTexto.value.trim();
+    btn.hidden = !hayIA || hayTexto;
+  }
+
+  function conectarBuscarLetra() {
+    var btn = form.querySelector('[data-buscar-letra]');
+    if (!btn) return;
+    var txtEl = btn.querySelector('[data-buscar-letra-txt]');
+
+    form.letraTexto.addEventListener('input', actualizarBotonBuscarLetra);
+
+    btn.addEventListener('click', function () {
+      if (btn.disabled) return;
+      var titulo = form.titulo.value.trim();
+      if (!titulo) {
+        form.titulo.classList.add('campo--error');
+        form.titulo.focus();
+        window.UI.aviso('Escribe primero el título de la canción.');
+        return;
+      }
+      var idiomaSel = form.idioma;
+      var idioma = idiomaSel.options[idiomaSel.selectedIndex]
+        ? idiomaSel.options[idiomaSel.selectedIndex].text : '';
+      if (!form.idioma.value) idioma = '';
+
+      btn.disabled = true;
+      btn.classList.add('is-cargando');
+      txtEl.textContent = 'Buscando la letra…';
+
+      window.IA.buscarLetra(titulo, {
+        compositor: form.compositor.value.trim(),
+        idioma: idioma,
+      }).then(function (letra) {
+        form.letraTexto.value = letra;
+        actualizarBotonBuscarLetra();
+        window.UI.aviso('Letra encontrada. Revísala por si acaso antes de guardar.', { tipo: 'ok' });
+      }).catch(function (e) {
+        var msg = (e && e.message === 'no encontrada')
+          ? 'No he encontrado la letra de esa canción. Prueba a afinar el título o el compositor, o pégala a mano.'
+          : 'No se ha podido buscar la letra ahora mismo. Prueba dentro de un rato.';
+        window.UI.aviso(msg, { tipo: 'error' });
+      }).then(function () {
+        btn.disabled = false;
+        btn.classList.remove('is-cargando');
+        txtEl.textContent = 'Buscar la letra con IA';
+      });
+    });
   }
 
   /* ---------- Editor de etiquetas ---------- */
@@ -336,24 +394,8 @@ window.HojaCancion = (function () {
     }
   }
 
-  function pintarFilaArchivo(tipo, nombre) {
-    var fila = form.querySelector('[data-fila="' + tipo + '"]');
-    if (!fila) return;
-    var txt = fila.querySelector('[data-nombre="' + tipo + '"]');
-    var quitar = fila.querySelector('[data-quitar="' + tipo + '"]');
-    var accion = fila.querySelector('.archivo-fila__accion');
-    if (nombre) {
-      txt.textContent = nombre;
-      fila.classList.add('archivo-fila--con-archivo');
-      quitar.hidden = false;
-      accion.firstChild.textContent = 'Cambiar';
-    } else {
-      txt.textContent = ETIQUETA_BASE[tipo];
-      fila.classList.remove('archivo-fila--con-archivo');
-      quitar.hidden = true;
-      accion.firstChild.textContent = 'Añadir';
-    }
-  }
+  // Los campos de archivo (letra / fonetica / partitura) los pinta
+  // window.Adjuntos a través de su controlador (ctrlArchivos[tipo]).
 
   /* ---------- Abrir / cerrar ---------- */
 
@@ -364,7 +406,6 @@ window.HojaCancion = (function () {
     idEditando = opts.id || null;
     cbGuardar = typeof opts.alGuardar === 'function' ? opts.alGuardar : null;
     cbBorrar = typeof opts.alBorrar === 'function' ? opts.alBorrar : null;
-    archivosPendientes = {};
     audioPendiente = null;
 
     var c = idEditando ? window.Canciones.obtener(idEditando) : null;
@@ -395,12 +436,32 @@ window.HojaCancion = (function () {
     var subTrad = form.querySelector('[data-sub-traduccion]');
     if (subTrad) subTrad.hidden = !(c && c.letraTraduccion && c.letraTraduccion.trim());
 
+    // Igual que la traducción: "cómo se pronuncia" solo se ve al editar una
+    // canción que ya la tiene (texto o archivo), o si se abre enfocando esa
+    // fila. Nunca al crear.
+    var subFon = form.querySelector('[data-sub-fonetica]');
+    if (subFon) {
+      var tieneFon = !!(c && (
+        (c.letraFonetica && c.letraFonetica.trim()) ||
+        (c.archivos && c.archivos.fonetica)
+      ));
+      subFon.hidden = !(tieneFon || opts.foco === 'fonetica');
+    }
+
+    var btnBL = form.querySelector('[data-buscar-letra]');
+    if (btnBL) {
+      btnBL.disabled = false;
+      btnBL.classList.remove('is-cargando');
+      var blTxt = btnBL.querySelector('[data-buscar-letra-txt]');
+      if (blTxt) blTxt.textContent = 'Buscar la letra con IA';
+    }
+    actualizarBotonBuscarLetra();
+
     var estado = c ? c.estado : 'pendiente';
     Array.prototype.forEach.call(form.estado, function (r) { r.checked = r.value === estado; });
 
     TIPOS_ARCHIVO.forEach(function (tipo) {
-      var meta = c && c.archivos ? c.archivos[tipo] : null;
-      pintarFilaArchivo(tipo, meta ? meta.nombre : null);
+      if (ctrlArchivos[tipo]) ctrlArchivos[tipo].fijar(window.Adjuntos.lista(c, tipo));
     });
 
     formTitulo.textContent = c ? 'Editar canción' : 'Nueva canción';
@@ -483,7 +544,8 @@ window.HojaCancion = (function () {
       }
       var extra = {};
       TIPOS_ARCHIVO.forEach(function (t) {
-        if (archivosPendientes[t] && archivosPendientes[t] !== 'quitar') extra[t] = archivosPendientes[t];
+        var pend = ctrlArchivos[t] ? ctrlArchivos[t].pendiente() : null;
+        if (pend && pend.anadir.length) extra[t] = pend.anadir;
       });
       window.Sesiones.crearSuelta(datos, audioPendiente, extra).then(function (res) {
         cerrar();
@@ -508,18 +570,12 @@ window.HojaCancion = (function () {
   }
 
   function aplicarArchivos(cancionId) {
+    var cancion = window.Canciones.obtener(cancionId);
     var tareas = TIPOS_ARCHIVO.map(function (tipo) {
-      var cambio = archivosPendientes[tipo];
-      if (!cambio) return Promise.resolve();
-      var clave = cancionId + ':' + tipo;
-      if (cambio === 'quitar') {
-        return window.Archivos.borrar(clave).then(function () {
-          window.Canciones.fijarArchivo(cancionId, tipo, null);
-        });
-      }
-      return window.Archivos.guardar(clave, cambio).then(function (meta) {
-        window.Canciones.fijarArchivo(cancionId, tipo, meta);
-      });
+      if (!ctrlArchivos[tipo]) return Promise.resolve();
+      return window.Adjuntos.aplicar(
+        cancionId, tipo, ctrlArchivos[tipo].pendiente(),
+        window.Adjuntos.lista(cancion, tipo));
     });
     return Promise.all(tareas).catch(function (e) {
       console.error('No se pudo guardar un archivo:', e);

@@ -99,6 +99,11 @@ window.Diario = (function () {
     return Array.isArray(l) ? l.slice() : [];
   }
 
+  // Todo el diario de una vez: { "YYYY-MM-DD": [eventos] }. Para cuando hay
+  // que recorrer todos los días (p. ej. calcular logros) — una sola lectura
+  // y un solo JSON.parse en vez de repetirlo por cada día con dias()+delDia().
+  function todos() { return _leer(); }
+
   function hayAlgo(iso) {
     var d = delDia(iso);
     if (d.length) return true;
@@ -250,6 +255,7 @@ window.Diario = (function () {
     registrar: registrar,
     dias: dias,
     delDia: delDia,
+    todos: todos,
     hayAlgo: hayAlgo,
     resumenDia: resumenDia,
   };

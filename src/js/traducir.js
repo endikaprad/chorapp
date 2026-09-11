@@ -135,6 +135,102 @@ window.Traductor = (function () {
 
   /* ---------- API ---------- */
 
+  // Traduce un texto de una sola línea (o pocas). Google primero, MyMemory
+  // de respaldo. Devuelve la traducción "aplanada" a una línea.
+  function unaLinea(linea, de, a) {
+    return trozoGoogle(linea, de, a)
+      .catch(function (err) {
+        if (!de || de === 'auto') throw err;
+        return trozoMyMemory(linea, de, a);
+      })
+      .then(function (t) {
+        return String(t || '').replace(/\s*\n\s*/g, ' ').trim();
+      });
+  }
+
+  // Lanza `tareas` (funciones que devuelven Promise) con como mucho `n` en
+  // vuelo a la vez. Mantiene el orden del resultado. Sirve para pedir varios
+  // bloques a Google en paralelo sin disparar el 429.
+  function enPool(tareas, n) {
+    var res = new Array(tareas.length);
+    var sig = 0;
+    function siguiente() {
+      if (sig >= tareas.length) return Promise.resolve();
+      var idx = sig++;
+      return tareas[idx]().then(function (v) { res[idx] = v; return siguiente(); });
+    }
+    var arranques = [];
+    for (var k = 0; k < Math.min(n, tareas.length); k++) arranques.push(siguiente());
+    return Promise.all(arranques).then(function () { return res; });
+  }
+
+  // Traduce conservando EXACTAMENTE la estructura de líneas del original
+  // (una línea de salida por cada línea de entrada; las líneas en blanco se
+  // quedan en blanco). Necesario para que la sincronía de la letra —anclada
+  // verso a verso— encaje también en la traducción.
+  //
+  // Antes se pedían los bloques de uno en uno (una letra larga = 6-10
+  // peticiones EN SERIE, de ahí la espera). Ahora se arma la lista de bloques
+  // de golpe y se piden EN PARALELO (hasta 4 a la vez): la letra entera tarda
+  // más o menos lo que un solo bloque.
+  function traducirPorVersos(texto, de, a, onProgreso) {
+    var lineas = texto.split('\n');
+    var salida = new Array(lineas.length);
+    var bloques = [];   // [{ items: [{ i, txt }] }]
+    var pend = [];
+    function cerrar() {
+      if (pend.length) { bloques.push({ items: pend }); pend = []; }
+    }
+    lineas.forEach(function (linea, i) {
+      if (!linea.trim()) { salida[i] = ''; cerrar(); return; }
+      pend.push({ i: i, txt: linea.trim() });
+      var largo = pend.reduce(function (n, p) { return n + p.txt.length + 1; }, 0);
+      var fin = (i + 1 >= lineas.length) || !lineas[i + 1].trim();
+      if (fin || largo >= 1500) cerrar();
+    });
+    cerrar();
+
+    function resolverBloque(bloque) {
+      var items = bloque.items;
+      var junto = items.map(function (p) { return p.txt; }).join('\n');
+      // Reparto verso a verso (con respaldo), para descuadres o fallo total.
+      function versoAVerso() {
+        return items.reduce(function (c2, p) {
+          return c2.then(function () {
+            return unaLinea(p.txt, de, a).then(function (t) { salida[p.i] = t; });
+          });
+        }, Promise.resolve());
+      }
+      return trozoGoogle(junto, de, a).then(function (tr) {
+        var partes = String(tr || '').split('\n')
+          .map(function (l) { return l.trim(); }).filter(Boolean);
+        if (partes.length === items.length) {
+          items.forEach(function (p, k) { salida[p.i] = partes[k]; });
+          return;
+        }
+        return versoAVerso();
+      }, function (err) {
+        return versoAVerso().catch(function () { throw err; });
+      });
+    }
+
+    var hechos = 0;
+    var tareas = bloques.map(function (b) {
+      return function () {
+        return resolverBloque(b).then(function (v) {
+          hechos++;
+          if (typeof onProgreso === 'function') {
+            try { onProgreso(hechos / (bloques.length || 1)); } catch (e) {}
+          }
+          return v;
+        });
+      };
+    });
+    return enPool(tareas, 4).then(function () {
+      return salida.map(function (l) { return l == null ? '' : l; }).join('\n');
+    });
+  }
+
   // texto: letra original. opts.de: idioma origen ('auto' si no se sabe).
   // opts.a: idioma destino (por defecto español).
   function traducir(texto, opts) {
@@ -144,14 +240,24 @@ window.Traductor = (function () {
 
     var de = opts.de || 'auto';
     var a = opts.a || 'es';
+    var onProgreso = typeof opts.onProgreso === 'function' ? opts.onProgreso : null;
+    var nOrig = texto.split('\n').filter(function (l) { return l.trim(); }).length;
 
-    return viaGoogle(texto, de, a)
-      .catch(function (errGoogle) {
-        return viaMyMemory(texto, de, a).catch(function () { throw errGoogle; });
+    return traducirPorVersos(texto, de, a, onProgreso)
+      .catch(function (errVersos) {
+        // Último recurso: traducción "en bloque" (puede descuadrar líneas).
+        return viaGoogle(texto, de, a)
+          .catch(function () { return viaMyMemory(texto, de, a).catch(function () { throw errVersos; }); });
       })
       .then(function (res) {
-        res = String(res || '').replace(/\n{3,}/g, '\n\n').trim();
+        res = String(res || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
         if (!res) throw new Error('sin resultado');
+        // Si aún así el nº de versos no cuadra, se avisa a quien llama para
+        // que sepa que la sincronía quizá no encaje fino (no rompe nada).
+        var nRes = res.split('\n').filter(function (l) { return l.trim(); }).length;
+        if (nOrig >= 2 && nRes !== nOrig && window.console) {
+          console.warn('Traductor: ' + nOrig + ' versos -> ' + nRes + ' traducidos');
+        }
         return res;
       });
   }

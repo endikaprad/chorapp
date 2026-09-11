@@ -69,14 +69,6 @@ window.ResumenMes = (function () {
     return mejor;
   }
 
-  function _tituloCancion(id) {
-    if (id && id.indexOf('marca:') !== 0 && window.Canciones) {
-      var c = window.Canciones.obtener(id);
-      if (c) return c.titulo;
-    }
-    return null;
-  }
-
   /* Recorre día a día un rango de meses (mesIni..mesFin, ambos incluidos, 0-11)
      y devuelve los agregados en bruto. Lo comparten datosDe (un mes) y
      datosAnuales (los doce). */
@@ -85,6 +77,21 @@ window.ResumenMes = (function () {
 
   function _escanear(anio, mesIni, mesFin) {
     var reg = window.Practica && window.Practica.leer ? window.Practica.leer() : {};
+    // Diario.delDia(iso) relee y re-parsea el diario ENTERO en cada llamada;
+    // aquí se pedía una vez por cada día del rango (hasta 366 en el resumen
+    // anual). Con Diario.todos() se lee una sola vez y se indexa en memoria.
+    var diarioCompleto = window.Diario && window.Diario.todos ? window.Diario.todos() : {};
+    // Canciones.obtener(id) relee y reordena (localeCompare) TODO el
+    // repertorio en cada llamada — aquí se llamaba potencialmente una vez
+    // por evento sin título propio. Un mapa calculado una vez basta.
+    var cancionPorId = {};
+    if (window.Canciones) window.Canciones.listar().forEach(function (c) { cancionPorId[c.id] = c; });
+    function tituloCancion(id) {
+      if (!id || id.indexOf('marca:') === 0) return null;
+      var c = cancionPorId[id];
+      return c ? c.titulo : null;
+    }
+
     var diasSet = {};       // ISO -> true (días con estudio)
     var porCancion = {};    // id -> nº de días que aparece
     var titulos = {};       // id -> titulo
@@ -99,7 +106,7 @@ window.ResumenMes = (function () {
       if (!id || vistasHoy[id]) return;
       vistasHoy[id] = true;
       porCancion[id] = (porCancion[id] || 0) + 1;
-      if (!titulos[id]) titulos[id] = titulo || _tituloCancion(id) || 'una canción';
+      if (!titulos[id]) titulos[id] = titulo || tituloCancion(id) || 'una canción';
     }
 
     for (var mes = mesIni; mes <= mesFin; mes++) {
@@ -107,7 +114,7 @@ window.ResumenMes = (function () {
       for (var d = 1; d <= diasDelMes; d++) {
         var iso = _iso(new Date(anio, mes, d));
         var practica = Array.isArray(reg[iso]) ? reg[iso] : [];
-        var evs = window.Diario && window.Diario.delDia ? window.Diario.delDia(iso) : [];
+        var evs = diarioCompleto[iso] || [];
 
         // Un día "cuenta" si hay práctica registrada o un evento de estudio.
         var estudiadoHoy = practica.length > 0 ||
@@ -125,12 +132,12 @@ window.ResumenMes = (function () {
             apunta(vistasHoy, ev.cancionId || ('marca:' + (ev.marcaId || '')), ev.titulo);
           } else if (ev.t === 'reproduccion') {
             escuchas++;
-            var rt = ev.titulo || _tituloCancion(ev.cancionId);
+            var rt = ev.titulo || tituloCancion(ev.cancionId);
             if (rt) reproPorTitulo[rt] = (reproPorTitulo[rt] || 0) + 1;
           } else if (ev.t === 'fragmento') {
             trozos++;
           } else if (ev.t === 'estado' && ev.extra && ev.extra.a === 'aprendida') {
-            var tit = ev.titulo || _tituloCancion(ev.cancionId) || 'una canción';
+            var tit = ev.titulo || tituloCancion(ev.cancionId) || 'una canción';
             if (!vistasAprend[tit]) { vistasAprend[tit] = true; aprendidas.push(tit); }
           }
         });

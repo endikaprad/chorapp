@@ -417,9 +417,19 @@ window.CompartirCancion = (function () {
     return _pdfLib;
   }
 
+  // Acepta un blob o un array de blobs (varias páginas) y devuelve la
+  // lista aplanada de imágenes.
+  function documentoAImagenes(blobOArray, maxPag) {
+    if (Array.isArray(blobOArray)) {
+      return Promise.all(blobOArray.map(function (b) { return unDocumentoAImagenes(b, maxPag); }))
+        .then(function (listas) { return [].concat.apply([], listas); });
+    }
+    return unDocumentoAImagenes(blobOArray, maxPag);
+  }
+
   // Devuelve un array de <canvas>/<img> (con .width/.height) para un blob
   // que puede ser imagen o PDF. `maxPag` limita las páginas de un PDF.
-  function documentoAImagenes(blob, maxPag) {
+  function unDocumentoAImagenes(blob, maxPag) {
     if (!blob) return Promise.resolve([]);
     var tipo = (blob.type || '') + ' ' + (blob.name || '');
     if (/^image\//.test(blob.type || '') || /\.(png|jpe?g|gif|webp|bmp)$/i.test(blob.name || '')) {

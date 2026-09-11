@@ -9,32 +9,56 @@
 window.Pagina_songs = (function () {
   'use strict';
 
-  var raiz, contenido, buscador, inputBuscar;
+  var raiz, contenido, barra, inputBuscar, hojaFiltros, badge;
   var filtro = '';
   var filtroIdioma = '';   // '' => todos; código de idioma => solo ese
   var filtroEtiqueta = ''; // '' => todas; etiqueta => solo canciones con ella
+  var filtroEstado = '';   // '' => todas; 'pendiente' | 'progreso' | 'aprendida'
+  var orden = 'recientes'; // recientes | antiguas | az
   var primeraCarga = true;
+  var animarLista = false;  // anima el re-render de la lista tras un cambio de filtro
   var pendienteEditar = null;   // id a editar tras navegar desde otra pantalla
+
+  var ORDENES = [
+    { clave: 'recientes', etiqueta: 'Más recientes' },
+    { clave: 'antiguas',  etiqueta: 'Más antiguas' },
+    { clave: 'az',        etiqueta: 'Título A–Z' },
+  ];
 
   function iniciar(contenedor) {
     limpiarRestos();
 
     raiz = contenedor.querySelector('[data-modulo="songs"]');
     contenido = raiz.querySelector('[data-contenido]');
-    buscador = raiz.querySelector('[data-buscador]');
+    barra = raiz.querySelector('[data-barra]');
     inputBuscar = raiz.querySelector('[data-input-buscar]');
+    hojaFiltros = raiz.querySelector('[data-hoja-filtros]');
+    badge = raiz.querySelector('[data-badge]');
 
     var fab = raiz.querySelector('[data-nueva]');
     // .pantalla se anima con transform y crea un bloque contenedor que
-    // rompe `position: fixed`. Movemos el FAB al <body>.
+    // rompe `position: fixed`. Movemos el FAB (y la hoja de filtros) al <body>.
     fab.setAttribute('data-fab-songs', '');
     document.body.appendChild(fab);
+    hojaFiltros.setAttribute('data-hoja-filtros-songs', '');
+    document.body.appendChild(hojaFiltros);
 
     fab.addEventListener('click', function () { abrirHoja(null); });
 
     inputBuscar.addEventListener('input', function () {
       filtro = inputBuscar.value;
       pintarLista();
+    });
+
+    raiz.querySelector('[data-abrir-filtros]').addEventListener('click', abrirFiltros);
+    hojaFiltros.querySelector('[data-cerrar-filtros]').addEventListener('click', cerrarFiltros);
+    hojaFiltros.querySelector('[data-aplicar-filtros]').addEventListener('click', cerrarFiltros);
+    hojaFiltros.querySelector('[data-limpiar-filtros]').addEventListener('click', function () {
+      filtroIdioma = '';
+      filtroEtiqueta = '';
+      filtroEstado = '';
+      orden = 'recientes';
+      aplicarCambioFiltro();
     });
 
     // Al salir de la sección, retiramos el FAB del <body>.
@@ -59,9 +83,212 @@ window.Pagina_songs = (function () {
 
   function limpiarRestos() {
     Array.prototype.forEach.call(
-      document.querySelectorAll('body > [data-fab-songs], body > .menu-estado'),
+      document.querySelectorAll('body > [data-fab-songs], body > [data-hoja-filtros-songs], body > .menu-estado'),
       function (el) { el.remove(); }
     );
+  }
+
+  /* ---------- Hoja "Filtrar y ordenar" ---------- */
+
+  // Botones vivos de la hoja: [{ valor, el }]. Se rellenan al construir y se
+  // sincronizan en el sitio (sin rehacer DOM) al tocar cualquier opción, para
+  // que el deslizamiento del segmento y el "pop" de los chips se animen.
+  var opsOrden = [], opsEstado = [], opsIdioma = [], opsEtiqueta = [], segInd = null;
+
+  function abrirFiltros() {
+    construirFiltros();
+    hojaFiltros.hidden = false;
+    void hojaFiltros.offsetHeight;   // fuerza layout antes de medir el segmento
+    sincronizarHoja(true);
+    hojaFiltros.classList.add('is-abierta');
+    // recoloca el indicador cuando el panel ya ha subido del todo
+    setTimeout(function () { moverIndicador(false); }, 60);
+  }
+
+  function cerrarFiltros() {
+    hojaFiltros.classList.remove('is-abierta');
+    setTimeout(function () { hojaFiltros.hidden = true; }, 260);
+  }
+
+  // Nº de filtros de contenido activos (el orden no cuenta como "filtro").
+  function nFiltros() {
+    return (filtroEstado ? 1 : 0) + (filtroIdioma ? 1 : 0) + (filtroEtiqueta ? 1 : 0);
+  }
+
+  // Construye el contenido de la hoja según el repertorio (una vez por apertura).
+  function construirFiltros() {
+    var todas = window.Canciones.listar();
+
+    var idiomas = [];
+    todas.forEach(function (c) {
+      if (c.idioma && idiomas.indexOf(c.idioma) === -1) idiomas.push(c.idioma);
+    });
+    if (idiomas.indexOf(filtroIdioma) === -1) filtroIdioma = '';
+
+    var etiquetas = window.Canciones.etiquetasTodas ? window.Canciones.etiquetasTodas() : [];
+    if (etiquetas.indexOf(filtroEtiqueta) === -1) filtroEtiqueta = '';
+
+    // Ordenar — control segmentado con indicador deslizante
+    opsOrden = pintarSegmento(hojaFiltros.querySelector('[data-orden]'),
+      ORDENES.map(function (o) { return { valor: o.clave, texto: o.etiqueta }; }),
+      function (v) {
+        if (v === orden) return;
+        orden = v;
+        aplicarCambioFiltro();
+      });
+
+    // Estado — ver solo aprendidas / en progreso / pendientes
+    var EST = window.Canciones.ESTADOS;
+    opsEstado = pintarOpciones(hojaFiltros.querySelector('[data-estado]'),
+      [{ valor: '', texto: 'Todas' }].concat(['pendiente', 'progreso', 'aprendida'].map(function (k) {
+        return { valor: k, texto: EST[k].etiqueta, estado: EST[k].token };
+      })),
+      function (v) {
+        filtroEstado = (filtroEstado === v) ? '' : v;
+        aplicarCambioFiltro();
+      });
+
+    // Idioma (solo si hay 2+)
+    var secIdioma = hojaFiltros.querySelector('[data-sec="idioma"]');
+    secIdioma.hidden = idiomas.length < 2;
+    opsIdioma = secIdioma.hidden ? [] : pintarOpciones(hojaFiltros.querySelector('[data-idiomas]'),
+      [{ valor: '', texto: 'Todos' }].concat(idiomas.map(function (v) {
+        return { valor: v, texto: window.Canciones.nombreIdioma(v) };
+      })),
+      function (v) {
+        filtroIdioma = (filtroIdioma === v) ? '' : v;
+        aplicarCambioFiltro();
+      });
+
+    // Etiquetas
+    var secEtq = hojaFiltros.querySelector('[data-sec="etiqueta"]');
+    secEtq.hidden = !etiquetas.length;
+    opsEtiqueta = secEtq.hidden ? [] : pintarOpciones(hojaFiltros.querySelector('[data-etiquetas]'),
+      [{ valor: '', texto: 'Todas' }].concat(etiquetas.map(function (v) {
+        return { valor: v, texto: v, hash: true };
+      })),
+      function (v) {
+        filtroEtiqueta = (filtroEtiqueta === v) ? '' : v;
+        aplicarCambioFiltro();
+      });
+  }
+
+  // Un toque en cualquier opción: refresca la lista y la propia hoja en vivo.
+  function aplicarCambioFiltro() {
+    primeraCarga = false;
+    animarLista = true;
+    pintarLista();
+    sincronizarHoja(false);
+  }
+
+  // Sincroniza clases activas, indicador y textos sin rehacer el DOM.
+  function sincronizarHoja(instantaneo) {
+    marcarActivos(opsOrden, orden);
+    marcarActivos(opsEstado, filtroEstado);
+    marcarActivos(opsIdioma, filtroIdioma);
+    marcarActivos(opsEtiqueta, filtroEtiqueta);
+    moverIndicador(instantaneo);
+
+    hojaFiltros.querySelector('[data-limpiar-filtros]').hidden =
+      nFiltros() === 0 && orden === 'recientes';
+
+    var n = window.Canciones.listar().length ? contarVisibles() : 0;
+    var ver = hojaFiltros.querySelector('[data-aplicar-filtros]');
+    var txt = n === 0 ? 'Sin resultados'
+      : 'Ver ' + n + (n === 1 ? ' canción' : ' canciones');
+    if (ver.textContent !== txt) {
+      ver.textContent = txt;
+      ver.classList.remove('is-cambio');
+      void ver.offsetWidth;
+      ver.classList.add('is-cambio');
+    }
+  }
+
+  function marcarActivos(ops, valor) {
+    ops.forEach(function (o) {
+      var activo = o.valor === valor;
+      if (activo === o.el.classList.contains('is-activo')) return;
+      o.el.classList.toggle('is-activo', activo);
+      if (activo && !o.el.classList.contains('segmento__op')) {
+        o.el.classList.remove('is-pop');
+        void o.el.offsetWidth;
+        o.el.classList.add('is-pop');
+      }
+    });
+  }
+
+  // Desliza el indicador blanco del segmento bajo la opción activa.
+  function moverIndicador(instantaneo) {
+    if (!segInd) return;
+    var activo = null;
+    opsOrden.forEach(function (o) { if (o.valor === orden) activo = o.el; });
+    if (!activo || !activo.offsetParent) return;
+    if (instantaneo) segInd.style.transition = 'none';
+    segInd.style.width = activo.offsetWidth + 'px';
+    segInd.style.transform = 'translateX(' + activo.offsetLeft + 'px)';
+    if (instantaneo) { void segInd.offsetWidth; segInd.style.transition = ''; }
+  }
+
+  // Cuántas canciones pasan los filtros actuales (sin repintar la lista).
+  function contarVisibles() {
+    var base = filtro ? window.Canciones.buscar(filtro) : window.Canciones.listar();
+    return base.filter(function (c) {
+      if (filtroEstado && c.estado !== filtroEstado) return false;
+      if (filtroIdioma && c.idioma !== filtroIdioma) return false;
+      if (filtroEtiqueta && !(Array.isArray(c.etiquetas) && c.etiquetas.indexOf(filtroEtiqueta) !== -1)) return false;
+      return true;
+    }).length;
+  }
+
+  // Chips redondeados (estado, idioma, etiquetas). Devuelve [{ valor, el }].
+  function pintarOpciones(cont, items, onElegir) {
+    cont.innerHTML = '';
+    return items.map(function (it) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'filtro-op' +
+        (it.hash ? ' filtro-op--hash' : '') +
+        (it.estado ? ' filtro-op--estado filtro-op--' + it.estado : '');
+      if (it.estado) {
+        b.innerHTML = '<span class="filtro-op__punto"></span>';
+        b.appendChild(document.createTextNode(it.texto));
+      } else {
+        b.textContent = it.texto;
+      }
+      b.addEventListener('click', function () { onElegir(it.valor); });
+      cont.appendChild(b);
+      return { valor: it.valor, el: b };
+    });
+  }
+
+  // Control segmentado (una sola elección, ocupa el ancho). Devuelve [{ valor, el }].
+  function pintarSegmento(cont, items, onElegir) {
+    cont.innerHTML = '';
+    segInd = document.createElement('span');
+    segInd.className = 'segmento__ind';
+    segInd.setAttribute('aria-hidden', 'true');
+    cont.appendChild(segInd);
+    return items.map(function (it) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'segmento__op';
+      b.textContent = it.texto;
+      b.addEventListener('click', function () { onElegir(it.valor); });
+      cont.appendChild(b);
+      return { valor: it.valor, el: b };
+    });
+  }
+
+  // Marca en el botón de la barra cuántos filtros hay puestos.
+  function pintarBadge() {
+    var n = nFiltros();
+    if (n === 0) {
+      badge.hidden = true;
+    } else {
+      badge.hidden = false;
+      badge.textContent = String(n);
+    }
+    raiz.querySelector('[data-abrir-filtros]').classList.toggle('is-activo', n > 0 || orden !== 'recientes');
   }
 
   /* ---------- Hoja compartida de alta / edición ---------- */
@@ -87,11 +314,25 @@ window.Pagina_songs = (function () {
 
   /* ---------- Render de la lista ---------- */
 
+  function ordenar(lista) {
+    var arr = lista.slice();
+    if (orden === 'antiguas') {
+      arr.sort(function (a, b) { return (a.creada || 0) - (b.creada || 0); });
+    } else if (orden === 'az') {
+      arr.sort(function (a, b) {
+        return String(a.titulo || '').localeCompare(String(b.titulo || ''), 'es', { sensitivity: 'base' });
+      });
+    } else { // 'recientes' (por defecto)
+      arr.sort(function (a, b) { return (b.creada || 0) - (a.creada || 0); });
+    }
+    return arr;
+  }
+
   function pintarLista() {
     var todas = window.Canciones.listar();
     var visibles = filtro ? window.Canciones.buscar(filtro) : todas;
 
-    buscador.hidden = todas.length === 0;
+    barra.hidden = todas.length === 0;
 
     if (todas.length === 0) {
       contenido.innerHTML = vacioInicial();
@@ -99,7 +340,12 @@ window.Pagina_songs = (function () {
       return;
     }
 
-    // Idiomas presentes en el repertorio (para la fila de filtros).
+    // Estado elegido en la hoja (ver solo aprendidas / en progreso / pendientes).
+    if (filtroEstado) {
+      visibles = visibles.filter(function (c) { return c.estado === filtroEstado; });
+    }
+
+    // Idiomas / etiquetas presentes: si el filtro activo ya no existe, se cae.
     var idiomas = [];
     todas.forEach(function (c) {
       if (c.idioma && idiomas.indexOf(c.idioma) === -1) idiomas.push(c.idioma);
@@ -109,7 +355,6 @@ window.Pagina_songs = (function () {
       visibles = visibles.filter(function (c) { return c.idioma === filtroIdioma; });
     }
 
-    // Etiquetas presentes en el repertorio.
     var etiquetas = window.Canciones.etiquetasTodas ? window.Canciones.etiquetasTodas() : [];
     if (etiquetas.indexOf(filtroEtiqueta) === -1) filtroEtiqueta = '';
     if (filtroEtiqueta) {
@@ -118,53 +363,65 @@ window.Pagina_songs = (function () {
       });
     }
 
+    visibles = ordenar(visibles);
+    pintarBadge();
+
     contenido.innerHTML = '';
-    if (idiomas.length >= 2) contenido.appendChild(filaFiltros('idioma', idiomas));
-    if (etiquetas.length) contenido.appendChild(filaFiltros('etiqueta', etiquetas));
+
+    // Resumen de filtros activos, con acceso rápido a quitarlos.
+    if (filtroEstado || filtroIdioma || filtroEtiqueta) {
+      var res = document.createElement('div');
+      res.className = 'rep-activos';
+      if (filtroEstado) {
+        var et = (window.Canciones.ESTADOS[filtroEstado] || {}).etiqueta || filtroEstado;
+        res.appendChild(pildoraActiva(et, function () {
+          filtroEstado = ''; quitarPildora();
+        }, 'filtro-op--' + filtroEstado));
+      }
+      if (filtroIdioma) res.appendChild(pildoraActiva(window.Canciones.nombreIdioma(filtroIdioma), function () {
+        filtroIdioma = ''; quitarPildora();
+      }));
+      if (filtroEtiqueta) res.appendChild(pildoraActiva('#' + filtroEtiqueta, function () {
+        filtroEtiqueta = ''; quitarPildora();
+      }));
+      contenido.appendChild(res);
+    }
 
     if (visibles.length === 0) {
       var msg = document.createElement('p');
       msg.className = 'vacio vacio--mini';
       msg.textContent = filtro
         ? 'Ninguna canción coincide con «' + filtro + '».'
-        : (filtroEtiqueta
-            ? 'Ninguna canción con la etiqueta «' + filtroEtiqueta + '»'
-              + (filtroIdioma ? ' en ' + window.Canciones.nombreIdioma(filtroIdioma) : '') + '.'
-            : 'Ninguna canción en ' + window.Canciones.nombreIdioma(filtroIdioma) + '.');
+        : 'Ninguna canción con esos filtros. Prueba a quitar alguno.';
       contenido.appendChild(msg);
       return;
     }
 
     var lista = document.createElement('div');
-    lista.className = 'lista' + (primeraCarga ? ' stagger' : '');
+    lista.className = 'lista' +
+      (primeraCarga ? ' stagger' : (animarLista ? ' lista--refresca' : ''));
     visibles.forEach(function (c) { lista.appendChild(tarjetaCancion(c)); });
     contenido.appendChild(lista);
     primeraCarga = false;
+    animarLista = false;
   }
 
-  // Fila de filtros (scroll horizontal). tipo: 'idioma' | 'etiqueta'.
-  // "Todos" + un chip por valor.
-  function filaFiltros(tipo, valores) {
-    var esIdioma = tipo === 'idioma';
-    var bar = document.createElement('div');
-    bar.className = 'idioma-filtros' + (esIdioma ? '' : ' idioma-filtros--etiq');
-    [''].concat(valores).forEach(function (v) {
-      var activo = esIdioma ? (v === filtroIdioma) : (v === filtroEtiqueta);
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'idioma-filtros__chip' + (activo ? ' is-activo' : '');
-      b.textContent = v
-        ? (esIdioma ? window.Canciones.nombreIdioma(v) : v)
-        : (esIdioma ? 'Todos' : 'Todas');
-      b.addEventListener('click', function () {
-        if (esIdioma) filtroIdioma = (filtroIdioma === v) ? '' : v;
-        else filtroEtiqueta = (filtroEtiqueta === v) ? '' : v;
-        primeraCarga = false;
-        pintarLista();
-      });
-      bar.appendChild(b);
-    });
-    return bar;
+  // Quitar un filtro desde su píldora: anima la lista al recomponerse.
+  function quitarPildora() {
+    primeraCarga = false;
+    animarLista = true;
+    pintarLista();
+  }
+
+  // Píldora "filtro activo" con la (x) para quitarlo, encima de la lista.
+  function pildoraActiva(texto, onQuitar, extraClase) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rep-activos__pill' + (extraClase ? ' ' + extraClase : '');
+    b.innerHTML = '<span></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    b.querySelector('span').textContent = texto;
+    b.addEventListener('click', onQuitar);
+    return b;
   }
 
   function tarjetaCancion(c) {

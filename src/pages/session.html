@@ -190,6 +190,10 @@
             <span class="campo__sub-lbl">Letra original</span>
             <textarea name="letraTexto" rows="4" maxlength="8000" placeholder="Pega o escribe aquí la letra tal cual se canta"></textarea>
           </label>
+          <button type="button" class="hoja__buscar-letra" data-buscar-letra hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <span data-buscar-letra-txt>Buscar la letra con IA</span>
+          </button>
           <div class="archivo-fila" data-fila="letra">
             <svg class="archivo-fila__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v5h5"/><path d="M6 3h9l5 5v13H6z"/><path d="M9 13h6M9 17h6"/></svg>
             <span class="archivo-fila__txt" data-nombre="letra">Letra (PDF, imagen o texto)</span>
@@ -199,17 +203,21 @@
             <button type="button" class="archivo-fila__quitar" data-quitar="letra" hidden>Quitar</button>
           </div>
 
-          <label class="campo__sub">
-            <span class="campo__sub-lbl">Cómo se pronuncia</span>
-            <textarea name="letraFonetica" rows="4" maxlength="8000" placeholder="Cómo suena, línea a línea igual que la letra original"></textarea>
-          </label>
-          <div class="archivo-fila" data-fila="fonetica">
-            <svg class="archivo-fila__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v5h5"/><path d="M6 3h9l5 5v13H6z"/><path d="M9 13h6M9 17h6"/></svg>
-            <span class="archivo-fila__txt" data-nombre="fonetica">Cómo se pronuncia (PDF o imagen)</span>
-            <label class="archivo-fila__accion">Añadir
-              <input type="file" accept="application/pdf,.pdf,image/*,text/plain,.txt" data-input="fonetica" hidden />
+          <!-- "Cómo se pronuncia" se genera desde el Modo estudio (IA). Aquí
+               solo aparece al editar una canción que ya lo tiene. -->
+          <div data-sub-fonetica hidden>
+            <label class="campo__sub">
+              <span class="campo__sub-lbl">Cómo se pronuncia</span>
+              <textarea name="letraFonetica" rows="4" maxlength="8000" placeholder="Cómo suena, línea a línea igual que la letra original"></textarea>
             </label>
-            <button type="button" class="archivo-fila__quitar" data-quitar="fonetica" hidden>Quitar</button>
+            <div class="archivo-fila" data-fila="fonetica">
+              <svg class="archivo-fila__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v5h5"/><path d="M6 3h9l5 5v13H6z"/><path d="M9 13h6M9 17h6"/></svg>
+              <span class="archivo-fila__txt" data-nombre="fonetica">Cómo se pronuncia (PDF o imagen)</span>
+              <label class="archivo-fila__accion">Añadir
+                <input type="file" accept="application/pdf,.pdf,image/*,text/plain,.txt" data-input="fonetica" hidden />
+              </label>
+              <button type="button" class="archivo-fila__quitar" data-quitar="fonetica" hidden>Quitar</button>
+            </div>
           </div>
         </div>
 

@@ -23,18 +23,28 @@
     canciones:   { archivo: 'songs',      titulo: 'Repertorio',   raiz: false },
     cancion:     { archivo: 'song',       titulo: 'Canción',      raiz: false },
     estudio:     { archivo: 'study',      titulo: 'Modo estudio', raiz: false },
+    recibido:    { archivo: 'recibido',   titulo: 'Compartido desde otra app', raiz: false },
   };
 
   var ORDEN_TABS = ['inicio', 'sesiones', 'practica', 'grabaciones'];
 
   // Rutas que se pueden re-abrir con datos distintos sin bloquearse.
-  var REENTRANTES = ['estudio', 'sesion', 'cancion'];
+  var REENTRANTES = ['estudio', 'sesion', 'cancion', 'recibido'];
 
   var vista = document.getElementById('vista');
   var header = document.getElementById('app-header');
   var titulo = document.getElementById('header-titulo');
   var btnAtras = document.getElementById('btn-atras');
   var btnTema = document.getElementById('btn-tema');
+  var btnBackup = document.getElementById('btn-backup');
+  if (btnBackup) {
+    btnBackup.addEventListener('click', function () {
+      if (window.Backup) window.Backup.abrirPanel();
+    });
+    if (window.Backup && window.Backup.avisoPendiente && window.Backup.avisoPendiente()) {
+      btnBackup.classList.add('tiene-aviso');
+    }
+  }
   var nav = document.getElementById('bottom-nav');
   var indicador = document.getElementById('nav-indicador');
   var itemsNav = Array.prototype.slice.call(nav.querySelectorAll('.nav-item'));
@@ -61,6 +71,13 @@
     if (ruta === rutaActual && REENTRANTES.indexOf(ruta) === -1) return;
     cargando = true;
 
+    // DIAGNÓSTICO TEMPORAL — quitar cuando se resuelva el lag de Práctica.
+    var _diagT0 = performance.now();
+    var _diag = function (etiqueta) {
+      console.info('[perf] ' + ruta + ' · ' + etiqueta + ': ' +
+        (performance.now() - _diagT0).toFixed(1) + 'ms desde el click');
+    };
+
     var esPrimeraNav = rutaActual === null;
     // Cualquier salto a una pestaña del bottom nav usa fundido (no el
     // deslizamiento lateral), incluido volver desde una canción/sesión/
@@ -72,6 +89,7 @@
         if (!r.ok) throw new Error(r.status);
         return r.text();
       });
+      _diag('fetch pages/' + pantalla.archivo + '.html listo');
 
       // La pantalla entra invisible (opacity:0 en CSS). La animación NO se
       // dispara aquí: se añade su clase en el frame siguiente, cuando el
@@ -128,18 +146,24 @@
         }
       }
 
+      _diag('innerHTML + historial listos, antes de iniciar()');
+
       // Módulo opcional de la página: js/pages/<archivo>.js expone window.Pagina_<archivo>
       var modulo = window['Pagina_' + pantalla.archivo];
       if (modulo && typeof modulo.iniciar === 'function') {
         try { modulo.iniciar(contenedor, opts.datos); }
         catch (e) { console.error('Módulo de página falló:', e); }
       }
+      _diag('iniciar() ha vuelto (síncrono)');
 
       // La animación se dispara AHORA, con el contenido ya montado y todavía
       // en la misma tarea (el navegador aún no ha pintado): así el primer
       // fotograma ya arranca con `from { opacity: 0 }` y el resto de la
       // transición es solo opacidad (compositor), sin recalcular layout.
       contenedor.classList.add(claseAnim);
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { _diag('primer fotograma pintado'); });
+      });
 
       // Aviso estilo Steam si acaba de caer algún logro nuevo (tras la
       // acción que lo dispara, que casi siempre implica cambiar de pantalla).
@@ -210,6 +234,7 @@
   // Si la hay, "atrás" la cierra en vez de cambiar de pantalla.
   function cerrarCapaSuperior() {
     if (document.querySelector('.visor-pdf-full') ||
+        document.querySelector('.letralive') ||
         document.querySelector('.lightbox:not([hidden])')) {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
       return true;
@@ -229,8 +254,10 @@
   function actualizarCabecera(pantalla) {
     titulo.innerHTML = pantalla.titulo;
     btnAtras.hidden = pantalla.raiz;
-    // El botón de tema solo vive en Inicio (esquina superior derecha).
+    // El botón de tema y el de copia de seguridad solo viven en Inicio
+    // (esquina superior derecha).
     if (btnTema) btnTema.hidden = rutaActual !== 'inicio';
+    if (btnBackup) btnBackup.hidden = rutaActual !== 'inicio';
   }
 
   function actualizarNav(ruta) {
@@ -327,6 +354,15 @@
     // bundle por roto (~10 s) y revierta.
     if (window.OTA && window.OTA.iniciar) {
       setTimeout(function () { window.OTA.iniciar(); }, 400);
+    }
+    // Compartir desde WhatsApp/Galería ("Compartir con ChorApp"). Solo APK.
+    if (window.Compartido) {
+      window.Compartido.comprobarAlArrancar().then(function (item) {
+        if (item) ir('recibido', { datos: item });
+      });
+      window.Compartido.escuchar(function (item) {
+        ir('recibido', { datos: item, reemplazar: rutaActual === 'recibido' });
+      });
     }
   });
 })();

@@ -285,8 +285,7 @@ window.Wrapped = (function () {
           '<button type="button" class="w-btn w-btn--ghost" data-descargar>Guardar</button>' +
           '<button type="button" class="w-btn" data-compartir>Compartir</button>' +
         '</div>' +
-        '<button type="button" class="w-cerrar-link" data-cerrar>Cerrar</button>' +
-        '<p class="w-creditos">Música: Scott Buckley · scottbuckley.com.au · CC-BY 4.0</p>'
+        '<button type="button" class="w-cerrar-link" data-cerrar>Cerrar</button>'
     };
   }
 
@@ -777,9 +776,16 @@ window.Wrapped = (function () {
       '</div>';
 
     var cont = raiz.querySelector('.w-slides');
+    // Variantes de entrada (animación + acento tipográfico) para que no
+    // todos los slides "de dato" se sientan iguales. Portada y cierre
+    // llevan su propia coreografía y se quedan fuera del reparto.
+    var VARIANTES = ['w-var-0', 'w-var-1', 'w-var-2', 'w-var-3'];
+    var nVar = 0;
     slides = datos.map(function (s) {
       var el = document.createElement('section');
-      el.className = 'w-slide ' + (s.clase || '');
+      var esFijo = /w-slide--(portada|cierre)/.test(s.clase || '');
+      var variante = esFijo ? '' : ' ' + VARIANTES[(nVar++) % VARIANTES.length];
+      el.className = 'w-slide ' + (s.clase || '') + variante;
       el.innerHTML = '<div class="w-slide__in">' + s.html + '</div>';
       el.hidden = true;
       cont.appendChild(el);
@@ -863,6 +869,12 @@ window.Wrapped = (function () {
       contarHasta(num, num.getAttribute('data-num'));
     }
 
+    // Slide de recuerdo: revela la foto justo al llegar (no antes).
+    if (mt.foto) {
+      var elFoto = slides[n].querySelector('[data-foto]');
+      if (elFoto) revelarFoto(elFoto);
+    }
+
     // Slide de cierre: prepara la foto resumen para compartir y remata
     // el resumen con una pequeña celebración háptica.
     if (mt.cierre) {
@@ -921,18 +933,37 @@ window.Wrapped = (function () {
       .then(function () { if (bot) bot.classList.remove('is-trabajando'); });
   }
 
-  // Carga (async) las fotos de los slides de recuerdo de concierto.
+  // Precarga (async) las URLs de las fotos de recuerdo, pero SIN pintarlas
+  // ni animarlas: eso lo hace revelarFoto() cuando el slide se muestra de
+  // verdad. Si se pintaba aquí, para cuando Maite llegaba al slide la foto
+  // ya llevaba rato cargada y la transición de entrada nunca se veía.
+  var fotosListas = {}; // clave -> url
+
   function cargarFotos() {
     if (!raiz || !window.Archivos) return;
     Array.prototype.forEach.call(raiz.querySelectorAll('[data-foto]'), function (el) {
       var clave = el.getAttribute('data-foto');
       window.Archivos.url(clave).then(function (u) {
-        if (!u || !raiz || !raiz.contains(el)) { if (u) window.Archivos.liberar(u); return; }
+        if (!u || !raiz) { if (u) window.Archivos.liberar(u); return; }
         fotosUrls.push(u);
-        el.style.backgroundImage = 'url("' + u + '")';
-        el.classList.add('is-cargada');
+        fotosListas[clave] = u;
+        // Si para cuando termina de cargar ya está el slide en pantalla
+        // (fotos pequeñas, red rápida…), revélala ahora mismo.
+        var slideDe = el.closest('.w-slide');
+        if (raiz.contains(el) && slideDe && !slideDe.hidden) revelarFoto(el);
       }).catch(function () {});
     });
+  }
+
+  // Pinta y anima la foto de un slide de recuerdo la primera vez que se ve.
+  function revelarFoto(el) {
+    if (!el || el.classList.contains('is-cargada')) return;
+    var clave = el.getAttribute('data-foto');
+    var u = fotosListas[clave];
+    if (!u) return;
+    el.style.backgroundImage = 'url("' + u + '")';
+    void el.offsetHeight;
+    el.classList.add('is-cargada');
   }
 
   // Música del slide: la canción de Maite si la menciona, si no la de fondo.
@@ -1168,6 +1199,7 @@ window.Wrapped = (function () {
     if (window.WrappedAudio) { try { window.WrappedAudio.parar(); } catch (e) {} }
     fotosUrls.forEach(function (u) { try { window.Archivos.liberar(u); } catch (e) {} });
     fotosUrls = [];
+    fotosListas = {};
     if (posterUrl) { try { URL.revokeObjectURL(posterUrl); } catch (e) {} posterUrl = null; }
     posterBlob = null;
     datosActuales = null;

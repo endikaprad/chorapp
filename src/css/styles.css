@@ -398,10 +398,18 @@ button {
   .header-titulo .marca-logo::after { animation: none; opacity: 0; }
 }
 
-/* Botón de tema (esquina superior derecha, solo en Inicio).
-   Cicla: automático → claro → oscuro → automático. */
-.header-tema {
+/* Botones de la esquina superior derecha (solo en Inicio): copia de
+   seguridad + tema. Agrupados para no bailar uno de otro. */
+.header-acciones {
   margin-left: auto;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Botón de tema. Cicla: automático → claro → oscuro → automático. */
+.header-tema {
   flex: none;
   width: 40px;
   height: 40px;
@@ -418,8 +426,30 @@ button {
 .header-tema:active { transform: scale(0.9); }
 .header-tema svg { width: 22px; height: 22px; }
 .header-tema .tema-auto-arco { opacity: 0.45; }
+
+/* Botón de copia de seguridad — mismo molde que el de tema pero más
+   discreto (gris cálido, no cobalto): es mantenimiento, no una acción
+   del día a día de Ama. */
+.header-backup {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--color-texto-2);
+  background: color-mix(in srgb, var(--color-superficie) 70%, transparent);
+  border: 1px solid var(--color-borde);
+  transition: transform var(--dur-micro) var(--curva),
+              color var(--dur-micro) var(--curva);
+}
+.header-backup[hidden] { display: none; }
+.header-backup:active { transform: scale(0.9); }
+.header-backup svg { width: 20px; height: 20px; }
+.header-backup.tiene-aviso { color: var(--estado-progreso); }
 @media (prefers-reduced-motion: reduce) {
-  .header-tema { transition: none; }
+  .header-tema, .header-backup { transition: none; }
 }
 
 /* ============================================================
@@ -661,69 +691,109 @@ button {
 /* Racha estilo Duolingo (Práctica) — llama + semana + mensaje.
    Compacto a propósito: racha y calendario deben verse sin scroll. */
 .racha-hero {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   gap: 2px;
-  padding: 14px 16px 12px;
+  padding: 22px 16px 14px;
   margin-bottom: 12px;
-  background: var(--color-superficie);
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--color-acento-suave) 0%, transparent 60%),
+    var(--color-superficie);
   border: 1px solid var(--color-borde);
-  border-radius: var(--radio);
+  border-radius: calc(var(--radio) + 4px);
+  overflow: hidden;
 }
 .racha-hero__llama {
   position: relative;
-  width: 76px;
-  height: 76px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-acento-suave);
+  width: 96px;
+  height: 96px;
 }
-.racha-hero--activa .racha-hero__llama { color: var(--color-acento); }
-.racha-hero--peligro .racha-hero__llama { color: var(--estado-progreso); }
-.racha-hero--apagada .racha-hero__llama { color: var(--color-borde); }
+.racha-hero__halo {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--color-acento-suave) 0%, transparent 72%);
+  opacity: 0;
+  transform: scale(0.85);
+}
+.racha-hero--activa .racha-hero__halo {
+  opacity: 1;
+  animation: racha-halo 2.6s var(--curva) infinite;
+}
+.racha-hero--peligro .racha-hero__halo {
+  opacity: 0.9;
+  background: radial-gradient(circle, color-mix(in srgb, var(--estado-progreso) 35%, transparent) 0%, transparent 72%);
+}
 .racha-hero__fuego {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  filter: drop-shadow(0 4px 10px color-mix(in srgb, var(--color-acento) 35%, transparent));
 }
+.racha-hero--peligro .racha-hero__fuego { filter: hue-rotate(-45deg) saturate(1.3); }
+.racha-hero--apagada .racha-hero__fuego { filter: grayscale(1); opacity: 0.55; }
 .racha-hero--activa .racha-hero__fuego {
   animation: racha-fuego 2.6s var(--curva) infinite;
-  transform-origin: 50% 80%;
+  transform-origin: 50% 82%;
 }
+.racha-hero__chispas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.racha-hero__chispas i {
+  position: absolute;
+  bottom: 14px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-acento);
+  opacity: 0;
+}
+.racha-hero--activa .racha-hero__chispas i {
+  animation: racha-chispa 2.8s ease-in infinite;
+}
+.racha-hero__chispas i:nth-child(1) { left: 32px; animation-delay: 0s; }
+.racha-hero__chispas i:nth-child(2) { left: 52px; width: 3px; height: 3px; animation-delay: 0.9s; }
+.racha-hero__chispas i:nth-child(3) { left: 68px; animation-delay: 1.8s; }
 .racha-hero__num {
   position: relative;
   font-family: var(--fuente-titulo);
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 800;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
   color: #fff;
-  text-shadow: 0 1px 4px rgba(7, 7, 7, 0.4);
-  transform: translateY(5px);
+  text-shadow: 0 1px 5px rgba(7, 7, 7, 0.45);
+  transform: translateY(20px);
 }
-/* El número se amolda a las cifras para no salirse del fuego. */
-.racha-hero[data-cifras="2"] .racha-hero__llama { width: 84px; height: 84px; }
-.racha-hero[data-cifras="2"] .racha-hero__num { font-size: 20px; }
-.racha-hero[data-cifras="3"] .racha-hero__llama { width: 92px; height: 92px; }
-.racha-hero[data-cifras="3"] .racha-hero__num { font-size: 17px; transform: translateY(4px); }
+/* El número se amolda a las cifras para no salirse de la llama. */
+.racha-hero[data-cifras="3"] .racha-hero__num { font-size: 21px; transform: translateY(19px); }
+.racha-hero[data-cifras="4"] .racha-hero__num { font-size: 17px; transform: translateY(18px); }
 .racha-hero--apagada .racha-hero__num { color: var(--color-texto-2); text-shadow: none; }
 .racha-hero__label {
+  margin-top: 3px;
   font-size: 11px;
-  letter-spacing: 0.08em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--color-texto-2);
 }
 .racha-hero__msg {
-  margin-top: 3px;
+  margin-top: 10px;
   font-size: 14px;
   color: var(--color-texto);
 }
 .racha-hero__semana {
   width: 100%;
-  margin: 10px 0 2px;
+  margin: 12px 0 2px;
 }
 .racha-hero__semana.semana { gap: 6px; }
 .racha-hero__semana .semana__punto { width: 26px; height: 26px; }
@@ -758,10 +828,23 @@ button {
 }
 @keyframes racha-fuego {
   0%, 100% { transform: scale(1) rotate(-1.5deg); }
-  50%      { transform: scale(1.06) rotate(1.5deg); }
+  50%      { transform: scale(1.08) rotate(1.5deg); }
+}
+@keyframes racha-halo {
+  0%, 100% { transform: scale(0.9); opacity: 0.7; }
+  50%      { transform: scale(1.15); opacity: 1; }
+}
+@keyframes racha-chispa {
+  0%   { transform: translateY(0) scale(1); opacity: 0; }
+  15%  { opacity: 0.9; }
+  100% { transform: translateY(-38px) scale(0.4); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .racha-hero--activa .racha-hero__fuego { animation: none; }
+  .racha-hero--activa .racha-hero__fuego,
+  .racha-hero--activa .racha-hero__halo,
+  .racha-hero--activa .racha-hero__chispas i {
+    animation: none;
+  }
 }
 
 /* ============================================================
@@ -1790,6 +1873,32 @@ body.con-barra-repro .fab-menu { --fab-subida: -64px; }
 .btn--texto { color: var(--color-texto-2); }
 .btn--fantasma { color: #b3261e; }
 
+/* Botón "Buscar la letra con IA" (bajo el textarea de letra original) */
+.hoja__buscar-letra {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  margin-top: 8px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-acento);
+  background: var(--color-acento-suave);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 11px 14px;
+  text-align: left;
+  transition: transform var(--dur-micro) var(--curva), opacity var(--dur-micro) var(--curva);
+}
+.hoja__buscar-letra svg { width: 18px; height: 18px; flex: none; }
+.hoja__buscar-letra:active { transform: scale(0.97); }
+.hoja__buscar-letra:disabled,
+.hoja__buscar-letra.is-cargando { opacity: 0.6; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .hoja__buscar-letra { transition: opacity var(--dur-micro) var(--curva); }
+}
+
 /* ============================================================
    Importar archivos en la hoja de edición (Fase 4)
    ============================================================ */
@@ -1832,6 +1941,59 @@ body.con-barra-repro .fab-menu { --fab-subida: -64px; }
   color: var(--color-texto-2);
   padding: 10px 8px;
   min-height: 40px;
+}
+
+/* Campo de archivo con varias páginas (window.Adjuntos) */
+.archivo-fila--multi {
+  display: block;
+}
+.archivo-fila--multi .adj-anadir {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.adj-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.adj-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-acento-suave);
+  border-radius: 9px;
+  padding: 7px 6px 7px 11px;
+}
+.adj-chip__nom {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-texto);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.adj-chip--nuevo { opacity: 0.72; }
+.adj-chip__x {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-texto-2);
+}
+.adj-chip__x svg { width: 15px; height: 15px; }
+
+/* Páginas apiladas en el visor de letra / partitura */
+.visor-doc__item + .visor-doc__item { margin-top: 14px; }
+.visor-doc__pre {
+  white-space: pre-wrap;
+  font: inherit;
+  margin: 0;
 }
 
 /* Botón de reproducción rápida en la tarjeta de canción */
@@ -2365,6 +2527,177 @@ body.con-barra-repro .fab-menu { --fab-subida: -64px; }
 .visor-letra__traducir:disabled,
 .visor-letra__traducir.is-cargando { opacity: 0.6; pointer-events: none; }
 
+/* ============================================================
+   Barra de carga (traducir / generar cómo se pronuncia) — window.BarraProgreso
+   El progreso vive en la custom prop --frac (0..1) del contenedor; el relleno
+   y el destello se escalan con ella (transform: scaleX), así el brillo solo
+   recorre la parte llena. Todo el movimiento va sobre transform / opacity /
+   background-position para ir fino en el WebView.
+   ============================================================ */
+.barra-prog {
+  --frac: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 15px 2px 5px;
+  animation: barraProgEntra 340ms var(--curva) both;
+}
+.barra-prog--fuera { animation: barraProgSale 260ms var(--curva) forwards; }
+
+.barra-prog__pista {
+  position: relative;
+  height: 9px;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--color-acento-suave) 60%, var(--color-fondo)),
+      var(--color-acento-suave));
+  box-shadow:
+    inset 0 1px 2px rgba(7, 7, 7, .09),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-acento) 7%, transparent);
+  overflow: hidden;
+}
+/* Cabeza luminosa que viaja con el progreso (fuera del relleno escalado
+   para no deformarse; se coloca con --frac sobre el ancho de la pista) */
+.barra-prog__pista::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(var(--frac) * 100%);
+  width: 15px;
+  height: 15px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    #fff 0%,
+    color-mix(in srgb, var(--color-acento) 30%, #fff) 34%,
+    color-mix(in srgb, var(--color-acento) 60%, transparent) 55%,
+    transparent 76%);
+  box-shadow: 0 0 7px 1px color-mix(in srgb, var(--color-acento) 45%, transparent);
+  transition: left .58s cubic-bezier(.22, 1, .36, 1);
+  animation: barraProgLatido 1.5s var(--curva) infinite;
+  pointer-events: none;
+}
+
+/* Relleno: pastilla cobalto con volumen (luz arriba, sombra abajo) */
+.barra-prog__relleno {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(var(--frac));
+  border-radius: inherit;
+  background: linear-gradient(177deg,
+    color-mix(in srgb, var(--color-acento) 86%, #fff) 0%,
+    var(--color-acento) 46%,
+    color-mix(in srgb, var(--color-acento) 76%, #000) 100%);
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--color-acento) 45%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, .3);
+  transition: transform .58s cubic-bezier(.22, 1, .36, 1);
+}
+/* Overlay de estado final (verde ok / ámbar fallo): se funde encima */
+.barra-prog__relleno::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  background: linear-gradient(90deg,
+    var(--estado-aprendida),
+    color-mix(in srgb, var(--estado-aprendida) 60%, #fff));
+  transition: opacity .45s var(--curva);
+}
+
+/* Destello diagonal que barre — recortado a la parte llena por el scaleX */
+.barra-prog__brillo {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(var(--frac));
+  border-radius: inherit;
+  background: linear-gradient(100deg,
+    transparent 36%,
+    rgba(255, 255, 255, .3) 46%,
+    rgba(255, 255, 255, .68) 50%,
+    rgba(255, 255, 255, .3) 54%,
+    transparent 64%);
+  background-size: 240% 100%;
+  background-position: 175% 0;
+  animation: barraProgDestello 2.4s var(--curva) infinite;
+  transition: transform .58s cubic-bezier(.22, 1, .36, 1);
+}
+
+.barra-prog__etq {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: .012em;
+  color: var(--color-texto-2);
+  animation: barraProgRespira 1.9s ease-in-out infinite;
+}
+
+/* --- Éxito --- */
+.barra-prog--ok .barra-prog__pista { animation: barraProgFloracion .58s var(--curva); }
+.barra-prog--ok .barra-prog__relleno { animation-play-state: paused; }
+.barra-prog--ok .barra-prog__relleno::before { opacity: 1; }
+.barra-prog--ok .barra-prog__pista::after,
+.barra-prog--ok .barra-prog__brillo { opacity: 0; }
+.barra-prog--ok .barra-prog__etq {
+  color: var(--estado-aprendida);
+  animation: barraProgEtqCambia .42s var(--curva);
+}
+
+/* --- Fallo --- */
+.barra-prog--mal .barra-prog__relleno { animation-play-state: paused; }
+.barra-prog--mal .barra-prog__relleno::before {
+  opacity: 1;
+  background: linear-gradient(90deg,
+    var(--estado-progreso),
+    color-mix(in srgb, var(--estado-progreso) 58%, #fff));
+}
+.barra-prog--mal .barra-prog__pista::after,
+.barra-prog--mal .barra-prog__brillo { opacity: 0; }
+.barra-prog--mal .barra-prog__etq { color: var(--estado-progreso); animation: none; }
+
+@keyframes barraProgEntra {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes barraProgSale {
+  to { opacity: 0; transform: translateY(-5px); }
+}
+@keyframes barraProgDestello {
+  0%   { background-position: 175% 0; }
+  45%  { background-position: -75% 0; }
+  100% { background-position: -75% 0; }
+}
+@keyframes barraProgLatido {
+  0%, 100% { opacity: .45; transform: translate(-50%, -50%) scale(.9); }
+  50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes barraProgRespira {
+  0%, 100% { opacity: .6; }
+  50%      { opacity: 1; }
+}
+@keyframes barraProgFloracion {
+  0%   { transform: scaleY(1); filter: brightness(1); }
+  42%  { transform: scaleY(1.4); filter: brightness(1.16); }
+  100% { transform: scaleY(1); filter: brightness(1); }
+}
+@keyframes barraProgEtqCambia {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barra-prog { animation: none; }
+  .barra-prog--fuera { animation: none; opacity: 0; }
+  .barra-prog__relleno { animation: none; transition: transform .2s linear; }
+  .barra-prog__pista::after { animation: none; transition: none; }
+  .barra-prog__brillo { display: none; }
+  .barra-prog__etq { animation: none; }
+  .barra-prog--ok .barra-prog__pista { animation: none; }
+}
+
 /* La acción principal de estudio: practicar de memoria (cobalto lleno) */
 .visor-letra__memoria {
   color: #fff;
@@ -2374,44 +2707,952 @@ body.con-barra-repro .fab-menu { --fab-subida: -64px; }
 .visor-letra__memoria svg { color: #fff; }
 .visor-letra__memoria:active { background: var(--color-acento-oscuro); }
 
-/* Fila de archivo dentro del grupo "La letra" de los formularios */
-.campo--grupo .archivo-fila { margin: -2px 0 14px; }
-.campo--grupo .campo__sub { margin-bottom: 6px; }
-
-/* Fila de filtros por idioma (biblioteca) */
-.idioma-filtros {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 2px 2px 12px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-.idioma-filtros::-webkit-scrollbar { display: none; }
-.idioma-filtros__chip {
-  flex-shrink: 0;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-texto-2);
-  background: var(--color-superficie);
-  border: 1px solid var(--color-borde);
-  border-radius: 999px;
-  padding: 7px 14px;
-  transition: transform var(--dur-micro) var(--curva), border-color var(--dur-micro) var(--curva), color var(--dur-micro) var(--curva);
-}
-.idioma-filtros__chip:active { transform: scale(0.96); }
-.idioma-filtros__chip.is-activo {
+/* Botón "Ver la letra a pantalla completa" (abre el visor LetraLive) */
+.visor-letra__verletra {
   color: #fff;
   background: var(--color-acento);
   border-color: var(--color-acento);
 }
-/* Segunda fila (etiquetas): pega más a la de idioma, chips con almohadilla */
-.idioma-filtros--etiq { padding-top: 0; margin-top: -8px; }
-.idioma-filtros--etiq .idioma-filtros__chip:not(:first-child)::before {
-  content: "#";
-  opacity: 0.5;
-  margin-right: 2px;
+.visor-letra__verletra svg { color: #fff; }
+.visor-letra__verletra:active { background: var(--color-acento-oscuro); }
+
+/* ============================================================
+   LetraLive — visor de letra a pantalla completa (letralive.js)
+   ============================================================ */
+.letralive {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  background: #100f2c;
+  overflow: hidden;
+  opacity: 0;
+  /* Fundido puro, sin transform: es la capa que contiene el fondo con blur
+     a pantalla completa, y mover eso con translateY obliga a recomponer ese
+     blur en cada frame (se nota "a tirones" en el WebView de Android). Igual
+     que .wrapped / .bv. El "increíble" lo aportan los elementos pequeños de
+     dentro (cabecera, letra, controles), que sí es barato animar. */
+  transition: opacity 180ms var(--curva);
+  padding: max(env(safe-area-inset-top), 14px) env(safe-area-inset-right)
+           max(env(safe-area-inset-bottom), 10px) env(safe-area-inset-left);
+}
+.letralive.is-abierta { opacity: 1; }
+body.letralive-abierta { overflow: hidden; }
+
+/* --- Fondo vivo: gradiente de la app (cobalto) + manchas de luz que
+   se mueven y una capa de color que gira despacio. Los colores además
+   "respiran" con un hue-rotate lento (barato, va por GPU). --- */
+.letralive__fondo {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(158deg, #141134 0%, #1b1550 40%, #16233f 72%, #123043 100%);
+}
+/* El fondo del visor es RICO pero ESTÁTICO: en el WebView de Android, animar
+   `filter` (hue-rotate) o un `filter: blur` grande girando a pantalla completa
+   obliga a rerasterizar cada frame y hace que la pantalla entera "parpadee".
+   Mismas conclusiones que la nota de rendimiento del fondo de la app. */
+.letralive__fondo::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background: conic-gradient(from 0deg,
+    rgba(21, 18, 214, 0.30),
+    rgba(90, 60, 190, 0.22),
+    rgba(76, 122, 90, 0.18),
+    rgba(201, 138, 46, 0.16),
+    rgba(21, 18, 214, 0.30));
+  filter: blur(55px);
+}
+.letralive__blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.62;
+}
+.letralive__blob--1 {
+  width: 86vw; height: 86vw;
+  left: -28%; top: -24%;
+  background: radial-gradient(circle, rgba(21, 18, 214, 0.7), transparent 70%);
+}
+.letralive__blob--2 {
+  width: 78vw; height: 78vw;
+  right: -30%; bottom: -28%;
+  background: radial-gradient(circle, rgba(58, 130, 150, 0.58), transparent 70%);
+}
+.letralive__blob--3 {
+  width: 62vw; height: 62vw;
+  right: -16%; top: 22%;
+  background: radial-gradient(circle, rgba(201, 138, 46, 0.4), transparent 70%);
+}
+.letralive__grano {
+  position: absolute;
+  inset: -50%;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@keyframes ll-gira { to { transform: rotate(360deg); } }
+@keyframes ll-tinte {
+  0%, 100% { filter: hue-rotate(-6deg) saturate(1.02); }
+  33% { filter: hue-rotate(14deg) saturate(1.16); }
+  66% { filter: hue-rotate(-22deg) saturate(1.1); }
+}
+@keyframes ll-b1 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(9%, 7%, 0) scale(1.16); }
+}
+@keyframes ll-b2 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.06); }
+  50% { transform: translate3d(-8%, -7%, 0) scale(1); }
+}
+@keyframes ll-b3 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(0.95); }
+  50% { transform: translate3d(-7%, 10%, 0) scale(1.12); }
+}
+
+/* --- Cabecera --- */
+.letralive__top,
+.letralive__pie { position: relative; z-index: 2; }
+.letralive__top {
+  padding: 18px 14px 6px;
+  opacity: 0;
+  transform: translateY(-10px);
+}
+.letralive.is-abierta .letralive__top { animation: ll-top-in 220ms var(--curva) both; }
+@keyframes ll-top-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: none; }
+}
+.letralive__asa {
+  display: block;
+  width: 38px; height: 5px;
+  margin: 2px auto 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.32);
+}
+.letralive__top-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.letralive__icono {
+  flex: none;
+  width: 40px; height: 40px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border: 0;
+  border-radius: 50%;
+  transition: transform var(--dur-micro) var(--curva), background var(--dur-micro) var(--curva);
+}
+.letralive__icono svg { width: 20px; height: 20px; }
+.letralive__icono:active { transform: scale(0.92); background: rgba(255, 255, 255, 0.24); }
+.letralive__meta { flex: 1 1 auto; min-width: 0; text-align: center; }
+.letralive__titulo {
+  font-family: var(--fuente-titulo);
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.letralive__sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* --- Selector de versión --- */
+.letralive__vistas {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 12px 8px 12px;
+}
+.letralive__vista {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.1);
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 15px;
+  transition: color 220ms var(--curva), background 220ms var(--curva), transform 200ms var(--curva);
+}
+.letralive__vista.is-activa { color: #14172b; background: #fff; }
+.letralive__vista.is-pop { animation: ll-pop 260ms var(--curva); }
+@keyframes ll-pop {
+  0% { transform: scale(0.9); }
+  55% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+/* --- Área de letra --- */
+.letralive__scroll {
+  flex: 1 1 auto;
+  position: relative;
+  z-index: 2;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 5%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 5%, #000 90%, transparent 100%);
+}
+.letralive__lineas {
+  padding: 5vh 26px 20vh;
+  transition: opacity 260ms var(--curva), transform 260ms var(--curva);
+}
+.letralive__lineas.is-saliendo { opacity: 0; transform: translateY(-10px); }
+.letralive__lineas.is-entrando { opacity: 0; transform: translateY(12px); }
+.letralive__esp { height: 16px; }
+
+/* Al abrir por primera vez, la letra entra verso a verso (30-40ms de
+   diferencia entre cada uno), como el resto de listas de la app. */
+.letralive__lineas.is-primera .letralive__linea,
+.letralive__lineas.is-primera .letralive__inst {
+  animation: ll-linea-in 260ms var(--curva) both;
+}
+.letralive__lineas.is-primera .letralive__linea:nth-child(1) { animation-delay: 0ms; }
+.letralive__lineas.is-primera .letralive__linea:nth-child(2) { animation-delay: 30ms; }
+.letralive__lineas.is-primera .letralive__linea:nth-child(3) { animation-delay: 60ms; }
+.letralive__lineas.is-primera .letralive__linea:nth-child(4) { animation-delay: 90ms; }
+.letralive__lineas.is-primera .letralive__linea:nth-child(5) { animation-delay: 120ms; }
+.letralive__lineas.is-primera .letralive__linea:nth-child(6) { animation-delay: 150ms; }
+.letralive__lineas.is-primera .letralive__linea:nth-child(n+7) { animation-delay: 180ms; }
+@keyframes ll-linea-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.letralive__linea {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--fuente-titulo);
+  font-weight: 800;
+  font-size: 27px;
+  line-height: 1.26;
+  letter-spacing: -0.015em;
+  color: rgba(255, 255, 255, 0.24);
+  background: transparent;
+  border: 0;
+  padding: 11px 0;
+  transform-origin: left center;
+  /* Transición larga y muy suave al pasar de un verso a otro (sin tirón). */
+  transition: color 620ms cubic-bezier(0.22, 1, 0.30, 1),
+    transform 760ms cubic-bezier(0.22, 1, 0.30, 1);
+}
+.letralive__txt { display: inline; }
+
+/* Barrido letra a letra: la voz recorre la línea encendiendo cada letra y
+   elevándola con una "ola" suave (variable --lift, 0→1, la pone el JS). */
+.letralive__w {
+  display: inline-block;
+  white-space: nowrap;
+  color: inherit;
+}
+/* El barrido letra a letra es SOLO color: en el WebView de Android, animar
+   transform/scale y un text-shadow de radio variable por cada <span> y en
+   cada frame hace que el texto "vibre" (el glifo se recoloca en la rejilla
+   de píxeles). El efecto de "se enciende de izquierda a derecha" lo lleva
+   entero el cambio de color. */
+.letralive__c {
+  color: inherit;
+  transition: color 200ms var(--curva);
+}
+.letralive__linea.is-activa .letralive__c {
+  color: rgba(255, 255, 255, 0.32);
+}
+.letralive__linea.is-activa .letralive__c.is-on {
+  color: #fff;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.32);
+}
+
+.letralive__t {
+  display: none;
+  margin-left: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+
+.letralive__linea.is-pasada { color: rgba(255, 255, 255, 0.34); transform: scale(0.97); }
+.letralive__linea.is-proxima { color: rgba(255, 255, 255, 0.26); transform: scale(0.98); }
+.letralive__linea.is-anterior { color: rgba(255, 255, 255, 0.52); }
+.letralive__linea.is-siguiente { color: rgba(255, 255, 255, 0.48); }
+.letralive__linea.is-activa {
+  color: #fff;
+  transform: scale(1.022);
+}
+/* Brillo al terminar el verso */
+.letralive__linea.is-fin { animation: ll-fin 700ms var(--curva); }
+@keyframes ll-fin {
+  0% { text-shadow: 0 0 0 rgba(255, 255, 255, 0); }
+  26% { text-shadow: 0 0 26px rgba(255, 255, 255, 0.7); }
+  100% { text-shadow: 0 0 0 rgba(255, 255, 255, 0); }
+}
+.letralive__linea.is-toque { transform: scale(0.97); }
+
+/* Marca de "solo música" (intro instrumental o pausa larga entre versos).
+   Se queda SIEMPRE en su sitio en la letra; solo "late" cuando suena. */
+.letralive__inst {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding: 16px 0 18px;
+  font-size: 20px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.32);
+  transition: color 500ms var(--curva);
+}
+.letralive__inst.is-sonando { color: rgba(255, 255, 255, 0.92); }
+.letralive__inst-b {
+  font-weight: 300;
+  opacity: 0.55;
+}
+.letralive__inst-n {
+  display: inline-block;
+}
+.letralive__inst.is-sonando .letralive__inst-n {
+  animation: ll-inst 1.5s var(--curva) infinite;
+}
+.letralive__inst.is-sonando .letralive__inst-n:nth-child(3) { animation-delay: 0.22s; }
+.letralive__inst.is-sonando .letralive__inst-n:nth-child(4) { animation-delay: 0.44s; }
+@keyframes ll-inst {
+  0%, 70%, 100% { transform: translateY(2px) scale(0.9); opacity: 0.55; }
+  35% { transform: translateY(-3px) scale(1.06); opacity: 1; }
+}
+
+/* Botón flotante "Volver a la letra" (si Maite ha desplazado a mano) */
+.letralive__volver {
+  position: absolute;
+  left: 50%;
+  bottom: 200px;
+  transform: translate(-50%, 14px);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #14172b;
+  background: #fff;
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 16px 9px 13px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 6;
+  transition: opacity 220ms var(--curva), transform 220ms var(--curva);
+}
+.letralive__volver svg { width: 15px; height: 15px; }
+.letralive__volver.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+/* Sin sincronía: lectura estática, todo legible */
+.letralive__lineas:not(.is-karaoke) .letralive__linea {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 25px;
+}
+
+/* Modo ajustar tiempos */
+.letralive__lineas.is-ajustando .letralive__linea {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 19px;
+  padding: 9px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.18);
+}
+.letralive__lineas.is-ajustando .letralive__linea.is-activa { color: #fff; }
+.letralive__lineas.is-ajustando .letralive__t { display: inline; }
+
+/* --- Pie --- */
+.letralive__pie {
+  padding: 22px 22px calc(26px + env(safe-area-inset-bottom));
+  opacity: 0;
+  transform: translateY(16px);
+}
+.letralive.is-abierta .letralive__pie { animation: ll-pie-in 240ms var(--curva) 20ms both; }
+@keyframes ll-pie-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+.letralive__aviso {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 18px;
+  transition: opacity 220ms var(--curva);
+}
+.letralive__aviso--ajuste {
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.82);
+  text-align: center;
+  flex-wrap: wrap;
+}
+.letralive__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: #14172b;
+  background: #fff;
+  border: 0;
+  border-radius: 999px;
+  padding: 11px 20px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+  transition: transform var(--dur-micro) var(--curva), opacity var(--dur-micro) var(--curva);
+}
+.letralive__cta svg { width: 18px; height: 18px; color: var(--color-acento); }
+.letralive__cta:active { transform: scale(0.96); }
+.letralive__cta.is-cargando { opacity: 0.7; pointer-events: none; }
+.letralive__mini {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #14172b;
+  background: #fff;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+
+/* Progreso de la sincronía con la IA: barra que avanza mientras la IA
+   escucha el audio, para que la espera no sea a ciegas. El avance es
+   estimado (Gemini no informa de progreso real): se acerca al ~92% y se
+   frena; al terminar salta al 100%. */
+.letralive__aviso--sinc { width: 100%; }
+.letralive__sincbox {
+  width: 100%;
+  max-width: 340px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 13px 15px 12px;
+}
+.letralive__sinc-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+}
+.letralive__sinc-ic { width: 17px; height: 17px; color: #fff; flex: none; }
+.letralive__sinc-fila [data-ll-prog-txt] {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.letralive__sinc-pct {
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.6);
+  flex: none;
+}
+.letralive__sinc-riel {
+  margin: 9px 0 0;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+.letralive__sinc-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-acento), #fff);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 260ms var(--curva);
+}
+.letralive__sincbox.is-ok .letralive__sinc-fill {
+  background: var(--estado-aprendida, #4c7a5a);
+}
+.letralive__sinc-nota {
+  margin: 8px 0 0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.55);
+}
+@media (prefers-reduced-motion: reduce) {
+  .letralive__sinc-fill { transition: none; }
+}
+
+.letralive__barra { margin-bottom: 12px; }
+.letralive__barra input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  outline: none;
+}
+.letralive__barra input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.letralive__barra input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff;
+}
+.letralive__tiempos {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+.letralive__transport {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  margin-top: 8px;
+}
+.letralive__tp {
+  width: 54px; height: 54px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  transition: transform var(--dur-micro) var(--curva);
+}
+.letralive__tp svg { width: 26px; height: 26px; }
+.letralive__tp:active { transform: scale(0.9); }
+.letralive__tp--play {
+  width: 68px; height: 68px;
+  background: #fff;
+  color: #14172b;
+}
+.letralive__tp--play svg { width: 30px; height: 30px; }
+.letralive__tp--play.is-sonando { animation: ll-pulso 2.6s var(--curva) infinite; }
+
+/* Botón de grabar dentro de la letra a pantalla completa.
+   Va anclado a la derecha para NO descentrar el play/pause. */
+.letralive__tp--rec {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  transform: translateY(-50%);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+.letralive__tp--rec svg { width: 21px; height: 21px; }
+.letralive__tp--rec:active { transform: translateY(-50%) scale(0.9); }
+.letralive__tp--rec.is-grabando {
+  color: #fff;
+  background: #d93025;
+  border-color: transparent;
+  animation: ll-pulso-rec 1.6s var(--curva) infinite;
+}
+@keyframes ll-pulso-rec {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.5); }
+  50% { box-shadow: 0 0 0 12px rgba(217, 48, 37, 0); }
+}
+/* Reserva SIEMPRE su alto (aunque esté vacío) para que al empezar/parar
+   la grabación el transporte no dé un salto. */
+.letralive__rec-t {
+  height: 14px;
+  margin-top: 6px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: #ff8a80;
+}
+/* Con la letra a pantalla completa, el botón de parada global estorba:
+   la propia letra ya trae su botón de grabar. */
+body.letralive-abierta.app-grabando #btn-parar-grabando { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .letralive__tp--rec.is-grabando { animation: none; }
+}
+@keyframes ll-pulso {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.22); }
+  50% { box-shadow: 0 0 0 13px rgba(255, 255, 255, 0); }
+}
+
+/* --- Menú ⋯ --- */
+.letralive__menu {
+  position: absolute;
+  top: 62px;
+  right: 14px;
+  z-index: 5;
+  min-width: 212px;
+  background: #232244;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  animation: ll-menu-in 150ms var(--curva);
+}
+@keyframes ll-menu-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+}
+.letralive__menu-op {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  padding: 11px 12px;
+}
+.letralive__menu-op:active { background: rgba(255, 255, 255, 0.1); }
+.letralive__menu-op.is-peligro { color: #ff9a8f; }
+
+@media (prefers-reduced-motion: reduce) {
+  .letralive__fondo,
+  .letralive__fondo::before,
+  .letralive__blob,
+  .letralive__inst.is-sonando .letralive__inst-n { animation: none; }
+  .letralive__scroll { scroll-behavior: auto; }
+  .letralive__lineas { transition: opacity 120ms linear; }
+  .letralive__lineas.is-saliendo, .letralive__lineas.is-entrando { transform: none; }
+  .letralive__linea,
+  .letralive__linea.is-activa,
+  .letralive__linea.is-pasada,
+  .letralive__linea.is-proxima {
+    transition: color 120ms linear;
+    transform: none !important;
+    animation: none !important;
+  }
+  .letralive__c { transition: color 120ms linear; }
+  .letralive__linea.is-activa .letralive__c { transform: none !important; text-shadow: none; }
+  .letralive__linea.is-fin { animation: none; }
+  .letralive__tp--play.is-sonando { animation: none; }
+  .letralive__vista.is-pop { animation: none; }
+  .letralive, .letralive__menu { transition: opacity 120ms linear; transform: none; }
+  .letralive__top,
+  .letralive__pie,
+  .letralive__lineas.is-primera .letralive__linea,
+  .letralive__lineas.is-primera .letralive__inst {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Fila de archivo dentro del grupo "La letra" de los formularios */
+.campo--grupo .archivo-fila { margin: -2px 0 14px; }
+.campo--grupo .campo__sub { margin-bottom: 6px; }
+
+/* ---- Biblioteca: barra (buscador + botón de filtros) ---- */
+.rep-barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.buscador--inline { flex: 1; min-width: 0; margin: 0; }
+.rep-filtrar {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  color: var(--color-texto-2);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 15px;
+  transition: transform var(--dur-micro) var(--curva),
+              border-color var(--dur-micro) var(--curva),
+              background-color var(--dur-micro) var(--curva),
+              color var(--dur-micro) var(--curva),
+              box-shadow var(--dur-micro) var(--curva);
+}
+.rep-filtrar svg { width: 22px; height: 22px; }
+.rep-filtrar:active { transform: scale(0.92); }
+.rep-filtrar.is-activo {
+  color: #fff;
+  background: var(--color-acento);
+  border-color: var(--color-acento);
+  box-shadow: 0 8px 20px -6px color-mix(in srgb, var(--color-acento) 55%, transparent);
+}
+.rep-filtrar__badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--color-acento);
+  background: var(--color-superficie);
+  border: 2px solid var(--color-acento);
+  border-radius: 999px;
+  animation: badge-pop 220ms var(--curva);
+}
+.rep-filtrar.is-activo .rep-filtrar__badge {
+  color: var(--color-acento);
+  background: #fff;
+  border-color: #fff;
+}
+@keyframes badge-pop {
+  from { transform: scale(0.4); opacity: 0; }
+  60%  { transform: scale(1.12); }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* ---- Píldoras de "filtro activo" sobre la lista ---- */
+.rep-activos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.rep-activos__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-acento);
+  background: var(--color-acento-suave);
+  border: 1px solid color-mix(in srgb, var(--color-acento) 22%, transparent);
+  border-radius: 999px;
+  padding: 6px 11px 6px 13px;
+  transition: transform var(--dur-micro) var(--curva);
+  animation: pill-in 200ms var(--curva);
+}
+.rep-activos__pill:active { transform: scale(0.94); }
+.rep-activos__pill svg { width: 13px; height: 13px; opacity: 0.75; }
+.rep-activos__pill.filtro-op--pendiente {
+  color: var(--estado-pendiente);
+  background: color-mix(in srgb, var(--estado-pendiente) 15%, transparent);
+  border-color: color-mix(in srgb, var(--estado-pendiente) 30%, transparent);
+}
+.rep-activos__pill.filtro-op--progreso {
+  color: var(--estado-progreso);
+  background: color-mix(in srgb, var(--estado-progreso) 15%, transparent);
+  border-color: color-mix(in srgb, var(--estado-progreso) 30%, transparent);
+}
+.rep-activos__pill.filtro-op--aprendida {
+  color: var(--estado-aprendida);
+  background: color-mix(in srgb, var(--estado-aprendida) 15%, transparent);
+  border-color: color-mix(in srgb, var(--estado-aprendida) 30%, transparent);
+}
+@keyframes pill-in {
+  from { transform: translateY(4px) scale(0.9); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* ---- Hoja "Filtrar y ordenar" ---- */
+.filtros-panel {
+  border-radius: 28px 28px 0 0;
+  padding-top: 8px;
+  box-shadow: 0 -24px 60px -20px color-mix(in srgb, var(--color-texto) 30%, transparent);
+}
+.filtros-panel .hoja__asa { width: 44px; height: 5px; margin-bottom: 6px; }
+.filtros-cab {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.filtros-cab .hoja__titulo { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
+.filtros-limpiar {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-acento);
+  background: none;
+  border: none;
+  padding: 4px 2px;
+}
+.filtros-limpiar:active { opacity: 0.6; }
+
+.filtro-seccion { margin-bottom: 22px; animation: filtro-sec-in 320ms var(--curva) both; }
+.filtro-seccion:nth-child(4) { animation-delay: 45ms; }
+.filtro-seccion:nth-child(5) { animation-delay: 90ms; }
+.filtro-seccion:nth-child(6) { animation-delay: 135ms; }
+@keyframes filtro-sec-in {
+  from { transform: translateY(10px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+.filtro-seccion__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-texto-2);
+  margin-bottom: 11px;
+}
+.filtro-opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+/* Control segmentado (Ordenar) — con indicador blanco que se desliza */
+.segmento {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: color-mix(in srgb, var(--color-texto) 6%, transparent);
+  border-radius: 15px;
+}
+.segmento__ind {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  bottom: 4px;
+  width: 0;
+  border-radius: 11px;
+  background: var(--color-superficie);
+  box-shadow: 0 2px 10px -2px color-mix(in srgb, var(--color-texto) 26%, transparent);
+  transform: translateX(0);
+  transition: transform 280ms var(--curva), width 280ms var(--curva);
+  pointer-events: none;
+}
+.segmento__op {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-texto-2);
+  background: transparent;
+  border: none;
+  border-radius: 11px;
+  padding: 11px 4px;
+  white-space: nowrap;
+  transition: color 200ms var(--curva), transform var(--dur-micro) var(--curva);
+}
+.segmento__op:active { transform: scale(0.94); }
+.segmento__op.is-activo { color: var(--color-acento); }
+
+/* Chips de filtro (estado / idioma / etiquetas) */
+.filtro-op {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  border: 1.5px solid var(--color-borde);
+  border-radius: 999px;
+  padding: 10px 17px;
+  transition: transform var(--dur-micro) var(--curva),
+              background-color var(--dur-micro) var(--curva),
+              border-color var(--dur-micro) var(--curva),
+              color var(--dur-micro) var(--curva),
+              box-shadow var(--dur-micro) var(--curva);
+}
+.filtro-op--hash::before { content: "#"; opacity: 0.4; margin-right: -3px; }
+.filtro-op:active { transform: scale(0.95); }
+.filtro-op.is-activo {
+  color: #fff;
+  background: var(--color-acento);
+  border-color: var(--color-acento);
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--color-acento) 60%, transparent);
+}
+/* "Pop" al seleccionar un chip */
+.filtro-op.is-pop { animation: chip-pop 260ms var(--curva); }
+@keyframes chip-pop {
+  0%   { transform: scale(0.9); }
+  55%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+/* Punto de color del estado */
+.filtro-op__punto {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background-color var(--dur-micro) var(--curva);
+}
+.filtro-op--pendiente .filtro-op__punto { background: var(--estado-pendiente); }
+.filtro-op--progreso  .filtro-op__punto { background: var(--estado-progreso); }
+.filtro-op--aprendida .filtro-op__punto { background: var(--estado-aprendida); }
+
+/* Chip de estado activo: se tiñe con SU color, no con el cobalto */
+.filtro-op--estado.is-activo { color: #fff; }
+.filtro-op--pendiente.is-activo {
+  background: var(--estado-pendiente);
+  border-color: var(--estado-pendiente);
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--estado-pendiente) 60%, transparent);
+}
+.filtro-op--progreso.is-activo {
+  background: var(--estado-progreso);
+  border-color: var(--estado-progreso);
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--estado-progreso) 60%, transparent);
+}
+.filtro-op--aprendida.is-activo {
+  background: var(--estado-aprendida);
+  border-color: var(--estado-aprendida);
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--estado-aprendida) 60%, transparent);
+}
+.filtro-op--estado.is-activo .filtro-op__punto { background: #fff; }
+
+/* Botón "Ver N canciones" — ancho completo, protagonista */
+.filtros-ver {
+  width: 100%;
+  margin: 6px 0 0;
+  padding: 15px;
+  font-size: 15.5px;
+  font-weight: 800;
+  border-radius: 16px;
+  box-shadow: 0 12px 26px -10px color-mix(in srgb, var(--color-acento) 65%, transparent);
+}
+.filtros-ver:active { transform: scale(0.985); }
+.filtros-ver__n { display: inline-block; }
+.filtros-ver.is-cambio { animation: ver-pulso 300ms var(--curva); }
+@keyframes ver-pulso {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.035); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filtro-seccion, .rep-activos__pill, .rep-filtrar__badge,
+  .filtro-op.is-pop, .filtros-ver.is-cambio { animation: none; }
+  .segmento__ind { transition: none; }
 }
 
 /* Editor de etiquetas (hoja de canción) */
@@ -2660,6 +3901,45 @@ body.sin-scroll { overflow: hidden; }
   border-radius: var(--radio);
   background: var(--color-superficie);
   cursor: zoom-in;
+}
+
+/* Carrusel horizontal: varias imágenes que se deslizan con el dedo */
+.visor-doc--carrusel .visor-doc__pista {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  gap: 12px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.visor-doc--carrusel .visor-doc__pista::-webkit-scrollbar { display: none; }
+.visor-doc--carrusel .visor-doc__item {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  margin-top: 0 !important;
+}
+.visor-doc__puntos {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.visor-doc__punto {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-borde);
+  transition: background var(--dur-micro) var(--curva), transform var(--dur-micro) var(--curva);
+}
+.visor-doc__punto.is-activo {
+  background: var(--color-acento);
+  transform: scale(1.4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .visor-doc--carrusel .visor-doc__pista { scroll-behavior: auto; }
+  .visor-doc__punto { transition: none; }
 }
 
 /* Fichas de fragmentos difíciles */
@@ -4770,7 +6050,14 @@ body.reordenando { cursor: grabbing; user-select: none; }
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  background: color-mix(in srgb, var(--color-fondo) 50%, transparent);
+  -webkit-backdrop-filter: blur(6px) saturate(1.05);
+  backdrop-filter: blur(6px) saturate(1.05);
+  animation: celebra-fondo 220ms var(--curva) both;
 }
+@keyframes celebra-fondo { from { opacity: 0; } to { opacity: 1; } }
+@keyframes celebra-fondo-salida { to { opacity: 0; } }
+.celebra--saliendo { animation: celebra-fondo-salida 240ms var(--curva) forwards; }
 .celebra__circulo {
   width: 96px;
   height: 96px;
@@ -4839,6 +6126,8 @@ body.reordenando { cursor: grabbing; user-select: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton::after { animation: none; }
+  .celebra { animation: celebra-fondo 120ms linear both; }
+  .celebra--saliendo { animation: celebra-fondo-salida 120ms linear forwards; }
   .celebra__circulo { animation: celebra-pop-simple 700ms linear both; }
   .celebra__circulo svg path { animation: none; stroke-dashoffset: 0; }
   @keyframes celebra-pop-simple { 0%,80% { opacity: 1; } 100% { opacity: 0; } }
@@ -5293,7 +6582,9 @@ body.reordenando { cursor: grabbing; user-select: none; }
 .ui-modal {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  /* Por encima de TODO (letra a pantalla completa z-3000, bloqueo, OTA…): una
+     confirmación que Maite ha pedido siempre tiene que poder responderse. */
+  z-index: 21000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5995,6 +7286,25 @@ body.app-grabando #btn-parar-grabando {
   cursor: pointer;
 }
 
+/* Recibido desde otra app (WhatsApp, Galería…) — ver js/pages/recibido.js */
+.recibido { display: flex; flex-direction: column; gap: 18px; }
+.recibido__origen {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 14px;
+}
+.recibido__ic {
+  width: 22px; height: 22px;
+  color: var(--color-acento);
+  flex-shrink: 0;
+}
+.recibido__nombre { font-weight: 600; color: var(--color-texto); word-break: break-word; }
+.recibido__paso { display: flex; flex-direction: column; gap: 14px; }
+
 /* Mini reproductor dentro de la hoja: adelantar el ensayo sin cerrarla */
 .hoja-repro {
   display: flex;
@@ -6563,6 +7873,31 @@ body.wrapped-abierto { overflow: hidden; }
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Variantes de entrada — reparto cíclico por slide (ver abrir() en
+   wrapped.js) para que el Wrapped no se sienta como el mismo slide
+   repetido con distinto texto. w-var-0 usa el w-rise de siempre. */
+@keyframes w-rise-pop {
+  from { opacity: 0; transform: translateY(16px) scale(0.88); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes w-rise-izq {
+  from { opacity: 0; transform: translateX(-32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes w-rise-der {
+  from { opacity: 0; transform: translateX(32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.w-slide--entra.w-var-1 .w-slide__in > *:where(:not(.w-tops):not(.w-aprend):not(.w-medallas):not(.w-recuerdo)) {
+  animation-name: w-rise-pop;
+}
+.w-slide--entra.w-var-2 .w-slide__in > *:where(:not(.w-tops):not(.w-aprend):not(.w-medallas):not(.w-recuerdo)) {
+  animation-name: w-rise-izq;
+}
+.w-slide--entra.w-var-3 .w-slide__in > *:where(:not(.w-tops):not(.w-aprend):not(.w-medallas):not(.w-recuerdo)) {
+  animation-name: w-rise-der;
+}
+
 /* Listas: los ítems entran escalonados.
    Longhands (no atajo) para que el `animation-delay` de los nth-child no se
    resetee — si no, los ítems 4º y 5º (top del año) entraban de golpe. */
@@ -6657,6 +7992,19 @@ body.wrapped-abierto { overflow: hidden; }
   color: rgba(255, 255, 255, 0.76);
   margin: 0;
 }
+/* En la mitad de los slides la "nota" (el comentario suelto) sale con
+   letra manuscrita, como una anotación al margen — variedad tipográfica
+   contenida al Wrapped, que ya es su propia experiencia de pantalla
+   completa; el resto de la app se queda en Plus Jakarta Sans. */
+.w-var-1 .w-nota, .w-var-3 .w-nota {
+  font-family: 'Caveat', 'Segoe Script', 'Bradley Hand', cursive;
+  font-size: clamp(19px, 5.6vw, 23px);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.86);
+  line-height: 1.3;
+}
+.w-var-1 .w-nota { transform: rotate(-1.2deg); }
+.w-var-3 .w-nota { transform: rotate(1deg); }
 .w-cancion {
   font-family: var(--fuente-titulo);
   font-weight: 800;
@@ -6815,17 +8163,6 @@ body.wrapped-abierto { overflow: hidden; }
   font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
-}
-
-/* Crédito de la música (CC-BY 4.0) — discreto, al pie del cierre */
-.w-creditos {
-  margin: 6px auto 0;
-  color: rgba(255, 255, 255, 0.45);
-  font-family: var(--fuente-texto);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  text-align: center;
 }
 
 /* Mientras la última slide (cierre) está en pantalla, el toque no salta */
@@ -7317,13 +8654,14 @@ body.wrapped-abierto { overflow: hidden; }
 }
 .bv.is-abierta { opacity: 1; }
 
-/* --- Capas de fondo (una por sector, fundido cruzado) --- */
+/* --- Capas de fondo (una por sector, fundido cruzado), a pantalla COMPLETA
+   de `.bv` para que no queden bordes oscuros arriba/abajo. --- */
 .bv-fondos { position: absolute; inset: 0; z-index: 0; }
 .bv-fondo {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity 620ms var(--curva);
+  transition: opacity 520ms var(--curva);
 }
 
 /* --- Barra superior: atrás - progreso - saltar --- */
@@ -7378,16 +8716,87 @@ body.wrapped-abierto { overflow: hidden; }
   justify-content: center;          /* grupo centrado: el aire sobra arriba y abajo por igual */
   gap: clamp(18px, 4.5vh, 40px);
   padding: 24px 26px;
+  /* Transición fluida: fundido + un pelín de deslizamiento lateral. Solo
+     `opacity` y `transform` (nada de scale a pantalla completa). */
   opacity: 0;
-  transform: translateX(0) scale(0.985);
-  transition: opacity 440ms var(--curva), transform 440ms var(--curva);
+  transform: translate3d(0, 0, 0);
+  transition: opacity 400ms var(--curva), transform 400ms var(--curva);
+  backface-visibility: hidden;
 }
 .bv-slide[hidden] { display: none; }
-.bv-slide.is-ent-der { opacity: 0; transform: translateX(46px) scale(0.985); }
-.bv-slide.is-ent-izq { opacity: 0; transform: translateX(-46px) scale(0.985); }
-.bv-slide.is-sal-izq { opacity: 0; transform: translateX(-46px) scale(0.985); }
-.bv-slide.is-sal-der { opacity: 0; transform: translateX(46px) scale(0.985); }
-.bv-slide.is-activo { opacity: 1; transform: none; transition-delay: 30ms; }
+.bv-slide.is-ent-der { opacity: 0; transform: translate3d(40px, 0, 0); }
+.bv-slide.is-ent-izq { opacity: 0; transform: translate3d(-40px, 0, 0); }
+.bv-slide.is-sal-izq { opacity: 0; transform: translate3d(-40px, 0, 0); }
+.bv-slide.is-sal-der { opacity: 0; transform: translate3d(40px, 0, 0); }
+.bv-slide.is-activo  { opacity: 1; transform: translate3d(0, 0, 0); transition-delay: 20ms; }
+/* Ningún sector que no sea el activo anima nada: varias ilustraciones tenían
+   animaciones infinitas SIN atar a `.is-activo` y seguían corriendo ocultas
+   gastando CPU. Selector barato. */
+.bv-slide:not(.is-activo) *,
+.bv-slide:not(.is-activo) *::before,
+.bv-slide:not(.is-activo) *::after { animation-play-state: paused !important; }
+
+/* Decoración congelada durante el deslizamiento entre sectores (JS pone
+   `bv--transicion` ~540 ms). Selector barato: solo los 2 sectores en juego.
+   El texto (`.bv-in`) sí sigue: su entrada `bv-rise` es lo que da vida al
+   momento en que el sector se descubre, y es barata. */
+.bv--transicion .bv-slide.is-activo *,
+.bv--transicion .bv-slide.is-activo *::before,
+.bv--transicion .bv-slide.is-activo *::after,
+.bv--transicion .bv-slide.is-sal-izq *,
+.bv--transicion .bv-slide.is-sal-der * { animation-play-state: paused !important; }
+.bv--transicion .bv-slide.is-activo .bv-in,
+.bv--transicion .bv-slide.is-activo .bv-in * { animation-play-state: running !important; }
+
+/* `backdrop-filter` dentro de la bienvenida: es de lo más caro que hay en
+   el WebView de Android (recompone todo lo que queda por detrás cada
+   frame). Ninguna ilustración lo necesita. */
+.bv .bv-codigo,
+.bv [class*="bv-decor"],
+.bv [class*="bv-decor"] * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Y NADA de `filter` (blur / drop-shadow) en las ilustraciones: varias los
+   animaban en bucle (desenfoque letra a letra en la de la IA, la polaroid
+   revelándose…) y eso mantiene un shader corriendo a pantalla parcial todo
+   el rato — es lo que hacía que, una vez dentro del sector, siguiera
+   lagueado. Los `!important` ganan también a los valores de los keyframes.
+   Las ilustraciones se quedan planas pero se mueven fluidas, que es lo que
+   se ha pedido. */
+.bv [class*="bv-decor"],
+.bv [class*="bv-decor"] *,
+.bv [class*="bv-decor"] *::before,
+.bv [class*="bv-decor"] *::after { filter: none !important; }
+
+/* `will-change` a mano en decenas de elementos de una ilustración (el
+   karaoke tiene un `will-change` por palabra) satura la memoria de GPU del
+   WebView y acaba provocando que recree capas → parpadeos negros. Que
+   decida el navegador. */
+.bv [class*="bv-decor"] * { will-change: auto !important; }
+
+/* PODA GLOBAL (v1.24.5): todas las capas de "adorno" —partículas, chispas,
+   auras, halos, motas, glifos flotando, corazones cayendo, haces de luz—
+   solo suman elementos animándose sin parar. Cada sector conserva su
+   elemento principal y su animación clave; el resto fuera. Es lo que hacía
+   que los cambios de sector fueran lentos en un móvil de 120 Hz. */
+.bv .bv-flota,
+.bv .bv-cae,
+.bv .bv-luna,
+.bv [class$="__chispa"], .bv [class*="__chispa "],
+.bv [class$="__spark"], .bv [class*="__spark "], .bv .bv-ll__sparks,
+.bv [class*="__pulso"],
+.bv [class*="__dust"], .bv .bv-ll__dustwrap,
+.bv [class*="__mota"],
+.bv [class*="__aura"],
+.bv [class*="__glow"],
+.bv [class*="__scan"],
+.bv [class*="__beam"],
+.bv [class*="__halo"],
+.bv [class*="__ping"],
+.bv .bv-est__chispa,
+.bv .bv-ia__pulso { display: none !important; }
 
 /* Ilustración: ocupa solo lo que necesita, encima del texto */
 .bv-decor {
@@ -7461,43 +8870,18 @@ body.wrapped-abierto { overflow: hidden; }
   font-size: 34px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.95);
-  /* de partida, tapada del todo por la derecha */
-  clip-path: inset(-25% 100% -25% -6%);
-}
-.bv-firma__pluma {
-  position: absolute;
-  top: 5px;
-  left: 0;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #FFD98A;
-  box-shadow: 0 0 11px 2px rgba(243, 179, 63, 0.75);
   opacity: 0;
 }
-/* Se escribe a ritmo constante y lento (2 s). El puntito de tinta va
-   con el borde de escritura y, cuando acaba, se apaga poco a poco EN EL
-   SITIO (sin moverse). El puntito dura un poco más que la escritura. */
+.bv-firma__pluma { display: none; }
+/* Entra sola: sube un poco y aparece (solo transform + opacity). Antes
+   animaba `clip-path` (repinta el texto cada frame) + un puntito con
+   `left` (layout cada frame): dos cosas caras justo al entrar al cierre. */
 .bv-slide.is-activo .bv-firma__tx {
-  animation: bv-firma-escribe 2000ms cubic-bezier(0.32, 0.1, 0.5, 0.95) 1100ms both;
+  animation: bv-firma-in 620ms cubic-bezier(0.2, 0.8, 0.3, 1) 1100ms both;
 }
-.bv-slide.is-activo .bv-firma__pluma {
-  animation: bv-firma-pluma-x 2000ms cubic-bezier(0.32, 0.1, 0.5, 0.95) 1100ms both,
-             bv-firma-pluma-o 2650ms linear 1100ms both;
-}
-@keyframes bv-firma-escribe {
-  from { clip-path: inset(-25% 100% -25% -6%); }
-  to   { clip-path: inset(-25% -8% -25% -6%); }
-}
-@keyframes bv-firma-pluma-x {
-  from { left: 0; }
-  to   { left: 100%; }
-}
-@keyframes bv-firma-pluma-o {
-  0%   { opacity: 0; }
-  6%   { opacity: 1; }
-  74%  { opacity: 1; }
-  100% { opacity: 0; }
+@keyframes bv-firma-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ---- Confirmación al "Saltar" ---- */
@@ -7572,7 +8956,7 @@ body.wrapped-abierto { overflow: hidden; }
   align-items: flex-start;
   gap: 5px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.14);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
@@ -7638,7 +9022,10 @@ body.wrapped-abierto { overflow: hidden; }
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.5);
+  /* Sombra contenida: con 34-38 px de blur, al entrar el botón se promovía a
+     capa (por `bv-rise`/`bv-cta-latido`) y rasterizar esa sombra grande daba
+     un parpadeo al llegar al cierre. */
+  box-shadow: 0 10px 20px -12px rgba(0, 0, 0, 0.5);
   transition: transform var(--dur-micro) var(--curva), opacity 320ms var(--curva);
 }
 .bv-cta svg { width: 19px; height: 19px; }
@@ -7649,7 +9036,7 @@ body.wrapped-abierto { overflow: hidden; }
   transform: scale(0.9);
   pointer-events: none;
 }
-.bv-s--cierre .bv-cta { background: linear-gradient(120deg, #FFE9B0, #F3B33F); color: #5A4300; }
+.bv-s--cierre .bv-cta { background: linear-gradient(120deg, #FFE9B0, #F3B33F); color: #5A4300; box-shadow: 0 10px 22px -12px rgba(0, 0, 0, 0.55); }
 /* primero entra (bv-rise), luego late sin parar para pedir que la toquen.
    Selector reforzado para ganar a `.bv-slide.is-activo .bv-in > *`. */
 .bv-slide.bv-s--cierre.is-activo .bv-cta {
@@ -7657,8 +9044,8 @@ body.wrapped-abierto { overflow: hidden; }
              bv-cta-latido 1.7s ease-in-out 1.5s infinite;
 }
 @keyframes bv-cta-latido {
-  0%, 100% { transform: scale(1); box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.5); }
-  50% { transform: scale(1.055); box-shadow: 0 22px 46px -12px rgba(243, 179, 63, 0.5); }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.055); }
 }
 
 /* --- Pie: aviso + indicador de pausa --- */
@@ -7767,15 +9154,17 @@ body.wrapped-abierto { overflow: hidden; }
    Se congelan además las animaciones internas del overlay para que se
    apague quieto. --- */
 .bv.bv--entrando-app {
-  transition:
-    opacity 1500ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 1600ms cubic-bezier(0.22, 1, 0.36, 1),
-    filter 1400ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* "Entrar a un mundo nuevo" = DISOLVENCIA lenta de cine. CERO `transform`
+     y CERO `filter` sobre `.bv` — ya se probó `scale()` y Maite se quejó de
+     que "el slide se mueve mientras se desvanece" (escalar a pantalla
+     completa desplaza el contenido de los bordes), y el blur daba tirones.
+     Solo `opacity`, despacio (~1,3 s) y con una curva suave. El "viaje" lo
+     da el tempo + que la app aparezca por detrás con su propio ritmo. */
+  transition: opacity 1300ms cubic-bezier(0.5, 0, 0.2, 1);
   opacity: 0;
-  /* La portada de bienvenida se aleja hacia dentro: como si la
-     atravesaras al entrar en un sitio nuevo. */
-  transform: scale(1.18);
-  filter: blur(10px);
+  transform: none;
+  filter: none;
+  will-change: opacity;
   pointer-events: none;
 }
 .bv.bv--entrando-app *,
@@ -7788,36 +9177,33 @@ body.wrapped-abierto { overflow: hidden; }
    transform: `#vista` es alto y su centro cae fuera de pantalla, así que
    cualquier `scale` desplazaba el contenido visible. */
 body.bv-aterriza #vista {
-  /* La app entra despacio, enfocándose: primero borrosa y tenue, como
-     cuando tus ojos se acostumbran a una luz nueva. SIN transform
-     (`#vista` es alto y su centro cae fuera de pantalla). */
-  animation: bv-aterrizaje 1500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* El mundo nuevo aparece despacio por OPACIDAD, sin moverse (nada de
+     `transform` en `#vista`: es alto y cualquier scale desplaza lo visible)
+     y sin blur. Empieza un pelín después que se va la bienvenida → hay un
+     instante de "cruce" entre los dos mundos. */
+  animation: bv-aterrizaje 1300ms cubic-bezier(0.33, 1, 0.68, 1) 120ms both;
 }
 @keyframes bv-aterrizaje {
-  0%   { opacity: 0.15; filter: blur(12px); }
-  60%  { opacity: 0.8;  filter: blur(3px); }
-  100% { opacity: 1;    filter: blur(0); }
+  0%   { opacity: 0.08; }
+  100% { opacity: 1; }
 }
 
 /* Golpe corto cuando la instrumental rompe (no cierra: sigue el acto 2) */
-.bv.bv--pulso { animation: bv-pulso 440ms var(--curva) both; }
+/* El "drop" al pasar al acto 2: SOLO un destello de opacidad. Se quitó el
+   `transform: scale()` sobre `.bv` — escalar todo el overlay a pantalla
+   completa re-rasterizaba el árbol entero y provocaba un "corte" negro. */
 .bv.bv--pulso::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 4;
-  background: #fff;
+  background: radial-gradient(circle at 50% 46%, #fff 0%, rgba(255,255,255,0.7) 45%, rgba(255,255,255,0) 78%);
   pointer-events: none;
-  animation: bv-flash 440ms var(--curva) both;
-}
-@keyframes bv-pulso {
-  0% { transform: scale(1); }
-  30% { transform: scale(1.03); }
-  100% { transform: scale(1); }
+  animation: bv-flash 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes bv-flash {
-  0% { opacity: 0; }
-  18% { opacity: 0.5; }
+  0%  { opacity: 0; }
+  22% { opacity: 0.34; }
   100% { opacity: 0; }
 }
 
@@ -8018,7 +9404,9 @@ body.bv-aterriza #vista {
 .bv-s--fases .bv-decor,
 .bv-s--logros .bv-decor,
 .bv-s--conci .bv-decor,
+.bv-s--programa .bv-decor,
 .bv-s--compartir .bv-decor,
+.bv-s--estados .bv-decor,
 .bv-s--notis .bv-decor { overflow: visible; }
 .bv-fases { padding-bottom: 6px; }
 
@@ -8156,6 +9544,7 @@ body.bv-aterriza #vista {
 .bv-ia__linea {
   position: absolute; inset: 0; margin: 0;
   display: flex; justify-content: center; flex-wrap: nowrap;
+  gap: 0.32em;
   white-space: nowrap;
 }
 .bv-ia__linea--fon {
@@ -8171,7 +9560,6 @@ body.bv-aterriza #vista {
   --ox: calc((0.5 - var(--k, 0) / var(--n, 1)) * 190px);
   display: inline-block; font-style: inherit;
   opacity: 0;
-  text-shadow: 0 0 11px rgba(150, 170, 255, 0.6);
   animation-duration: 11s;
   animation-timing-function: cubic-bezier(0.16, 0.8, 0.3, 1);
   animation-iteration-count: infinite;
@@ -8236,6 +9624,31 @@ body.bv-aterriza #vista {
 }
 .bv-ia__flecha { color: rgba(255, 255, 255, 0.5); font-size: 15px; }
 
+/* Sector fusionado: karaoke en directo (arriba) + IA que pronuncia y
+   traduce (abajo), unidos por un haz que sube de la onda a la estrella. */
+.bv-iac {
+  --lh: 40px; --beat: 0.462s; --ww: min(320px, 88vw);
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  overflow: visible;
+}
+.bv-iac .bv-ll__marco { min-height: var(--lh); }
+.bv-iac .bv-ll__linea { font-size: 16px; }
+.bv-iac .bv-ia__salida { height: 26px; }
+.bv-iac__rayo {
+  width: 2px; height: 20px; border-radius: 2px;
+  background: linear-gradient(180deg, rgba(198, 179, 255, 0), rgba(198, 179, 255, 0.95));
+  animation: bv-iac-rayo 11s var(--curva) infinite;
+}
+@keyframes bv-iac-rayo {
+  0%, 3%    { opacity: 0; transform: scaleY(0.35); }
+  8%        { opacity: 1; transform: scaleY(1); }
+  16%, 53%  { opacity: 0; transform: scaleY(0.5); }
+  58%       { opacity: 1; transform: scaleY(1); }
+  66%, 100% { opacity: 0; transform: scaleY(0.5); }
+}
+.bv-iac__nucleo { width: 40px; height: 40px; }
+.bv-iac__etqs { margin-top: 2px; }
+
 /* Eyebrow con la palabra Gemini en degradado y un brillo que barre el texto */
 .bv-eyebrow--gem {
   display: inline-flex; align-items: center; gap: 7px;
@@ -8253,6 +9666,112 @@ body.bv-aterriza #vista {
   animation: bv-gem-sheen 4.5s linear infinite;
 }
 @keyframes bv-gem-sheen { to { background-position: -260% 0; } }
+
+/* --- Letra en directo: KARAOKE ESPACIAL. La pila de versos flota en 3D
+   (el que suena viene al frente y nítido, el resto retrocede y se apaga),
+   un haz de la IA "lee" el verso y sus palabras se encienden una a una al
+   pasar. Debajo, la onda real de la canción con su cabezal de luz. Un aura
+   late al ritmo (--beat). Ciclo de 15 s. transform / opacity (+ blur breve
+   solo en las transiciones de cada verso). --- */
+.bv-decor--letralive { flex-direction: column; overflow: visible; }
+.bv-ll {
+  --lh: 44px;
+  --beat: 0.462s;
+  --ww: min(340px, 90vw);
+  position: relative;
+  width: var(--ww);
+  display: flex; flex-direction: column; align-items: center; gap: 17px;
+  overflow: visible;
+}
+
+/* Chip "sonando" */
+.bv-ll__chip {
+  position: relative; z-index: 3;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 13px 5px 9px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.11);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: rgba(255, 255, 255, 0.74);
+}
+.bv-ll__gem { width: 14px; height: 14px; display: block; flex: 0 0 auto; }
+.bv-ll__gem svg {
+  width: 100%; height: 100%; display: block;
+  animation: bv-gem-nucleo 3s var(--curva) infinite;
+}
+
+/* Escenario de la letra: UN verso centrado y quieto; las palabras se
+   encienden solas. Sin 3D, sin máscara, sin apilado. */
+.bv-ll__marco {
+  position: relative; z-index: 2;
+  width: 100%; min-height: var(--lh);
+  display: flex; align-items: center; justify-content: center;
+  padding: 4px 0;
+}
+.bv-ll__pila { display: contents; }
+.bv-ll__linea {
+  margin: 0;
+  display: flex; align-items: baseline; justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.1em 0.4em;
+  font-size: 17.5px; font-weight: 700;
+  text-align: center;
+}
+
+/* Cada palabra se enciende al pasar el "cabezal". ANTES animaba
+   `background-position` sobre texto con `background-clip:text` → el WebView
+   re-rasterizaba las 13 palabras EN CADA FRAME (era el mayor coste de este
+   sector). Ahora es solo `opacity` + `transform` (compositor): apagada =
+   translúcida, encendida = blanca con un micro-pop. */
+.bv-ll__w {
+  display: inline-block; font-weight: inherit; font-style: normal;
+  color: #fff;
+  opacity: 0.3;
+  animation: bv-ll-word 6s ease-in-out infinite both;
+  animation-delay: calc(var(--w) * 0.9s);
+}
+@keyframes bv-ll-word {
+  0%      { opacity: 0.3; transform: scale(0.96); }
+  8%      { opacity: 1;   transform: scale(1.08); }
+  14%     { opacity: 1;   transform: scale(1); }
+  60%     { opacity: 1;   transform: scale(1); }
+  75%,100%{ opacity: 0.3; transform: scale(1); }
+}
+/* Onda de la canción: 22 barras estáticas, un relleno que barre (clip-path)
+   y un cabezal que corre (translateX). Nada de animar `width`/`left` (era
+   layout en cada frame) ni barras animándose una a una. */
+.bv-ll__wave {
+  position: relative; z-index: 2;
+  width: var(--ww); height: 46px;
+}
+.bv-ll__bars {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; gap: 3px;
+}
+.bv-ll__bars i {
+  flex: 1 1 0; border-radius: 2px;
+  height: calc(var(--h) * 1px); min-height: 3px;
+}
+.bv-ll__bars--bg i { background: rgba(255, 255, 255, 0.16); }
+.bv-ll__bars--on i { background: linear-gradient(180deg, #C6B3FF, #6BA9FF); }
+.bv-ll__fill {
+  position: absolute; inset: 0; overflow: hidden;
+  animation: bv-ll-fill 12s linear infinite;
+}
+@keyframes bv-ll-fill {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+.bv-ll__playhead {
+  position: absolute; left: 0; top: -6px; bottom: -6px;
+  width: 2px; background: #fff;
+  box-shadow: 0 0 10px 1px rgba(169, 139, 255, 0.95);
+  animation: bv-ll-head 12s linear infinite;
+}
+@keyframes bv-ll-head {
+  from { transform: translateX(0); }
+  to   { transform: translateX(var(--ww)); }
+}
 
 /* --- De memoria: una hoja de letra con huecos; la palabra correcta CAE
    en su sitio (sube, se enfoca, chispa, la línea se enciende) y al final
@@ -8409,6 +9928,72 @@ body.bv-aterriza #vista {
 @keyframes bv-ring {
   0%   { opacity: 0.55; transform: scale(1); }
   100% { opacity: 0; transform: scale(2.3); }
+}
+
+/* --- Copia de seguridad: nube que respira + iconos que suben y se funden --- */
+.bv-decor.bv-decor--nube {
+  overflow: visible;
+  min-height: 200px;
+}
+.bv-nube {
+  position: relative;
+  width: 168px;
+  height: 108px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.bv-nube__svg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.28));
+  animation: bv-nube-respira 3.6s var(--curva) infinite;
+}
+@keyframes bv-nube-respira {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.035); }
+}
+.bv-nube__check {
+  position: absolute;
+  right: 18px;
+  bottom: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--estado-aprendida, #4C7A5A);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.5);
+  animation: bv-nube-check-in 520ms cubic-bezier(0.34, 1.6, 0.5, 1) 400ms both,
+             bv-late 2.4s var(--curva) 900ms infinite;
+}
+.bv-nube__check svg { width: 20px; height: 20px; }
+@keyframes bv-nube-check-in {
+  0%   { opacity: 0; transform: scale(0.3) rotate(-20deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+.bv-nube__subidas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.bv-nube__item {
+  position: absolute;
+  left: calc(24% + var(--i) * 26%);
+  bottom: -6px;
+  font-size: 20px;
+  opacity: 0;
+  animation: bv-nube-sube 2.8s ease-in infinite;
+  animation-delay: calc(var(--i) * 0.9s);
+}
+@keyframes bv-nube-sube {
+  0%   { opacity: 0; transform: translateY(0) scale(0.8); }
+  15%  { opacity: 1; }
+  70%  { opacity: 0.9; }
+  100% { opacity: 0; transform: translateY(-88px) scale(0.55); }
 }
 
 /* --- Resumen: las barras suben y bajan suave, sin parar --- */
@@ -8600,6 +10185,430 @@ body.bv-aterriza #vista {
   94%, 100% { opacity: 0; }
 }
 
+/* ============================================================
+   Programa de concierto: la hoja del programa. Las canciones entran
+   en orden, una luz baja marcando "esta toca ahora", cada una se
+   queda cantada con su check + chispa, y al final un barrido de
+   brillo recorre la hoja. Bucle de 11 s. Solo transform / opacity
+   (+ color y sombra, que no cuestan layout). --- */
+.bv-pc {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  overflow: visible;
+}
+/* La pila: la hoja del pase + otros programas asomando por detrás.
+   `margin-right` centra el bloque dejando hueco a la derecha para
+   que el abanico no se salga de pantalla. */
+.bv-pc__pila {
+  position: relative;
+  width: min(258px, 70vw);
+  margin-right: 50px;
+}
+/* Tarjetas de fondo: otros conciertos, cada uno con su lista de
+   canciones ya marcadas. Ocultas tras la hoja hasta que el pase
+   acaba; entonces asoman en abanico hacia la derecha. Sin `scale`
+   final (emborrona el texto): solo desplazamiento + giro leve. */
+.bv-pc__fantasma {
+  position: absolute;
+  inset: 0;
+  padding: 15px 9px 15px 15px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #F1E7D2 0%, #E4D8BC 100%);
+  box-shadow: 0 20px 40px -18px rgba(0, 0, 0, 0.55);
+  transform-origin: 50% 55%;
+  opacity: 0;
+  transform: translateX(6px);
+  z-index: calc(2 - var(--k, 1));
+}
+.bv-pc__fantasma:nth-child(1) { --fx: 26px; --fy: 8px;  --fr: 2deg; }
+.bv-pc__fantasma:nth-child(2) { --fx: 54px; --fy: 15px; --fr: 3.4deg; }
+.bv-pc__fantasma-kick {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #B0842E;
+}
+.bv-pc__fantasma-tit {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #6B5836;
+}
+.bv-pc__fantasma-lista {
+  margin-top: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.bv-pc__ff {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.bv-pc__ff s {
+  flex: 1;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(107, 88, 54, 0.20);
+}
+.bv-pc__ff:nth-child(2n) s { flex: 0 0 78%; }
+.bv-pc__ff:nth-child(3n) s { flex: 0 0 64%; }
+/* Tick a mano: trazo de boli verde, sin círculo, y cada uno con su
+   inclinación/tamaño para que no parezcan clonados. */
+.bv-pc__ff em {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  display: block;
+  color: #3B6B4E;
+}
+.bv-pc__ffcheck {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+.bv-pc__ff:nth-child(1) em { transform: rotate(-7deg) scale(1.02); }
+.bv-pc__ff:nth-child(2) em { transform: rotate(5deg) scale(1.1); }
+.bv-pc__ff:nth-child(3) em { transform: rotate(-3deg) scale(0.92); }
+.bv-pc__ff:nth-child(4) em { transform: rotate(8deg) scale(1.04); }
+.bv-pc__ff:nth-child(5) em { transform: rotate(-5deg) scale(0.97); }
+.bv-pc__fantasma:nth-child(2) .bv-pc__ff:nth-child(1) em { transform: rotate(6deg) scale(0.95); }
+.bv-pc__fantasma:nth-child(2) .bv-pc__ff:nth-child(3) em { transform: rotate(-8deg) scale(1.06); }
+.bv-pc__fantasma:nth-child(2) .bv-pc__ff:nth-child(5) em { transform: rotate(3deg) scale(0.9); }
+.bv-slide.is-activo .bv-pc__fantasma {
+  animation: bv-pc-fantasma 900ms cubic-bezier(0.32, 1.25, 0.5, 1) forwards;
+}
+.bv-slide.is-activo .bv-pc__fantasma:nth-child(1) { animation-delay: 9.9s; }
+.bv-slide.is-activo .bv-pc__fantasma:nth-child(2) { animation-delay: 9.72s; }
+@keyframes bv-pc-fantasma {
+  0%   { opacity: 0; transform: translate(0, 10px) rotate(0); }
+  50%  { opacity: 1; }
+  100% { opacity: 1; transform: translate(var(--fx), var(--fy)) rotate(var(--fr)); }
+}
+
+.bv-pc__hoja {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  padding: 16px 16px 14px;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, #FDF8EE 0%, #F6EEDD 100%);
+  color: #2A2622;
+  box-shadow:
+    0 26px 50px -18px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transform-origin: 50% 100%;
+  opacity: 0;
+  overflow: hidden;
+}
+/* Toda la secuencia se reproduce UNA vez y se queda (el sector solo
+   está en pantalla ~12 s). Nada de `infinite`: al repetirse en bucle
+   el escalonado se perdía y salían todos a la vez.
+   2ª animación: al acabar el pase, la hoja se echa a un lado y deja
+   ver las tarjetas de fondo. `forwards` (no `both`) para no pisar la
+   entrada. */
+.bv-slide.is-activo .bv-pc__hoja {
+  animation:
+    bv-pc-hoja 900ms cubic-bezier(0.34, 1.3, 0.5, 1) both,
+    bv-pc-hoja-aparta 850ms cubic-bezier(0.34, 1.12, 0.5, 1) 9.75s forwards;
+}
+/* Entrada: solo translateY (nada de rotateX/scale, que emborronan el
+   texto bajo `perspective`). Termina exactamente en reposo, nítida. */
+@keyframes bv-pc-hoja {
+  0%   { opacity: 0; transform: translateY(-24px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+/* Se echa a un lado. Sin `scale` final: el giro es suficiente y el
+   texto se queda nítido. */
+@keyframes bv-pc-hoja-aparta {
+  0%   { transform: translate(0, 0) rotate(0); }
+  100% { transform: translate(-8px, -3px) rotate(-3.5deg); }
+}
+/* Barrido de brillo cuando el pase ya está entero */
+.bv-pc__hoja::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(100deg,
+    transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%);
+  transform: translateX(0) skewX(-12deg);
+  opacity: 0;
+  pointer-events: none;
+}
+.bv-slide.is-activo .bv-pc__hoja::after {
+  animation: bv-pc-sheen 1300ms ease-in-out 8.7s both;
+}
+@keyframes bv-pc-sheen {
+  0%   { opacity: 0; transform: translateX(0) skewX(-12deg); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(380%) skewX(-12deg); }
+}
+
+.bv-pc__cab { margin-bottom: 12px; }
+.bv-pc__kicker {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #B0621C;
+}
+.bv-pc__cab b {
+  display: block;
+  margin-top: 3px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #241F1A;
+}
+
+.bv-pc__cuerpo { position: relative; }
+/* El hilo vertical que une los números; ::before es la parte "recorrida".
+   left:21px = centro exacto del círculo del número
+   (fila: padding-left 10px + radio 11px). */
+.bv-pc__hilo {
+  position: absolute;
+  left: 21px;
+  margin-left: -1px;
+  top: 15px;
+  bottom: 17px;
+  width: 2px;
+  background: rgba(42, 38, 34, 0.18);
+  border-radius: 2px;
+  z-index: 0;
+}
+.bv-pc__hilo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #1512D6, #4C7A5A);
+  transform: scaleY(0);
+  transform-origin: 50% 0%;
+}
+.bv-slide.is-activo .bv-pc__hilo::before {
+  animation: bv-pc-hilo 7.4s cubic-bezier(0.4, 0, 0.2, 1) 1.2s both;
+}
+@keyframes bv-pc-hilo {
+  0%   { transform: scaleY(0); }
+  100% { transform: scaleY(1); }
+}
+/* La luz que baja por el hilo, centrada en el mismo eje (21px) */
+.bv-pc__luz {
+  position: absolute;
+  left: 21px;
+  margin-left: -3px;
+  top: 12px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 4px rgba(21, 18, 214, 0.28),
+    0 0 14px 4px rgba(21, 18, 214, 0.65);
+  opacity: 0;
+  transform: translateY(0);
+  z-index: 1;
+}
+.bv-slide.is-activo .bv-pc__luz {
+  animation: bv-pc-luz 7.4s cubic-bezier(0.4, 0, 0.2, 1) 1.2s both;
+}
+@keyframes bv-pc-luz {
+  0%   { opacity: 0; transform: translateY(0); }
+  6%   { opacity: 1; transform: translateY(4px); }
+  90%  { opacity: 1; transform: translateY(150px); }
+  100% { opacity: 0; transform: translateY(156px); }
+}
+
+.bv-pc__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bv-pc__fila {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 34px;
+  padding: 4px 10px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  opacity: 0;
+  transform: translateX(calc(var(--lado, -1) * 26px));
+}
+.bv-slide.is-activo .bv-pc__fila {
+  animation:
+    bv-pc-fila-in 600ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    bv-pc-fila-estado 2800ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-delay:
+    calc(0.5s + var(--n) * 0.16s),
+    calc(1.15s + var(--n) * 1.3s);
+}
+@keyframes bv-pc-fila-in {
+  0%   { opacity: 0; transform: translateX(calc(var(--lado, -1) * 26px)); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+/* pendiente -> AHORA (cobalto) -> cantada (verde, atenuada) */
+@keyframes bv-pc-fila-estado {
+  0%, 14% {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+  24%, 48% {
+    background: rgba(21, 18, 214, 0.10);
+    border-color: rgba(21, 18, 214, 0.30);
+    box-shadow: 0 10px 22px -10px rgba(21, 18, 214, 0.55);
+  }
+  100% {
+    background: rgba(76, 122, 90, 0.10);
+    border-color: rgba(76, 122, 90, 0.22);
+    box-shadow: none;
+  }
+}
+/* Nodo: círculo SIEMPRE opaco (tapa el hilo). Dentro, el dígito y el
+   check se cruzan; nada se sale del círculo. */
+.bv-pc__num {
+  position: relative;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  font-weight: 800;
+  background: #EBE2CD;
+  color: #fff;
+  z-index: 2;
+}
+.bv-pc__digito {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+  color: #8A7F68;
+}
+.bv-pc__tick {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 13px;
+  height: 13px;
+  color: #fff;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.3);
+}
+.bv-slide.is-activo .bv-pc__num {
+  animation: bv-pc-num 2800ms cubic-bezier(0.34, 1.5, 0.5, 1) both;
+  animation-delay: calc(1.15s + var(--n) * 1.3s);
+}
+@keyframes bv-pc-num {
+  0%, 14%   { transform: scale(1);    background: #EBE2CD; }
+  24%       { transform: scale(1.24); background: #1512D6; }
+  40%       { transform: scale(1);    background: #1512D6; }
+  55%, 100% { transform: scale(1);    background: #4C7A5A; }
+}
+.bv-slide.is-activo .bv-pc__digito {
+  animation: bv-pc-digito 2800ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-delay: calc(1.15s + var(--n) * 1.3s);
+}
+@keyframes bv-pc-digito {
+  0%, 14%   { opacity: 1; color: #8A7F68; }
+  24%, 40%  { opacity: 1; color: #fff; }
+  52%, 100% { opacity: 0; color: #fff; }
+}
+.bv-slide.is-activo .bv-pc__tick {
+  animation: bv-pc-tick 2800ms cubic-bezier(0.34, 1.5, 0.5, 1) both;
+  animation-delay: calc(1.15s + var(--n) * 1.3s);
+}
+@keyframes bv-pc-tick {
+  0%, 44%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  56%       { opacity: 1; transform: translate(-50%, -50%) scale(1.18); }
+  66%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.bv-pc__tit {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #3A342C;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bv-slide.is-activo .bv-pc__tit {
+  animation: bv-pc-tit 2800ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-delay: calc(1.15s + var(--n) * 1.3s);
+}
+@keyframes bv-pc-tit {
+  0%, 14%  { opacity: 0.62; transform: translateX(0); }
+  24%      { opacity: 1; transform: translateX(2px); }
+  48%      { opacity: 0.82; transform: translateX(0); }
+  100%     { opacity: 0.82; transform: translateX(0); }
+}
+/* Chispa al terminar cada canción: un halo dorado que revienta
+   alrededor del nodo (mismo eje, por detrás del círculo). */
+.bv-pc__chispa {
+  position: absolute;
+  left: 21px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: #F3B33F;
+  opacity: 0;
+  transform: scale(0);
+  pointer-events: none;
+  z-index: 1;
+}
+.bv-slide.is-activo .bv-pc__chispa {
+  animation: bv-pc-chispa 720ms ease-out both;
+  animation-delay: calc(1.15s + var(--n) * 1.3s + 1.35s);
+}
+@keyframes bv-pc-chispa {
+  0%   { opacity: 0; transform: scale(0); }
+  35%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+
+.bv-pc__pie {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 9px;
+  border-top: 1px dashed rgba(42, 38, 34, 0.22);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8A7F68;
+}
+.bv-pc__pie span { opacity: 0; transform: translateY(6px); }
+.bv-slide.is-activo .bv-pc__pie span {
+  animation: bv-pc-pie 600ms cubic-bezier(0.22, 1, 0.36, 1) 9.2s both;
+}
+.bv-slide.is-activo .bv-pc__pie span:last-child { animation-delay: 9.5s; }
+@keyframes bv-pc-pie {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
 /* --- Avisos: flujo continuo. Cada aviso entra por arriba, se queda un
    rato y se va por abajo; el desfase hace que siempre haya un par a la
    vista y no paren de llegar. --- */
@@ -8773,6 +10782,66 @@ body.bv-aterriza #vista {
   letter-spacing: -0.025em;
 }
 .bv-s--cierre .bv-sub { font-size: clamp(14px, 4vw, 16px); }
+/* Resplandor del marco al llegar al cierre + destello. Antes era un SVG con
+   3 trazos a pantalla completa, cada uno con `drop-shadow` y animando
+   `stroke-dashoffset`: el WebView re-rasterizaba TODA la pantalla a través
+   de un filtro en cada frame → la transición al último sector se atascaba
+   muchísimo. Ahora es SOLO opacidad (el resplandor es un `box-shadow`
+   estático que se enciende, y el destello un degradado que aparece y se
+   va). Cero filtros, cero transform: todo en el compositor. */
+.bv-luz {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0;
+  /* Marco luminoso en el cierre: los CUATRO bordes brillan. SOLO degradados
+     lineales (rasterizan al instante) + un rim fino. SIN `box-shadow` inset
+     con blur — esa convolución a pantalla completa era lo que hacía que el
+     "encendido" del marco no fuera fluido en el primer frame. Los degradados
+     de arriba/abajo van un poco más anchos para dar el "bloom" interior. */
+  border: 1px solid rgba(214, 226, 255, 0.42);
+  background:
+    linear-gradient(180deg, rgba(180, 202, 255, 0.62) 0%, rgba(180, 202, 255, 0.12) 9%, rgba(180, 202, 255, 0) 26%),
+    linear-gradient(0deg,   rgba(180, 202, 255, 0.62) 0%, rgba(180, 202, 255, 0.12) 9%, rgba(180, 202, 255, 0) 26%),
+    linear-gradient(90deg,  rgba(180, 202, 255, 0.5) 0%, rgba(180, 202, 255, 0) 13%),
+    linear-gradient(270deg, rgba(180, 202, 255, 0.5) 0%, rgba(180, 202, 255, 0) 13%);
+}
+/* Un frame antes de encender el marco lo dejamos ya en su propia capa y
+   RASTERIZADO (opacidad casi nula) → cuando arranca el `bv-luz-marco` solo
+   se compone, sin pintar nada de golpe. */
+.bv.bv--precierre:not(.bv--cierre) .bv-luz { opacity: 0.02; }
+.bv.bv--precierre .bv-luz { will-change: opacity; }
+.bv.bv--cierre .bv-luz {
+  /* Se encienden con un fundido MUY suave (1,3 s, ease puro) hasta 0,72 y
+     desde ahí brillan MÁS y MENOS sin parar. CLAVE: `bv-luz-late` empieza y
+     termina en 0,72 (= donde acaba `bv-luz-marco`) → no hay salto entre las
+     dos animaciones, que era lo que hacía rara la "primera toma de contacto". */
+  animation:
+    bv-luz-marco 1400ms cubic-bezier(0.45, 0, 0.55, 1) both,
+    bv-luz-late 5000ms ease-in-out 1400ms infinite;
+}
+
+/* El destello blanco a pantalla completa (`.bv-luz__rayo`) se quitó: era otra
+   capa a pantalla completa que se encendía en el cierre y sumaba al tirón.
+   El marco luminoso ya da suficiente sensación de "cierre". */
+.bv-luz__rayo { display: none; }
+
+@keyframes bv-luz-marco {
+  0%   { opacity: 0; }
+  100% { opacity: 0.72; }
+}
+@keyframes bv-luz-late {
+  0%, 100% { opacity: 0.72; }
+  50%      { opacity: 0.44; }
+}
+
+.bv--sin-motion .bv-luz { animation: none !important; opacity: 0.4; }
+.bv--sin-motion .bv-luz__rayo { animation: none !important; opacity: 0; }
+
 .bv-check svg { width: 100%; height: 100%; fill: none; stroke: #fff; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
 .bv-check circle { stroke-dasharray: 151; stroke-dashoffset: 151; animation: bv-draw 620ms var(--curva) 200ms forwards; }
 .bv-check path { stroke-dasharray: 40; stroke-dashoffset: 40; animation: bv-draw 420ms var(--curva) 640ms forwards; }
@@ -8816,11 +10885,13 @@ body.bv-aterriza #vista {
   border-radius: 20px;
   padding: 15px 15px 17px;
   background: linear-gradient(158deg, #2422E4 0%, #1512D6 55%, #100CA8 100%);
-  box-shadow: 0 24px 48px -18px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  /* Sombra más contenida (antes 48 px de blur): al arrancar el sector, el
+     WebView promovía esta tarjeta a capa y rasterizaba la sombra grande de
+     golpe → un parpadeo al entrar. Además ya NO flota (`bv-lk-bob` fuera):
+     así no se promueve a capa y la sombra se pinta una sola vez. */
+  box-shadow: 0 14px 26px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.14);
   color: #fff;
 }
-.bv-slide.is-activo .bv-lock__card { animation: bv-lk-bob 5.5s ease-in-out infinite; }
-@keyframes bv-lk-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 .bv-lock__cab { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
 .bv-lock__ic { flex: none; width: 34px; height: 34px; border-radius: 9px; overflow: hidden; }
 .bv-lock__ic img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -8830,21 +10901,29 @@ body.bv-aterriza #vista {
   font-size: 12px; color: rgba(255, 255, 255, 0.62);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.bv-lock__barra { position: relative; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); }
+.bv-lock__barra { position: relative; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); container-type: inline-size; }
+/* La barra de progreso del lock: ANTES animaba `width` y `left` (layout en
+   cada frame durante 11 s → parpadeo al entrar al sector). Ahora solo
+   `transform` (scaleX + translateX en `cqw` = % del ancho de la barra). */
 .bv-lock__fill {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 8%;
+  position: absolute; left: 0; top: 0; bottom: 0; width: 100%;
   border-radius: 999px; background: #fff;
+  transform-origin: left center;
+  transform: scaleX(0.07);
 }
 .bv-lock__thumb {
-  position: absolute; top: 50%; left: 8%;
+  position: absolute; top: 50%; left: 0;
   width: 11px; height: 11px; border-radius: 999px; background: #fff;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) translateX(7cqw);
   box-shadow: 0 2px 7px rgba(0, 0, 0, 0.4);
 }
 .bv-slide.is-activo .bv-lock__fill { animation: bv-lk-fill 11s linear infinite; }
 .bv-slide.is-activo .bv-lock__thumb { animation: bv-lk-thumb 11s linear infinite; }
-@keyframes bv-lk-fill { 0% { width: 7%; } 100% { width: 68%; } }
-@keyframes bv-lk-thumb { 0% { left: 7%; } 100% { left: 68%; } }
+@keyframes bv-lk-fill { 0% { transform: scaleX(0.07); } 100% { transform: scaleX(0.68); } }
+@keyframes bv-lk-thumb {
+  0%   { transform: translate(-50%, -50%) translateX(7cqw); }
+  100% { transform: translate(-50%, -50%) translateX(68cqw); }
+}
 .bv-lock__times {
   display: flex; justify-content: space-between; margin-top: 7px;
   font-size: 11px; color: rgba(255, 255, 255, 0.55); font-variant-numeric: tabular-nums;
@@ -8922,11 +11001,240 @@ body.bv-aterriza #vista {
 .bv--sin-motion .bv-lk__vel i:last-child { opacity: 0 !important; }
 .bv--sin-motion .bv-lk__dot { transform: translateX(-50%) scale(1) !important; }
 
-/* --- Accesibilidad: sin movimiento --- */
-.bv--sin-motion .bv-slide {
-  transition: opacity 140ms linear;
-  transform: none !important;
+/* ============================================================
+   Sector Estados: Pendiente -> En progreso -> Aprendida
+   Tres tarjetas desfasadas 1/3 de ciclo: siempre se ven los
+   tres estados a la vez y avanzando. Al tocar "Aprendida":
+   el aro se cierra, el check se dibuja y salta una celebración.
+   ============================================================ */
+.bv-est {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(320px, 84vw);
 }
+.bv-est__card {
+  --d: calc(var(--n) * -3s);
+  --brillo: 0 0 0 rgba(124, 243, 198, 0);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 15px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  will-change: transform;
+}
+.bv-slide.bv-s--estados.is-activo .bv-est {
+  animation: bv-est-in 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes bv-est-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.bv-slide.bv-s--estados.is-activo .bv-est__card {
+  animation: bv-est-card 9s cubic-bezier(0.4, 0, 0.2, 1) var(--d) infinite;
+}
+@keyframes bv-est-card {
+  0%, 12%   { transform: translateY(0) scale(1);
+              box-shadow: 0 10px 24px -16px rgba(0, 0, 0, 0.5); }
+  46%       { transform: translateY(-7px) scale(1.045);
+              box-shadow: 0 20px 44px -14px rgba(52, 214, 150, 0.55),
+                          0 0 0 1px rgba(124, 243, 198, 0.5); }
+  54%, 80%  { transform: translateY(-3px) scale(1.02);
+              box-shadow: 0 16px 34px -16px rgba(52, 214, 150, 0.4),
+                          0 0 0 1px rgba(124, 243, 198, 0.22); }
+  92%, 100% { transform: translateY(0) scale(1);
+              box-shadow: 0 10px 24px -16px rgba(0, 0, 0, 0.5); }
+}
+
+/* Icono: aro de progreso + nota + check */
+.bv-est__ico {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bv-est__ring { position: absolute; inset: 0; transform: rotate(-90deg); overflow: visible; }
+.bv-est__ring-bg { fill: none; stroke: rgba(255, 255, 255, 0.18); stroke-width: 3; }
+.bv-est__ring-fg {
+  fill: none;
+  stroke: #FFCE6B;
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  filter: drop-shadow(0 0 5px rgba(255, 206, 107, 0.7));
+}
+.bv-slide.bv-s--estados.is-activo .bv-est__ring-fg {
+  animation: bv-est-ring 9s cubic-bezier(0.4, 0, 0.2, 1) var(--d) infinite;
+}
+@keyframes bv-est-ring {
+  0%, 12%   { stroke-dashoffset: 100; stroke: #FFCE6B; }
+  44%       { stroke-dashoffset: 34;  stroke: #FFCE6B; }
+  50%       { stroke-dashoffset: 0;   stroke: #5CE6A0;
+              filter: drop-shadow(0 0 9px rgba(92, 230, 160, 0.95)); }
+  80%       { stroke-dashoffset: 0;   stroke: #5CE6A0; }
+  90%, 100% { stroke-dashoffset: 100; stroke: #FFCE6B; }
+}
+.bv-est__nota {
+  font-style: normal;
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.92);
+}
+.bv-slide.bv-s--estados.is-activo .bv-est__nota {
+  animation: bv-est-nota 9s ease var(--d) infinite;
+}
+@keyframes bv-est-nota {
+  0%, 42%   { opacity: 1; transform: scale(1); }
+  47%, 82%  { opacity: 0; transform: scale(0.4); }
+  88%, 100% { opacity: 1; transform: scale(1); }
+}
+.bv-est__check {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  color: #7CF3C6;
+  opacity: 0;
+  stroke-dasharray: 34;
+  stroke-dashoffset: 34;
+}
+.bv-slide.bv-s--estados.is-activo .bv-est__check {
+  animation: bv-est-check 9s cubic-bezier(0.34, 1.6, 0.5, 1) var(--d) infinite;
+}
+@keyframes bv-est-check {
+  0%, 45%  { opacity: 0; stroke-dashoffset: 34; transform: scale(0.3); }
+  50%      { opacity: 1; stroke-dashoffset: 0;  transform: scale(1.25); }
+  56%, 80% { opacity: 1; stroke-dashoffset: 0;  transform: scale(1); }
+  86%, 100% { opacity: 0; stroke-dashoffset: 34; transform: scale(0.3); }
+}
+
+/* Texto + chip de estado */
+.bv-est__tx { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.bv-est__tx b {
+  font-size: 14.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bv-est__chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  height: 21px;
+  padding: 0 10px 0 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: rgba(154, 148, 144, 0.55);
+  max-width: 100%;
+}
+.bv-slide.bv-s--estados.is-activo .bv-est__chip {
+  animation: bv-est-chip 9s cubic-bezier(0.4, 0, 0.2, 1) var(--d) infinite;
+}
+@keyframes bv-est-chip {
+  0%, 10%   { background: rgba(154, 148, 144, 0.55); }
+  16%, 44%  { background: rgba(201, 138, 46, 0.92); }
+  50%, 82%  { background: rgba(52, 170, 116, 0.95); }
+  90%, 100% { background: rgba(154, 148, 144, 0.55); }
+}
+.bv-est__dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #fff;
+}
+.bv-slide.bv-s--estados.is-activo .bv-est__dot {
+  animation: bv-est-dot 9s ease var(--d) infinite;
+}
+@keyframes bv-est-dot {
+  0%, 8%   { transform: scale(1); opacity: 0.9; }
+  13%      { transform: scale(1.9); opacity: 1; }
+  18%, 44% { transform: scale(1); opacity: 0.9; }
+  48%      { transform: scale(2.1); opacity: 1; }
+  54%, 100% { transform: scale(1); opacity: 0.9; }
+}
+.bv-est__labs { display: inline-grid; }
+.bv-est__labs > .bv-est__lab { grid-area: 1 / 1; }
+.bv-est__lab {
+  white-space: nowrap;
+  opacity: 0;
+}
+.bv-slide.bv-s--estados.is-activo .bv-est__lab--pend { animation: bv-est-lp 9s ease var(--d) infinite; }
+.bv-slide.bv-s--estados.is-activo .bv-est__lab--prog { animation: bv-est-lg 9s ease var(--d) infinite; }
+.bv-slide.bv-s--estados.is-activo .bv-est__lab--aprd { animation: bv-est-la 9s ease var(--d) infinite; }
+@keyframes bv-est-lp { 0%, 9% { opacity: 1; } 13%, 87% { opacity: 0; } 92%, 100% { opacity: 1; } }
+@keyframes bv-est-lg { 0%, 12% { opacity: 0; } 17%, 45% { opacity: 1; } 49%, 100% { opacity: 0; } }
+@keyframes bv-est-la { 0%, 47% { opacity: 0; } 52%, 83% { opacity: 1; } 88%, 100% { opacity: 0; } }
+
+/* Celebración: chispas que salen del icono al llegar a Aprendida */
+.bv-est__chispas {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  width: 42px;
+  height: 42px;
+  margin-top: -21px;
+  pointer-events: none;
+}
+.bv-est__chispa {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px;
+  border-radius: 999px;
+  background: #7CF3C6;
+  opacity: 0;
+  box-shadow: 0 0 6px rgba(124, 243, 198, 0.9);
+}
+.bv-slide.bv-s--estados.is-activo .bv-est__chispa {
+  animation: bv-est-chispa 9s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d) infinite;
+}
+@keyframes bv-est-chispa {
+  0%, 46%  { opacity: 0; transform: rotate(calc(var(--a) * 72deg)) translateY(0) scale(0.2); }
+  50%      { opacity: 1; transform: rotate(calc(var(--a) * 72deg)) translateY(-12px) scale(1); }
+  60%      { opacity: 0; transform: rotate(calc(var(--a) * 72deg)) translateY(-30px) scale(0.4); }
+  100%     { opacity: 0; transform: rotate(calc(var(--a) * 72deg)) translateY(-30px) scale(0.4); }
+}
+
+/* Sin movimiento: cada tarjeta se queda en un estado fijo (los tres a la vez) */
+.bv--sin-motion .bv-est,
+.bv--sin-motion .bv-est__card,
+.bv--sin-motion .bv-est__ring-fg,
+.bv--sin-motion .bv-est__nota,
+.bv--sin-motion .bv-est__check,
+.bv--sin-motion .bv-est__chip,
+.bv--sin-motion .bv-est__dot,
+.bv--sin-motion .bv-est__lab,
+.bv--sin-motion .bv-est__chispa { animation: none !important; transform: none !important; }
+.bv--sin-motion .bv-est__chispa { display: none; }
+.bv--sin-motion .bv-est__lab { position: static; opacity: 0; }
+.bv--sin-motion .bv-est__card:nth-child(1) .bv-est__lab--pend,
+.bv--sin-motion .bv-est__card:nth-child(2) .bv-est__lab--prog,
+.bv--sin-motion .bv-est__card:nth-child(3) .bv-est__lab--aprd { opacity: 1; }
+.bv--sin-motion .bv-est__card:nth-child(2) .bv-est__chip { background: rgba(201, 138, 46, 0.92); }
+.bv--sin-motion .bv-est__card:nth-child(3) .bv-est__chip { background: rgba(52, 170, 116, 0.95); }
+.bv--sin-motion .bv-est__card:nth-child(1) .bv-est__ring-fg { stroke-dashoffset: 100; }
+.bv--sin-motion .bv-est__card:nth-child(2) .bv-est__ring-fg { stroke-dashoffset: 40; }
+.bv--sin-motion .bv-est__card:nth-child(3) .bv-est__ring-fg { stroke-dashoffset: 0; stroke: #5CE6A0; }
+.bv--sin-motion .bv-est__card:nth-child(3) .bv-est__nota { opacity: 0; }
+.bv--sin-motion .bv-est__card:nth-child(3) .bv-est__check { opacity: 1; stroke-dashoffset: 0; }
+
+/* --- Accesibilidad: sin movimiento --- */
+.bv--sin-motion .bv-slide { transition: opacity 140ms linear; transform: none !important; }
 .bv--sin-motion .bv-slide.is-ent-der,
 .bv--sin-motion .bv-slide.is-ent-izq,
 .bv--sin-motion .bv-slide.is-sal-izq,
@@ -8960,10 +11268,16 @@ body.bv-aterriza #vista {
 .bv--sin-motion .bv-ia__etq--fon,
 .bv--sin-motion .bv-ia__etq--tra,
 .bv--sin-motion .bv-gem-tx,
+.bv--sin-motion .bv-iac__rayo,
 .bv--sin-motion .bv-memo__hueco i,
 .bv--sin-motion .bv-memo__hueco::after,
 .bv--sin-motion .bv-memo__hueco::before,
-.bv--sin-motion .bv-memo__nota { animation: none !important; }
+.bv--sin-motion .bv-memo__nota,
+.bv--sin-motion .bv-nube__svg,
+.bv--sin-motion .bv-nube__check,
+.bv--sin-motion .bv-nube__item { animation: none !important; }
+.bv--sin-motion .bv-nube__check { opacity: 1 !important; transform: none !important; }
+.bv--sin-motion .bv-nube__item { opacity: 0 !important; }
 .bv--sin-motion .bv-memo__hueco i { opacity: 1 !important; transform: none !important; filter: none !important; }
 .bv--sin-motion .bv-memo__hueco::after { background: rgba(160, 205, 255, 0.8) !important; }
 .bv--sin-motion .bv-memo__nota { opacity: 1 !important; transform: none !important; }
@@ -8977,6 +11291,32 @@ body.bv-aterriza #vista {
 .bv--sin-motion .bv-ia__etq--tra { position: static; opacity: 1 !important; }
 .bv--sin-motion .bv-ia__pulso,
 .bv--sin-motion .bv-ia__scan { display: none; }
+.bv--sin-motion .bv-iac__rayo { opacity: 1 !important; transform: none !important; }
+.bv--sin-motion .bv-ll__aura,
+.bv--sin-motion .bv-ll__glow,
+.bv--sin-motion .bv-ll__beam,
+.bv--sin-motion .bv-ll__dust,
+.bv--sin-motion .bv-ll__pila,
+.bv--sin-motion .bv-ll__linea,
+.bv--sin-motion .bv-ll__w,
+.bv--sin-motion .bv-ll__w::after,
+.bv--sin-motion .bv-ll__spark,
+.bv--sin-motion .bv-ll__wave,
+.bv--sin-motion .bv-ll__clip,
+.bv--sin-motion .bv-ll__playhead,
+.bv--sin-motion .bv-ll__playdot,
+.bv--sin-motion .bv-ll__gem svg { animation: none !important; }
+.bv--sin-motion .bv-ll__aura { opacity: 0.4; transform: translate(-50%, -50%); }
+.bv--sin-motion .bv-ll__glow { opacity: 0.7; transform: translate(-50%, -50%); }
+.bv--sin-motion .bv-ll__beam { opacity: 0; }
+.bv--sin-motion .bv-ll__linea { opacity: 0; transform: none; filter: none; }
+.bv--sin-motion .bv-ll__linea:nth-child(2) { opacity: 0.22; transform: translateY(calc(var(--lh) * -1)); }
+.bv--sin-motion .bv-ll__linea:nth-child(3) { opacity: 1; transform: none; }
+.bv--sin-motion .bv-ll__linea:nth-child(4) { opacity: 0.22; transform: translateY(var(--lh)); }
+.bv--sin-motion .bv-ll__w { background-position: 100% 0; transform: none; filter: none; }
+.bv--sin-motion .bv-ll__linea:nth-child(3) .bv-ll__w { background-position: 0 0; }
+.bv--sin-motion .bv-ll__clip { width: 46%; }
+.bv--sin-motion .bv-ll__playhead { left: 46%; }
 .bv--sin-motion .bv-comp__avion { display: none; }
 .bv--sin-motion .bv-comp__check { opacity: 1 !important; }
 .bv--sin-motion .bv-polaroid__revela { opacity: 0 !important; }
@@ -8996,6 +11336,41 @@ body.bv-aterriza #vista {
   opacity: 1 !important;
   transform: none !important;
 }
+.bv--sin-motion .bv-pc__hoja,
+.bv--sin-motion .bv-pc__hoja::after,
+.bv--sin-motion .bv-pc__hilo::before,
+.bv--sin-motion .bv-pc__luz,
+.bv--sin-motion .bv-pc__fila,
+.bv--sin-motion .bv-pc__num,
+.bv--sin-motion .bv-pc__digito,
+.bv--sin-motion .bv-pc__tick,
+.bv--sin-motion .bv-pc__tit,
+.bv--sin-motion .bv-pc__chispa,
+.bv--sin-motion .bv-pc__pie span { animation: none !important; }
+.bv--sin-motion .bv-pc__hoja { opacity: 1 !important; transform: none !important; }
+.bv--sin-motion .bv-pc__fila { opacity: 1 !important; transform: none !important;
+  background: rgba(76, 122, 90, 0.10); border-color: rgba(76, 122, 90, 0.22); }
+.bv--sin-motion .bv-pc__num { transform: none !important; background: #EBE2CD; }
+.bv--sin-motion .bv-pc__digito { opacity: 1 !important; color: #8A7F68; }
+.bv--sin-motion .bv-pc__tick { opacity: 0 !important; }
+.bv--sin-motion .bv-pc__tit { opacity: 1 !important; transform: none !important; }
+.bv--sin-motion .bv-pc__luz, .bv--sin-motion .bv-pc__chispa { display: none; }
+.bv--sin-motion .bv-pc__hilo::before { transform: scaleY(1) !important; }
+.bv--sin-motion .bv-pc__pie span { opacity: 1 !important; transform: none !important; }
+/* Sin movimiento: las tarjetas de fondo se muestran ya en su sitio,
+   quietas, y la hoja sin ladear. */
+.bv--sin-motion .bv-pc__fantasma {
+  animation: none !important;
+  opacity: 1;
+}
+.bv--sin-motion .bv-pc__fantasma:nth-child(1) {
+  transform: translate(26px, 8px) rotate(2deg);
+}
+.bv--sin-motion .bv-pc__fantasma:nth-child(2) {
+  transform: translate(54px, 15px) rotate(3.4deg);
+}
+.bv--sin-motion .bv-pc__hoja { transform: translate(-8px, -3px) rotate(-3.5deg) !important; }
+
 .bv--sin-motion .bv-firma__tx { animation: none !important; clip-path: none !important; }
 .bv--sin-motion .bv-firma__pluma { display: none; }
 .bv--sin-motion .bv-agrupa__caja { opacity: 1 !important; transform: none !important; }

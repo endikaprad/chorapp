@@ -9,6 +9,15 @@
        Tono cabrón (window.Frases.avisoRacha). Se reprograma en cada
        apertura y al registrar la práctica del día (study.js), así que en
        cuanto estudia, el aviso de esa tarde se cancela solo.
+     - Resumen mensual (día 1, 10:00) y Wrapped anual (31 dic, 12:00).
+     - Conciertos: la víspera a las 19:00 ("mañana cantáis, repasa hoy"),
+       el día a las 13:00 (ánimo) y el día después a las 12:00 ("¿qué tal?").
+     - "Ese trozo difícil sigue ahí": la canción con el fragmento difícil
+       más abandonado (12+ días sin tocar), mañana a las 17:00.
+     - "Medalla a un paso": si el próximo logro de racha/constancia está a
+       1 día de caer, mañana a las 10:00.
+     Las dos últimas y la de racha se recalculan en cada apertura: en cuanto
+     estudia lo que tocaba, el aviso desaparece solo.
 
    window.Avisos.emitir(titulo, texto) lanza una notificación al
    instante. Lo usa control-remoto.js cuando el panel del hijo manda
@@ -92,6 +101,25 @@ window.Avisos = (function () {
   var ID_POST_MAX = 52000000;
   var ID_POST_BASE = 51000000;
   var HORA_POST = 12;
+
+  // "Mañana concierto": la víspera de cada concierto, a las 19:00.
+  // id = ID_VISPERA_BASE + AAAAMMDD del día del concierto.
+  var ID_VISPERA_MIN = 53000000;
+  var ID_VISPERA_MAX = 54000000;
+  var ID_VISPERA_BASE = 53000000;
+  var HORA_VISPERA = 19;
+
+  // "Ese trozo difícil sigue ahí": una sola notificación (la canción con
+  // el fragmento difícil más abandonado), mañana a las 17:00. Se reprograma
+  // en cada apertura, así que en cuanto toca esa canción, desaparece.
+  var ID_TROZO = 17300000;
+  var HORA_TROZO = 17;
+  var DIAS_TROZO = 12;   // días sin tocar la canción para que salte
+
+  // "Te falta un día para la medalla X": una sola notificación, mañana a
+  // las 10:00, cuando un logro de racha/constancia está a 1 día de caer.
+  var ID_LOGRO = 17400000;
+  var HORA_LOGRO = 10;
   var HORA_MES = 10;
   var HORA_ANUAL = 12;
   var MESES_NOMBRE = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
@@ -257,6 +285,115 @@ window.Avisos = (function () {
     });
   }
 
+  /* Aviso la VÍSPERA de cada concierto (19:00): "mañana cantáis, repasa
+     hoy". Recorre los conciertos y programa los que su víspera aún esté
+     por llegar. Complementa a los avisos del día y del día después. */
+  function agregarAvisosVispera(notifs) {
+    if (!window.Conciertos || !window.Conciertos.listar) return;
+    var textoDe = (window.Frases && window.Frases.avisoVispera) || null;
+    var lista = [];
+    try { lista = window.Conciertos.listar() || []; } catch (e) { return; }
+
+    lista.forEach(function (c) {
+      var p = /^(\d{4})-(\d{2})-(\d{2})$/.exec((c && c.fecha) || '');
+      if (!p) return;
+      // día ANTES del concierto, a las 19:00
+      var at = new Date(+p[1], +p[2] - 1, +p[3] - 1, HORA_VISPERA, 0, 0, 0);
+      if (at.getTime() <= Date.now()) return;
+      var ymd = (+p[1]) * 10000 + (+p[2]) * 100 + (+p[3]);
+      notifs.push({
+        id: ID_VISPERA_BASE + ymd,
+        title: 'ChorApp',
+        body: textoDe ? textoDe(c.lugar || '')
+          : 'Mañana hay concierto con Bihotsak. Repasa hoy con calma.',
+        channelId: CANAL_ID,
+        schedule: { at: at, allowWhileIdle: true }
+      });
+    });
+  }
+
+  /* Aviso de "trozo difícil olvidado": busca la canción con un fragmento
+     marcado como difícil que lleve más días sin tocarse (al menos
+     DIAS_TROZO) y programa UNA notificación para mañana a las 17:00.
+     Si mañana toca esa canción, la reprogramación de ese día lo quita. */
+  function agregarAvisoTrozo(notifs) {
+    if (!window.Sesiones || !window.Sesiones.listar || !window.Canciones) return;
+    if (!window.Practica || !window.Practica.leer) return;
+    var textoDe = (window.Frases && window.Frases.avisoTrozo) || null;
+
+    // Última fecha (ISO) en que se estudió cada canción.
+    var ultimo = {};
+    var reg = window.Practica.leer() || {};
+    Object.keys(reg).forEach(function (dia) {
+      (reg[dia] || []).forEach(function (id) {
+        if (id && (!ultimo[id] || dia > ultimo[id])) ultimo[id] = dia;
+      });
+    });
+
+    // Canciones con al menos un fragmento difícil.
+    var conTrozo = {};
+    try {
+      window.Sesiones.listar().forEach(function (s) {
+        (s.marcas || []).forEach(function (m) {
+          if (m.cancionId && (m.fragmentos || []).length) conTrozo[m.cancionId] = true;
+        });
+      });
+    } catch (e) { return; }
+
+    var hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    var mejor = null, masDias = -1;
+    Object.keys(conTrozo).forEach(function (id) {
+      var iso = ultimo[id];
+      if (!iso) return;   // nunca estudiada: no damos la lata todavía
+      var d = new Date(iso + 'T00:00:00');
+      var dias = Math.round((hoy - d) / 86400000);
+      if (dias < DIAS_TROZO) return;
+      var c = window.Canciones.obtener(id);
+      if (!c || c.estado === 'aprendida') return;   // ya aprendida: la dejamos en paz
+      if (dias > masDias) { masDias = dias; mejor = c; }
+    });
+    if (!mejor) return;
+
+    var at = new Date();
+    at.setDate(at.getDate() + 1);
+    at.setHours(HORA_TROZO, 0, 0, 0);
+    notifs.push({
+      id: ID_TROZO,
+      title: 'ChorApp',
+      body: textoDe ? textoDe(mejor.titulo)
+        : 'Ese trozo difícil de «' + mejor.titulo + '» sigue esperándote.',
+      channelId: CANAL_ID,
+      schedule: { at: at, allowWhileIdle: true }
+    });
+  }
+
+  /* Aviso de "medalla a un paso": si el próximo logro pendiente es de racha
+     o de constancia (días) y le falta 1 para caer, programa UNA notificación
+     para mañana a las 10:00. Al conseguirlo, la reprogramación lo quita. */
+  function agregarAvisoLogro(notifs) {
+    if (!window.Logros || !window.Logros.resumen) return;
+    var textoDe = (window.Frases && window.Frases.avisoLogroCerca) || null;
+
+    var sig = null;
+    try { sig = window.Logros.resumen().siguiente; } catch (e) { return; }
+    if (!sig || sig.hecho) return;
+    if (sig.m !== 'racha' && sig.m !== 'dias') return;   // solo los que avanzan estudiando
+    var falta = (sig.objetivo || 0) - (sig.valor || 0);
+    if (falta !== 1) return;
+
+    var at = new Date();
+    at.setDate(at.getDate() + 1);
+    at.setHours(HORA_LOGRO, 0, 0, 0);
+    notifs.push({
+      id: ID_LOGRO,
+      title: 'ChorApp',
+      body: textoDe ? textoDe(sig.titulo)
+        : 'Te falta un día de estudio para la medalla «' + sig.titulo + '».',
+      channelId: CANAL_ID,
+      schedule: { at: at, allowWhileIdle: true }
+    });
+  }
+
   function plugin() {
     var Cap = window.Capacitor;
     return (Cap && Cap.Plugins && Cap.Plugins.LocalNotifications) || null;
@@ -353,7 +490,9 @@ window.Avisos = (function () {
                  (n.id >= ID_RACHA_MIN && n.id <= ID_RACHA_MAX) ||
                  (n.id >= ID_MES_MIN && n.id <= ID_MES_MAX) ||
                  n.id === ID_ANUAL ||
-                 (n.id >= ID_POST_MIN && n.id <= ID_POST_MAX);
+                 (n.id >= ID_POST_MIN && n.id <= ID_POST_MAX) ||
+                 (n.id >= ID_VISPERA_MIN && n.id <= ID_VISPERA_MAX) ||
+                 n.id === ID_TROZO || n.id === ID_LOGRO;
         });
         if (!mias.length) return;
         return LN.cancel({ notifications: mias.map(function (n) { return { id: n.id }; }) });
@@ -388,6 +527,14 @@ window.Avisos = (function () {
 
         // "¿Qué tal el concierto?" el día después de cada concierto (12:00).
         agregarAvisosPostConcierto(notifs);
+
+        // La víspera de cada concierto (19:00): "mañana cantáis, repasa hoy".
+        agregarAvisosVispera(notifs);
+
+        // "Ese trozo difícil sigue ahí" (mañana 17:00) y "medalla a un paso"
+        // (mañana 10:00). Una de cada como mucho; se recalculan en cada apertura.
+        agregarAvisoTrozo(notifs);
+        agregarAvisoLogro(notifs);
 
         return LN.schedule({ notifications: notifs });
       });

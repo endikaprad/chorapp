@@ -1,0 +1,63 @@
+<!-- Recibido desde otra app (WhatsApp, Galería…) — ver src/js/compartido.js -->
+<div class="recibido" data-modulo="recibido">
+
+  <div class="recibido__origen">
+    <span class="recibido__ic archivo-fila__ic" data-ic aria-hidden="true"></span>
+    <div>
+      <p class="recibido__nombre" data-nombre>—</p>
+      <p class="campo__ayuda" data-sub>Recibido desde otra app</p>
+    </div>
+  </div>
+
+  <!-- Audio: ¿canción nueva o ya existente? -->
+  <div class="recibido__paso" data-paso-audio-tipo hidden>
+    <p class="campo__label">¿Qué es este audio?</p>
+    <div class="selcancion__lista">
+      <button type="button" class="selcancion__op" data-opt-nueva>
+        <span class="selcancion__op-tit">Canción nueva</span>
+        <span class="selcancion__op-sub">Crea una ficha del repertorio con este audio</span>
+      </button>
+      <button type="button" class="selcancion__op" data-opt-existente>
+        <span class="selcancion__op-tit">Añadir a una canción que ya tengo</span>
+        <span class="selcancion__op-sub">Se guarda como un ensayo más de esa canción</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Audio -> canción nueva: solo el título -->
+  <form class="recibido__paso" data-paso-titulo hidden novalidate>
+    <label class="campo">
+      <span class="campo__label">Título de la canción</span>
+      <input type="text" name="titulo" required maxlength="120" autocomplete="off" />
+    </label>
+    <p class="campo__ayuda">Podrás añadir compositor, letra o partitura después, desde la ficha.</p>
+    <button type="submit" class="btn btn--primario" data-btn-crear>Crear canción</button>
+  </form>
+
+  <!-- Elegir canción del repertorio (audio existente, o pdf/imagen) -->
+  <div class="recibido__paso" data-paso-cancion hidden>
+    <p class="campo__label" data-lbl-buscar>¿A qué canción pertenece?</p>
+    <div class="selcancion__buscar">
+      <input type="search" data-sel-input autocomplete="off" maxlength="120" placeholder="Escribe el nombre de la canción…" />
+      <div class="selcancion__lista" data-sel-lista></div>
+    </div>
+  </div>
+
+  <!-- PDF / imagen: tipo de adjunto -->
+  <div class="recibido__paso" data-paso-tipo-adjunto hidden>
+    <p class="campo__label">Canción: <strong data-cancion-elegida>—</strong></p>
+    <fieldset class="campo">
+      <legend class="campo__label">¿Qué es este archivo?</legend>
+      <div class="segmentado" role="radiogroup">
+        <label><input type="radio" name="tipoAdjunto" value="partitura" checked /><span>Partitura</span></label>
+        <label><input type="radio" name="tipoAdjunto" value="letra" /><span>Letra</span></label>
+        <label><input type="radio" name="tipoAdjunto" value="fonetica" /><span>Cómo se pronuncia</span></label>
+      </div>
+    </fieldset>
+    <button type="button" class="btn btn--primario" data-btn-guardar-adjunto>Guardar</button>
+  </div>
+
+  <p class="vacio" data-sin-canciones hidden>
+    Aún no tienes ninguna canción en el repertorio. Comparte primero un audio para crear la primera.
+  </p>
+</div>

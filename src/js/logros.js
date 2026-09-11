@@ -51,6 +51,9 @@ window.Logros = (function () {
     estrella: '<path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.9 6.7 19.6l1-5.8L3.5 9.7l5.9-.9z"/>',
     micro: '<rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>',
     trofeo: '<path d="M7 4h10v4a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M9 15h6M8 21h8M12 15v6"/>',
+    sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+    luna: '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/>',
+    etiqueta: '<path d="M11.5 3.5H5a1.5 1.5 0 0 0-1.5 1.5v6.5c0 .4.16.78.44 1.06l8.5 8.5a1.5 1.5 0 0 0 2.12 0l6.5-6.5a1.5 1.5 0 0 0 0-2.12l-8.5-8.5a1.5 1.5 0 0 0-1.06-.44Z"/><circle cx="8" cy="8" r="1.2"/>',
   };
 
   function icono(clave) {
@@ -95,11 +98,23 @@ window.Logros = (function () {
     return arr.slice(0, -1).join(', ') + ' y ' + arr[arr.length - 1];
   }
 
-  /* --- Datos crudos de los que sale todo -------------------- */
-  function datos() {
+  /* --- Datos crudos de los que sale todo --------------------
+     `pre` (opcional): { canciones, sesiones } ya calculados por quien
+     llama (p. ej. Práctica, que ya necesita esas mismas listas para
+     otras cosas), para no volver a leer/sanear/ordenar el repertorio
+     y las sesiones otra vez aquí. */
+  function datos(pre) {
+    pre = pre || {};
     var P = window.Practica;
     var reg = P ? P.leer() : {};
     var diasOrden = Object.keys(reg).sort();
+
+    // Un solo listar() del repertorio (Canciones.obtener() relee y reordena
+    // TODO el repertorio con localeCompare en cada llamada — muy caro
+    // repetido por cada canción/grabación de todo el histórico).
+    var todasCanciones = pre.canciones || (window.Canciones ? window.Canciones.listar() : []);
+    var cancionPorId = {};
+    todasCanciones.forEach(function (c) { cancionPorId[c.id] = c; });
 
     // Canciones distintas, en el orden en que aparecieron por primera vez.
     var vistas = {}, cancionesOrden = [];
@@ -107,23 +122,20 @@ window.Logros = (function () {
       (reg[dia] || []).forEach(function (id) {
         if (id && !vistas[id]) {
           vistas[id] = true;
-          var c = window.Canciones && window.Canciones.obtener(id);
+          var c = cancionPorId[id];
           cancionesOrden.push({ id: id, titulo: (c && c.titulo) || 'una canción' });
         }
       });
     });
 
-    var aprendidas = [];
-    if (window.Canciones) {
-      aprendidas = window.Canciones.listar()
-        .filter(function (c) { return c.estado === 'aprendida'; })
-        .map(function (c) { return c.titulo; });
-    }
+    var aprendidas = todasCanciones
+      .filter(function (c) { return c.estado === 'aprendida'; })
+      .map(function (c) { return c.titulo; });
 
     var grabaciones = [];
     if (window.Grabaciones) {
       grabaciones = window.Grabaciones.listar().map(function (g) {
-        var c = g.cancionId && window.Canciones && window.Canciones.obtener(g.cancionId);
+        var c = g.cancionId && cancionPorId[g.cancionId];
         return {
           titulo: g.titulo || (c && c.titulo) || 'Grabación',
           creado: g.creado || 0,
@@ -132,8 +144,9 @@ window.Logros = (function () {
     }
 
     var trozos = [];
-    if (window.Sesiones) {
-      window.Sesiones.listar().forEach(function (s) {
+    var todasSesiones = pre.sesiones || (window.Sesiones ? window.Sesiones.listar() : null);
+    if (todasSesiones) {
+      todasSesiones.forEach(function (s) {
         (s.marcas || []).forEach(function (m) {
           (m.fragmentos || []).forEach(function (f) {
             trozos.push({ titulo: m.titulo || 'una canción', ts: f.creado || 0 });
@@ -141,6 +154,45 @@ window.Logros = (function () {
         });
       });
       trozos.sort(function (a, b) { return a.ts - b.ts; });
+    }
+
+    // Días con estudio muy temprano (<9h) o muy tarde (≥22h), y test de
+    // memoria perfecto: todo en UNA pasada sobre el diario, leído una sola
+    // vez (Diario.todos()). Antes se releía y re-parseaba el diario entero
+    // por cada día con dias()+delDia(), lo que con meses de historial se
+    // notaba como lag al entrar en Práctica.
+    var madrugaDias = [], noctDias = [], memoriaPerfectas = 0;
+    if (window.Diario) {
+      var diarioCompleto = window.Diario.todos();
+      Object.keys(diarioCompleto).forEach(function (dia) {
+        var horaMin = null, horaMax = null;
+        (diarioCompleto[dia] || []).forEach(function (ev) {
+          if (ev.t === 'estudio' && ev.ts) {
+            var h = new Date(ev.ts).getHours();
+            if (horaMin === null || h < horaMin) horaMin = h;
+            if (horaMax === null || h > horaMax) horaMax = h;
+          } else if (ev.t === 'memoria' && ev.extra && ev.extra.total > 0 &&
+                     ev.extra.aciertos >= ev.extra.total) {
+            memoriaPerfectas++;
+          }
+        });
+        if (horaMin !== null && horaMin < 9) madrugaDias.push(dia);
+        if (horaMax !== null && horaMax >= 22) noctDias.push(dia);
+      });
+    }
+
+    var etiquetadas = todasCanciones
+      .filter(function (c) { return Array.isArray(c.etiquetas) && c.etiquetas.length > 0; }).length;
+
+    var sensacionDias = window.Sensaciones ? window.Sensaciones.dias().length : 0;
+
+    var hoyC = window.Conciertos ? window.Conciertos.hoyISO() : '';
+    var conciertosPasados = 0, recuerdos = 0;
+    if (window.Conciertos) {
+      window.Conciertos.listar().forEach(function (c) {
+        if (c.fecha && c.fecha <= hoyC) conciertosPasados++;
+        if (c.recuerdo && (c.recuerdo.nota || c.recuerdo.foto)) recuerdos++;
+      });
     }
 
     return {
@@ -151,6 +203,13 @@ window.Logros = (function () {
       aprendidas: aprendidas,
       grabaciones: grabaciones,
       trozos: trozos,
+      madrugaDias: madrugaDias,
+      noctDias: noctDias,
+      memoriaPerfectas: memoriaPerfectas,
+      etiquetadas: etiquetadas,
+      sensacionDias: sensacionDias,
+      conciertosPasados: conciertosPasados,
+      recuerdos: recuerdos,
     };
   }
 
@@ -166,6 +225,13 @@ window.Logros = (function () {
       aprendidas: dt.aprendidas.length,
       grabaciones: dt.grabaciones.length,
       trozos: dt.trozos.length,
+      madruga: dt.madrugaDias.length,
+      noct: dt.noctDias.length,
+      memoriaPerfecta: dt.memoriaPerfectas,
+      etiquetadas: dt.etiquetadas,
+      sensaciones: dt.sensacionDias,
+      conciertos: dt.conciertosPasados,
+      recuerdos: dt.recuerdos,
     };
   }
 
@@ -214,6 +280,29 @@ window.Logros = (function () {
       titulo: 'Al detalle',   desc: 'Marcaste 5 trozos difíciles para repasarlos.' },
     { id: 'troz-20',   grupo: 'Detalle', icono: 'estrella', m: 'trozos', objetivo: 20,
       titulo: 'Nada se te escapa', desc: '20 trozos difíciles marcados.' },
+
+    { id: 'memoria-1', grupo: 'Detalle', icono: 'estrella', m: 'memoriaPerfecta', objetivo: 1,
+      titulo: 'De memoria',    desc: 'Superaste el test de memoria sin fallar ni un verso.' },
+    { id: 'memoria-5', grupo: 'Detalle', icono: 'estrella', m: 'memoriaPerfecta', objetivo: 5,
+      titulo: 'Sin chuleta',   desc: '5 veces perfecta en el test de memoria de la letra.' },
+
+    { id: 'madruga-5', grupo: 'Horario', icono: 'sol',  m: 'madruga', objetivo: 5,
+      titulo: 'Madrugadora',  desc: '5 días estudiando antes de las 9 de la mañana.' },
+    { id: 'noct-5',    grupo: 'Horario', icono: 'luna', m: 'noct', objetivo: 5,
+      titulo: 'Búho nocturno', desc: '5 días estudiando pasadas las 22h.' },
+
+    { id: 'etiq-5',    grupo: 'Organización', icono: 'etiqueta', m: 'etiquetadas', objetivo: 5,
+      titulo: 'Todo en su sitio', desc: '5 canciones con etiquetas para organizar el repertorio.' },
+
+    { id: 'sensa-10',  grupo: 'Detalle', icono: 'estrella', m: 'sensaciones', objetivo: 10,
+      titulo: 'Se sincera',   desc: '10 días registrando cómo te sentiste tras el ensayo.' },
+
+    { id: 'concierto-1', grupo: 'Conciertos', icono: 'trofeo', m: 'conciertos', objetivo: 1,
+      titulo: 'Al escenario', desc: 'Viviste tu primer concierto con la app.' },
+    { id: 'concierto-5', grupo: 'Conciertos', icono: 'trofeo', m: 'conciertos', objetivo: 5,
+      titulo: 'De gira',      desc: '5 conciertos. Ya es una temporada.' },
+    { id: 'recuerdo-1',  grupo: 'Conciertos', icono: 'nota',   m: 'recuerdos', objetivo: 1,
+      titulo: 'Para el recuerdo', desc: 'Guardaste tu primer recuerdo de un concierto.' },
   ];
 
   function _construye(l, m) {
@@ -226,8 +315,8 @@ window.Logros = (function () {
     };
   }
 
-  function listar() {
-    var dt = datos();
+  function listar(pre) {
+    var dt = datos(pre);
     var m = metricas(dt);
     var guardados = _hechosGuardados() || [];
     return CATALOGO.map(function (l) {
@@ -243,8 +332,10 @@ window.Logros = (function () {
     });
   }
 
-  function resumen() {
-    var l = listar();
+  // resumen(lista): si ya se llamó a listar() antes (caso habitual: pintar
+  // la grid y luego el resumen), se le pasa esa lista para no recalcularla.
+  function resumen(listaYaCalculada) {
+    var l = listaYaCalculada || listar();
     var hechos = l.filter(function (x) { return x.hecho; }).length;
     var pendientes = l.filter(function (x) { return !x.hecho; })
       .sort(function (a, b) { return b.progreso - a.progreso; });
@@ -316,6 +407,47 @@ window.Logros = (function () {
       var muestraT = songs.slice(0, 5);
       var colaT = songs.length > muestraT.length ? '…' : '.';
       return (hecho ? 'Marcaste ' : 'Llevas ') + v + ' trozos en ' + lista(muestraT) + colaT;
+    }
+
+    if (l.m === 'madruga') {
+      if (!v) return 'Todavía no has estudiado antes de las 9 de la mañana.';
+      return (hecho ? 'Ya van ' : 'Llevas ') + v + (v === 1 ? ' día' : ' días') +
+             ' estudiando antes de las 9. Te ' + (hecho ? 'gusta madrugar.' : 'faltan ' + (obj - v) + '.');
+    }
+
+    if (l.m === 'noct') {
+      if (!v) return 'Todavía no has estudiado pasadas las 22h.';
+      return (hecho ? 'Ya van ' : 'Llevas ') + v + (v === 1 ? ' día' : ' días') +
+             ' estudiando de noche.' + (hecho ? '' : ' Te faltan ' + (obj - v) + '.');
+    }
+
+    if (l.m === 'memoriaPerfecta') {
+      if (!v) return 'Aún no has superado el test de memoria de la letra sin fallos.';
+      return 'Van ' + v + (v === 1 ? ' vez perfecta' : ' veces perfectas') + ' en el test de memoria.' +
+             (hecho ? '' : ' Te faltan ' + (obj - v) + '.');
+    }
+
+    if (l.m === 'etiquetadas') {
+      if (!v) return 'Aún no has puesto etiquetas a ninguna canción.';
+      return 'Tienes ' + v + (v === 1 ? ' canción etiquetada' : ' canciones etiquetadas') + '.' +
+             (hecho ? '' : ' Te faltan ' + (obj - v) + '.');
+    }
+
+    if (l.m === 'sensaciones') {
+      if (!v) return 'Aún no has registrado cómo te sentiste tras un ensayo.';
+      return 'Llevas ' + v + (v === 1 ? ' día' : ' días') + ' contando cómo te sentiste.' +
+             (hecho ? '' : ' Te faltan ' + (obj - v) + '.');
+    }
+
+    if (l.m === 'conciertos') {
+      if (!v) return 'Todavía no ha llegado tu primer concierto.';
+      return 'Llevas ' + v + (v === 1 ? ' concierto' : ' conciertos') + '.' +
+             (hecho ? '' : ' Te faltan ' + (obj - v) + '.');
+    }
+
+    if (l.m === 'recuerdos') {
+      if (!v) return 'Aún no has guardado ningún recuerdo de un concierto.';
+      return 'Tienes ' + v + (v === 1 ? ' recuerdo guardado' : ' recuerdos guardados') + '.';
     }
 
     return l.desc;

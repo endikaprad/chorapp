@@ -2,10 +2,10 @@
    wrapped-music.js — La música de fondo del Wrapped.
 
    Capa 1 (la que suena): una instrumental real por mes, en
-   audio/wrapped/ (mes-00.mp3 … mes-11.mp3 y anual.mp3). Son cortes
-   de ~80 s con fundido de entrada y salida, hechos para sonar en
-   bucle por debajo de los textos. Música de Scott Buckley
-   (scottbuckley.com.au), CC-BY 4.0 — ver audio/wrapped/CREDITOS.txt.
+   audio/wrapped/ (01-*.mp3 … 11-*.mp3 y anual-gran-via.mp3). Los
+   meses van del 01 (enero) al 11 (noviembre); diciembre lo cubre el
+   Wrapped anual y no tiene pista propia. Cada pista arranca en un
+   segundo concreto, "no antes" — ver audio/wrapped/LEEME.txt.
 
    Capa 2 (red de seguridad): si el MP3 del mes no carga (sin archivo,
    sin conexión, formato no soportado…), se cae a una música
@@ -398,12 +398,29 @@ window.WrappedMusic = (function () {
   var vigilante = null;
   var fadeId = 0;
   var mesActual = null;
+  var inicioActual = 0;      // segundo por el que arranca (y reengancha) la pista
   var descartando = false;   // true mientras desmontamos un <audio> a propósito
 
-  function archivoDe(mes) {
-    if (mes === 'anual') return RUTA + 'anual.mp3';
-    var n = Number(mes) || 0;
-    return RUTA + 'mes-' + (n < 10 ? '0' + n : '' + n) + '.mp3';
+  // Archivo y segundo de arranque de cada instrumental. Meses 0-10 = enero-
+  // noviembre; diciembre (11) no tiene pista y cae al motor sintetizado.
+  // Ver audio/wrapped/LEEME.txt.
+  var PISTAS = {
+    0:  { archivo: '01-dtmf.mp3',                 inicio: 0 },
+    1:  { archivo: '02-detras-de-tu-alma.mp3',    inicio: 11 },
+    2:  { archivo: '03-cosa-nuestra.mp3',         inicio: 12 },
+    3:  { archivo: '04-alambre-pua.mp3',          inicio: 0 },
+    4:  { archivo: '05-amar-de-nuevo.mp3',        inicio: 50.5 },
+    5:  { archivo: '06-tu-con-el.mp3',            inicio: 0 },
+    6:  { archivo: '07-committed.mp3',            inicio: 15 },
+    7:  { archivo: '08-si-estas-con-alguien.mp3', inicio: 0 },
+    8:  { archivo: '09-carita-linda.mp3',         inicio: 0 },
+    9:  { archivo: '10-dios-es-un-stalker.mp3',   inicio: 0 },
+    10: { archivo: '11-buenas-noches.mp3',        inicio: 10 },
+    anual: { archivo: 'anual-gran-via.mp3',       inicio: 41 }
+  };
+
+  function pistaDe(mes) {
+    return (mes === 'anual') ? PISTAS.anual : (PISTAS[Number(mes)] || null);
   }
 
   // Al vaciar el src saltan eventos 'error'/'emptied' en el propio elemento.
@@ -420,6 +437,8 @@ window.WrappedMusic = (function () {
     try {
       a.removeEventListener('error', alError);
       a.removeEventListener('canplay', alCanPlay);
+      a.removeEventListener('ended', alFin);
+      a.removeEventListener('timeupdate', alTiempo);
       a.pause();
       a.removeAttribute('src');
       a.load();
@@ -435,8 +454,34 @@ window.WrappedMusic = (function () {
   function alCanPlay() {
     if (descartando || this !== audio || usandoSint) return;
     if (vigilante) { clearTimeout(vigilante); vigilante = null; }
+    if (inicioActual > 0 && audio.currentTime < inicioActual) {
+      try { audio.currentTime = inicioActual; } catch (e) {}
+    }
     reproducir();
     rampa(volObjetivo(), 1400);   // fundido de entrada
+  }
+
+  // Bucle manual cuando la pista no arranca en 0: al terminar, volvemos al
+  // segundo de inicio en vez de al principio.
+  function alFin() {
+    if (descartando || this !== audio || usandoSint) return;
+    try { audio.currentTime = inicioActual; } catch (e) {}
+    reproducir();
+  }
+
+  // Red de seguridad para el bucle manual: en algún WebView de Android el
+  // evento 'ended' no llega siempre en pistas largas (p.ej. la del anual,
+  // ~213s), y la música se queda muda al terminar. Con 'timeupdate'
+  // detectamos el final igualmente y reenganchamos a mano.
+  var reenganchando = false;
+  function alTiempo() {
+    if (descartando || this !== audio || usandoSint || reenganchando) return;
+    if (inicioActual <= 0 || !isFinite(audio.duration)) return;
+    if (audio.duration - audio.currentTime > 0.35) return;
+    reenganchando = true;
+    try { audio.currentTime = inicioActual; } catch (e) {}
+    reproducir();
+    setTimeout(function () { reenganchando = false; }, 300);
   }
 
   function volObjetivo() {
@@ -477,14 +522,20 @@ window.WrappedMusic = (function () {
     nivelActual = 1;
     mesActual = mes;
 
+    var p = pistaDe(mes);
+    if (!p) { caerASintetico(mes); return; }
+    inicioActual = p.inicio || 0;
+
     try {
-      audio = new Audio(archivoDe(mes));
-      audio.loop = true;
+      audio = new Audio(RUTA + p.archivo);
+      audio.loop = inicioActual === 0;   // si arranca >0, el bucle es manual (alFin)
       audio.preload = 'auto';
       audio.volume = 0;
 
       audio.addEventListener('error', alError);
       audio.addEventListener('canplay', alCanPlay);
+      audio.addEventListener('ended', alFin);
+      audio.addEventListener('timeupdate', alTiempo);
 
       vigilante = setTimeout(function () {
         if (!usandoSint && (!audio || audio.readyState < 2)) caerASintetico(mes);
@@ -515,6 +566,8 @@ window.WrappedMusic = (function () {
     usandoSint = false;
     nivelActual = 1;
     mesActual = null;
+    inicioActual = 0;
+    reenganchando = false;
   }
 
   return { iniciar: iniciar, nivel: nivel, reanudar: reanudar, parar: parar };

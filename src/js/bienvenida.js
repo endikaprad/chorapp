@@ -18,7 +18,7 @@ window.Bienvenida = (function () {
   'use strict';
 
   var CLAVE = 'bienvenida';   // Almacen: { v, fecha } cuando ya se ha visto
-  var VERSION = 11;
+  var VERSION = 12;
 
   /* La instrumental "Inner Light" suena de fondo.
      ACTO 1 (la historia) va sincronizado con la música: cada sector
@@ -26,7 +26,12 @@ window.Bienvenida = (function () {
      "drop" (cuando la canción rompe). Ahí termina el ACTO 1.
      ACTO 2 (cómo funciona) empieza en el drop y se pasa solo con su
      propio ritmo (ACTO2_BORDES, segundos DESDE el drop). */
-  var AUDIO_SRC = 'audio/inner-light.mp3';
+  var AUDIO_SRC = 'audio/instrumental/inner-light.mp3';
+  // Segunda pieza: entra cuando 'inner-light' termina, subiendo el volumen
+  // MUY poco a poco. Empieza desde el segundo 28 (no antes).
+  var AUDIO_SRC2 = 'audio/instrumental/kassandra.mp3';
+  var AUDIO2_DESDE = 28;      // segundo de arranque de kassandra
+  var AUDIO2_FADE = 14000;    // rampa de volumen larguísima (ms)
   var DROP = 47.5;
   var VOL = 0.85;
 
@@ -52,7 +57,7 @@ window.Bienvenida = (function () {
     });
     BORDES[BORDES.length - 1] = DROP;
 
-    var d2 = datos.slice(IDX_ACTO2, datos.length - 1).map(function (s) { return s.dur || 10; });
+    var d2 = datos.slice(IDX_ACTO2, datos.length - 1).map(function (s) { return (s.dur || 10) + 0.5; }); // medio segundo extra por slide del "cómo funciona"
     ACTO2_BORDES = [0];
     d2.forEach(function (x) { ACTO2_BORDES.push(ACTO2_BORDES[ACTO2_BORDES.length - 1] + x); });
     ACTO2_BORDES.push(ACTO2_BORDES[ACTO2_BORDES.length - 1] + 1); // +1 s para llenar la barra del cierre
@@ -60,16 +65,37 @@ window.Bienvenida = (function () {
 
   var raiz = null;
   var slides = [];
-  var fondos = [];
   var idx = 0;
   var acto = 1;
   var empezado = false;   // false hasta que Ama pulsa "Listo" en el sector 0
 
   var audio = null;
+  var audio2 = null;      // kassandra: entra al acabar inner-light
+  var fondos = [];
   var raf = null;
   var iniMs = 0, pausaMs = 0, pausaIni = 0, enPausa = false;
   var rematando = false;
   var holdT = null;
+
+  /* Pantalla siempre despierta mientras dura la bienvenida: son varios
+     minutos de slides que se pasan solos y Ama no toca la pantalla, así
+     que el móvil la apagaría a media historia. Usa la Wake Lock API del
+     WebView; si no está, no pasa nada. Se libera al cerrar y hay que
+     volver a pedirla al volver de segundo plano (el sistema la suelta). */
+  var _wakeLock = null;
+  function pedirWakeLock() {
+    try {
+      if (!navigator.wakeLock || _wakeLock) return;
+      navigator.wakeLock.request('screen').then(function (wl) {
+        _wakeLock = wl;
+        wl.addEventListener('release', function () { _wakeLock = null; });
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  function soltarWakeLock() {
+    try { if (_wakeLock) _wakeLock.release(); } catch (e) {}
+    _wakeLock = null;
+  }
 
 
   /* Vibración sutil (móvil). Con @capacitor/haptics si está; si no,
@@ -88,6 +114,21 @@ window.Bienvenida = (function () {
           : tipo === 'exito' ? [0, 12, 26, 12, 26, 22] : 12);
       }
     } catch (e) {}
+  }
+
+  /* El "drop": cuando la línea de luz se cierra y revienta. Golpe doble,
+     más fuerte que `vibrar('fuerte')`. */
+  function golpeDrop() {
+    if (reducido()) return;
+    try {
+      var H = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
+      if (H && H.impact) {
+        H.impact({ style: 'HEAVY' });
+        window.setTimeout(function () { try { H.impact({ style: 'HEAVY' }); } catch (e) {} }, 150);
+        return;
+      }
+    } catch (e) {}
+    try { if (navigator.vibrate) navigator.vibrate([0, 55, 45, 160]); } catch (e) {}
   }
 
   function _now() {
@@ -161,7 +202,7 @@ window.Bienvenida = (function () {
   // de app (cuadrado redondeado).
   var LOGO =
     '<span class="bv-logo-chip" aria-hidden="true">' +
-      '<img class="bv-logo-img" src="images/logo-app.jpg" alt="" />' +
+      '<img class="bv-logo-img" src="images/logo-app.jpg" alt="" decoding="async" />' +
     '</span>';
 
   // Auriculares de diadema (portada .bv-gate).
@@ -226,7 +267,65 @@ window.Bienvenida = (function () {
       '<span class="bv-agrupa__caja"><b>Ensayo del martes</b></span>' + li + '</div>';
   }
 
+  // Sector Estados: tres canciones del repertorio. Cada una recorre en
+  // bucle Pendiente -> En progreso -> Aprendida, desfasadas entre sí, así
+  // que siempre se ven los tres estados a la vez y "avanzando". Al llegar
+  // a Aprendida: el aro se cierra, el check se dibuja y salta una pequeña
+  // celebración (brillo + chispas).
+  function estadosCanciones() {
+    var t = ['Txoria txori', 'Ave verum', 'Hallelujah'];
+    var chispas = '';
+    for (var c = 1; c <= 5; c++) chispas += '<i class="bv-est__chispa" style="--a:' + c + '"></i>';
+    var cards = t.map(function (n, i) {
+      return '<div class="bv-est__card" style="--n:' + i + '">' +
+        '<span class="bv-est__ico">' +
+          '<svg class="bv-est__ring" viewBox="0 0 40 40">' +
+            '<circle class="bv-est__ring-bg" cx="20" cy="20" r="16"/>' +
+            '<circle class="bv-est__ring-fg" cx="20" cy="20" r="16" pathLength="100"/>' +
+          '</svg>' +
+          '<i class="bv-est__nota">&#9834;</i>' +
+          '<svg class="bv-est__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+            'stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M4 12l6 6 10-13"/></svg>' +
+        '</span>' +
+        '<div class="bv-est__tx">' +
+          '<b>' + n + '</b>' +
+          '<span class="bv-est__chip">' +
+            '<i class="bv-est__dot"></i>' +
+            '<span class="bv-est__labs">' +
+              '<span class="bv-est__lab bv-est__lab--pend">Pendiente</span>' +
+              '<span class="bv-est__lab bv-est__lab--prog">En progreso</span>' +
+              '<span class="bv-est__lab bv-est__lab--aprd">Aprendida</span>' +
+            '</span>' +
+          '</span>' +
+        '</div>' +
+        '<span class="bv-est__chispas">' + chispas + '</span>' +
+      '</div>';
+    }).join('');
+    return '<div class="bv-est" aria-hidden="true">' + cards + '</div>';
+  }
+
   // Sector Logros: medallas que van cayendo, una con brillo.
+  // Sector "Copia de seguridad": una nube con un check que respira, y
+  // tres iconos (canción, nota, grabación) que suben desde abajo y se
+  // funden dentro de ella, en bucle — la idea de "sube sola y a salvo".
+  function nubeCopia() {
+    var iconos = ['🎵', '📝', '🎙️'];
+    var subidas = iconos.map(function (ic, i) {
+      return '<span class="bv-nube__item" style="--i:' + i + '">' + ic + '</span>';
+    }).join('');
+    return '<div class="bv-nube" aria-hidden="true">' +
+      '<div class="bv-nube__subidas">' + subidas + '</div>' +
+      '<svg class="bv-nube__svg" viewBox="0 0 24 24" aria-hidden="true">' +
+        '<path fill="#fff" d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>' +
+      '</svg>' +
+      '<span class="bv-nube__check">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" ' +
+          'stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4 10-11"/></svg>' +
+      '</span>' +
+    '</div>';
+  }
+
   function medallas() {
     var m = [['🔥', '#FF7A3D'], ['⭐', '#F3B33F'], ['🎵', '#5A67E8'],
              ['🏆', '#FFD24A'], ['💪', '#4C7A5A']];
@@ -259,9 +358,67 @@ window.Bienvenida = (function () {
     return '<div class="bv-conci" aria-hidden="true">' +
       '<div class="bv-cal bv-cal--mini">' + cel + '</div>' +
       '<div class="bv-polaroid">' +
-        '<div class="bv-polaroid__foto"><img src="images/bihotsak-grupo.jpg" alt="" />' +
+        '<div class="bv-polaroid__foto"><img src="images/bihotsak-grupo.jpg" alt="" decoding="async" />' +
           '<i class="bv-polaroid__revela"></i></div>' +
         '<div class="bv-polaroid__pie">San Pedro · lo bordaste</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  // Sector "Programa de concierto": la hoja del programa con las canciones
+  // EN EL ORDEN del pase. Una luz baja por la lista marcando "esta toca
+  // ahora"; cada canción que pasa se queda cantada con su check y una
+  // chispa. Al final, un barrido de brillo sobre la hoja entera. En bucle.
+  function programaConcierto() {
+    var orden = ['Gaudeamus hodie', 'Ave verum corpus', 'Txoria txori',
+      'Locus iste', 'Hallelujah'];
+    var filas = orden.map(function (n, i) {
+      var lado = i % 2 === 0 ? -1 : 1;
+      return '<li class="bv-pc__fila" style="--n:' + i + ';--lado:' + lado + '">' +
+        '<span class="bv-pc__num">' +
+          '<b class="bv-pc__digito">' + (i + 1) + '</b>' +
+          '<svg class="bv-pc__tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+          'stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M4 12l6 6 10-13"/></svg>' +
+        '</span>' +
+        '<span class="bv-pc__tit">' + n + '</span>' +
+        '<i class="bv-pc__chispa"></i>' +
+      '</li>';
+    }).join('');
+    // Al acabar el pase, la hoja se echa a un lado y asoman por detrás
+    // otros programas (más conciertos, más listas de canciones).
+    // Check dibujado a mano (trazo irregular, como marcado con boli).
+    var CHECK_MANO =
+      '<svg class="bv-pc__ffcheck" viewBox="0 0 20 20" fill="none" ' +
+      'stroke="currentColor" stroke-width="2.6" stroke-linecap="round" ' +
+      'stroke-linejoin="round"><path d="M2.6 10.2c1.5 1 2.9 2.4 4.1 4.4 ' +
+      '1.8-5.3 4.7-9 9.6-11.9"/></svg>';
+    var otros = [['Santa Cecilia', 4], ['Concierto de Navidad', 5]];
+    var fantasmas = otros.map(function (c, k) {
+      var mini = '';
+      for (var j = 0; j < c[1]; j++) {
+        mini += '<i class="bv-pc__ff"><s></s><em>' + CHECK_MANO + '</em></i>';
+      }
+      return '<div class="bv-pc__fantasma" style="--k:' + (k + 1) + '">' +
+        '<span class="bv-pc__fantasma-kick">Programa</span>' +
+        '<b class="bv-pc__fantasma-tit">' + c[0] + '</b>' +
+        '<div class="bv-pc__fantasma-lista">' + mini + '</div>' +
+      '</div>';
+    }).join('');
+    return '<div class="bv-pc" aria-hidden="true">' +
+      '<div class="bv-pc__pila">' +
+        fantasmas +
+        '<div class="bv-pc__hoja">' +
+          '<div class="bv-pc__cab">' +
+            '<span class="bv-pc__kicker">Programa</span>' +
+            '<b>Concierto de San Pedro</b>' +
+          '</div>' +
+          '<div class="bv-pc__cuerpo">' +
+            '<span class="bv-pc__hilo"><i class="bv-pc__luz"></i></span>' +
+            '<ol class="bv-pc__lista">' + filas + '</ol>' +
+          '</div>' +
+          '<div class="bv-pc__pie"><span>5 canciones</span><span>en orden</span></div>' +
+        '</div>' +
       '</div>' +
     '</div>';
   }
@@ -278,7 +435,7 @@ window.Bienvenida = (function () {
     var out = [1, -1, 1];
     var s = n.map(function (t, i) {
       return '<div class="bv-noti" style="--n:' + i + ';--out:' + out[i] + '">' +
-        '<span class="bv-noti__ic"><img src="images/logo-app.jpg" alt=""></span>' +
+        '<span class="bv-noti__ic"><img src="images/logo-app.jpg" alt="" decoding="async"></span>' +
         '<div class="bv-noti__tx"><b>ChorApp · ' + t[0] + '</b><span>' + t[1] + '</span></div>' +
       '</div>';
     }).join('');
@@ -341,39 +498,67 @@ window.Bienvenida = (function () {
 
   // Parte un texto en <i> por carácter (respeta entidades &x;, espacios y
   // los puntos medios · de la fonética). Cada letra lleva su índice --k.
+  // Antes se partía LETRA a letra (~45 <i> animándose en bucle con
+  // text-shadow → mucho repintado). Ahora PALABRA a palabra (~6): el efecto
+  // "salen de la estrella y escriben" se mantiene, el coste baja 7x.
   function partirLetras(txt) {
-    var trozos = txt.match(/&[a-z]+;|[\s\S]/g) || [];
+    var w = String(txt).trim().split(/\s+/);
     return {
-      n: trozos.length,
-      html: trozos.map(function (ch, k) {
-        if (ch === ' ') return '<i class="bv-ia__sp" style="--k:' + k + '">&nbsp;</i>';
-        if (ch === '·') return '<i class="bv-ia__dot" style="--k:' + k + '">·</i>';
-        return '<i style="--k:' + k + '">' + ch + '</i>';
-      }).join('')
+      n: w.length,
+      html: w.map(function (p, k) {
+        return '<i style="--k:' + k + '">' + p + '</i>';
+      }).join(' ')
     };
   }
 
-  // Sector IA: Gemini LEE la línea en euskera (un haz de luz la recorre) y
-  // la estrella suelta una onda; las letras SALEN de la estrella y vuelan a
-  // su sitio para escribir, primero CÓMO SE PRONUNCIA y después LA TRADUCCIÓN.
-  // El euskera se queda arriba de referencia: se ve la correspondencia.
-  function iaIlustra() {
+  // Sector fusionado "La letra, en vivo y en tu idioma": UNA sola escena que
+  // encadena las dos ideas que antes iban en sectores separados. Arriba, el
+  // verso en euskera se canta EN DIRECTO (las palabras se encienden al
+  // pasar, como el karaoke) sobre la onda real de la canción. Un haz sube
+  // desde la onda hasta la estrella de Gemini, que "escucha" y responde
+  // abajo materializando primero CÓMO SE PRONUNCIA y después LA TRADUCCIÓN.
+  // Una sola animación, un solo flujo: canta -> la IA escucha -> te lo
+  // traduce. Reutiliza los bloques de bv-ll (karaoke + onda) y bv-ia
+  // (estrella + materialización) ya existentes; solo añade el haz que los
+  // conecta (bv-iac__rayo). Solo transform / opacity.
+  function iaLetraIlustra() {
+    var palabras = ['Bihotzeko', 'taupadak']
+      .map(function (p, j) {
+        return '<b class="bv-ll__w" style="--w:' + j + '">' + p + '</b>';
+      }).join(' ');
+    var li = '<p class="bv-ll__linea">' + palabras + '</p>';
+
+    var N = 18, bars = '';
+    for (var b = 0; b < N; b++) {
+      var h = 12 + Math.round(36 * Math.abs(Math.sin(b * 1.7) * Math.cos(b * 0.55) + 0.15 * Math.sin(b)));
+      bars += '<i style="--h:' + Math.min(48, h) + '"></i>';
+    }
+
     var fon = partirLetras('bi·ó·tse·ko  ta·u·pá·dak');
     var es = partirLetras('Los latidos del corazón');
-    return '<div class="bv-ia" aria-hidden="true">' +
-      '<p class="bv-ia__fuente">Bihotzeko taupadak<span class="bv-ia__scan"></span></p>' +
-      '<span class="bv-ia__estrella">' +
+
+    return '<div class="bv-iac" aria-hidden="true">' +
+      '<div class="bv-ll__chip">' +
+        '<span class="bv-ll__gem">' + estrellaGemini('bv-gem-iac1') + '</span>' +
+        '<span>Ave verum &middot; sonando</span>' +
+      '</div>' +
+      '<div class="bv-ll__marco">' + li + '</div>' +
+      '<div class="bv-ll__wave">' +
+        '<div class="bv-ll__bars bv-ll__bars--bg">' + bars + '</div>' +
+        '<div class="bv-ll__fill"><div class="bv-ll__bars bv-ll__bars--on">' + bars + '</div></div>' +
+        '<i class="bv-ll__playhead"></i>' +
+      '</div>' +
+      '<span class="bv-iac__rayo"></span>' +
+      '<span class="bv-ia__estrella bv-iac__nucleo">' +
         '<span class="bv-ia__pulso"></span>' +
         '<span class="bv-ia__pulso bv-ia__pulso--2"></span>' +
-        estrellaGemini('bv-gem-b') +
+        estrellaGemini('bv-gem-iac2') +
       '</span>' +
-      '<div class="bv-ia__salida">' +
+      '<div class="bv-ia__salida bv-iac__salida">' +
         '<p class="bv-ia__linea bv-ia__linea--fon" style="--n:' + fon.n + '">' + fon.html + '</p>' +
         '<p class="bv-ia__linea bv-ia__linea--es" style="--n:' + es.n + '">' + es.html + '</p>' +
       '</div>' +
-      '<div class="bv-ia__etqs">' +
-        '<span class="bv-ia__etq bv-ia__etq--src">euskera</span>' +
-        '<span class="bv-ia__flecha">&rarr;</span>' +
+      '<div class="bv-ia__etqs bv-iac__etqs">' +
         '<span class="bv-ia__etq-slot">' +
           '<span class="bv-ia__etq bv-ia__etq--fon">c&oacute;mo suena</span>' +
           '<span class="bv-ia__etq bv-ia__etq--tra">traducci&oacute;n</span>' +
@@ -453,7 +638,7 @@ window.Bienvenida = (function () {
       '<div class="bv-lock__top"><span class="bv-lock__lock">' + lock + '</span>' +
         '<span class="bv-lock__hora">19:29</span></div>' +
       '<div class="bv-lock__card">' +
-        '<div class="bv-lock__cab"><span class="bv-lock__ic"><img src="images/logo-app.jpg" alt=""></span>' +
+        '<div class="bv-lock__cab"><span class="bv-lock__ic"><img src="images/logo-app.jpg" alt="" decoding="async"></span>' +
           '<div class="bv-lock__meta"><b>Ave verum</b><span>Ensayo del martes</span></div></div>' +
         '<div class="bv-lock__barra"><i class="bv-lock__fill"></i><i class="bv-lock__thumb"></i></div>' +
         '<div class="bv-lock__times"><span>0:06</span><span>3:03</span></div>' +
@@ -584,6 +769,21 @@ window.Bienvenida = (function () {
           '</div>'
       },
 
+      // 5b — Estados de cada canción (Pendiente / En progreso / Aprendida)
+      {
+        dur: 11,
+        bg: 'radial-gradient(120% 85% at 18% 6%, #2E7D5B 0%, #285AA6 50%, #1512D6 100%)',
+        clase: 'bv-s--estados',
+        html:
+          '<div class="bv-decor bv-decor--estados">' + estadosCanciones() + '</div>' +
+          '<div class="bv-in">' +
+            '<p class="bv-eyebrow">Tu repertorio</p>' +
+            '<h3 class="bv-h3">De pendiente<br>a aprendida</h3>' +
+            '<p class="bv-sub">Marca cada canción como <b>Pendiente</b>, <b>En progreso</b> o ' +
+              '<b>Aprendida</b>. De un vistazo sabes qué te falta y cómo vas ganando terreno.</p>' +
+          '</div>'
+      },
+
       // 6 — Modo estudio
       {
         dur: 11,
@@ -602,22 +802,22 @@ window.Bienvenida = (function () {
           '</div>'
       },
 
-      // 6b — Inteligencia artificial: pronunciación y traducción
+      // 6b — Fusión: letra en directo (karaoke) + IA que pronuncia y traduce
       {
-        dur: 12,
+        dur: 14,
         bg: 'radial-gradient(120% 85% at 78% 6%, #2A2CC0 0%, #4A1D8F 52%, #16086B 100%)',
-        clase: 'bv-s--ia',
+        clase: 'bv-s--ia bv-s--letralive',
         html:
-          '<div class="bv-decor bv-decor--ia">' + iaIlustra() + '</div>' +
+          '<div class="bv-decor bv-decor--ia bv-decor--letralive">' + iaLetraIlustra() + '</div>' +
           '<div class="bv-in">' +
             '<p class="bv-eyebrow bv-eyebrow--gem">' +
               '<span class="bv-gem-ic">' + estrellaGemini('bv-gem-a') + '</span>' +
-              '<span class="bv-gem-tx">Con Gemini 2.5 Flash</span>' +
+              '<span class="bv-gem-tx">Con Gemini 3.8 Flash</span>' +
             '</p>' +
-            '<h3 class="bv-h3">La letra, en tu idioma</h3>' +
-            '<p class="bv-sub">La inteligencia artificial de Google te escribe cómo se pronuncia ' +
-              'cada palabra y te traduce la letra entera. Aunque la canción esté en euskera, ' +
-              'latín o alemán.</p>' +
+            '<h3 class="bv-h3">La letra, en directo<br>y en tu idioma</h3>' +
+            '<p class="bv-sub">Le das al play y la app va encendiendo el verso exacto que suena. ' +
+              'A la vez, la IA de Google te escribe cómo se pronuncia y te traduce la letra ' +
+              'entera, aunque la canción esté en euskera, latín o alemán.</p>' +
           '</div>'
       },
 
@@ -698,7 +898,23 @@ window.Bienvenida = (function () {
           '</div>'
       },
 
-      // 11 — Grabaciones
+      // 11 — Programa de concierto (las canciones en orden, para ensayar el pase)
+      {
+        dur: 14,
+        bg: 'radial-gradient(120% 85% at 80% 6%, #17805C 0%, #16408A 52%, #1512D6 100%)',
+        clase: 'bv-s--programa',
+        html:
+          '<div class="bv-decor">' + programaConcierto() + '</div>' +
+          '<div class="bv-in">' +
+            '<p class="bv-eyebrow">Programa de concierto</p>' +
+            '<h3 class="bv-h3">Ensaya el pase entero</h3>' +
+            '<p class="bv-sub">Montas el programa del concierto: eliges las canciones, las ' +
+              'pones en el orden real y las cantas seguidas, como en el escenario. Así llegas ' +
+              'al día grande con el pase por la mano.</p>' +
+          '</div>'
+      },
+
+      // 12 — Grabaciones
       {
         dur: 9,
         bg: 'radial-gradient(120% 85% at 80% 10%, #A11133 0%, #4A1D8F 55%, #160B3B 100%)',
@@ -738,9 +954,25 @@ window.Bienvenida = (function () {
           '</div>'
       },
 
+          // 12c — Copia de seguridad (tranquilidad: nada se pierde)
+      {
+        dur: 10,
+        bg: 'radial-gradient(120% 85% at 22% 6%, #12796B 0%, #1E2E9E 52%, #1512D6 100%)',
+        clase: 'bv-s--nube',
+        html:
+          '<div class="bv-decor bv-decor--nube">' + nubeCopia() + '</div>' +
+          '<div class="bv-in">' +
+            '<p class="bv-eyebrow">Tranquila</p>' +
+            '<h3 class="bv-h3">Nunca se pierde nada</h3>' +
+            '<p class="bv-sub">Cada semana, sola y sin que te enteres, la app guarda una copia ' +
+              'de todo: canciones, notas, racha, marcas. Si algún día cambias de móvil, ' +
+              'no empiezas de cero.</p>' +
+          '</div>'
+      },
+
       // 13 — Notificaciones
       {
-        dur: 12,
+        dur: 11,
         bg: 'radial-gradient(120% 85% at 50% 0%, #3B39E8 0%, #6E2CC9 55%, #2E1466 100%)',
         clase: 'bv-s--notis',
         html:
@@ -770,7 +1002,7 @@ window.Bienvenida = (function () {
             '<p class="bv-eyebrow">Cada mes</p>' +
             '<h3 class="bv-h3">Un resumen tuyo</h3>' +
             '<p class="bv-sub">A fin de mes, todo lo que hiciste, pantalla a pantalla. ' +
-              'Y uno especial de fin de año.</p>' +
+              'Como el resumen de Spotify, pero desafinando. Y uno especial de fin de año.</p>' +
           '</div>'
       },
 
@@ -834,6 +1066,9 @@ window.Bienvenida = (function () {
     raiz.setAttribute('role', 'dialog');
     raiz.setAttribute('aria-label', 'Bienvenida a ChorApp');
 
+    // Capas de fondo: una por sector, a pantalla COMPLETA de `.bv` (cubren
+    // también la barra de arriba y el pie — si no, esas zonas se ven con la
+    // base oscura). Fundido cruzado al cambiar de sector.
     var capasFondo = datos.map(function (s, i) {
       return '<i class="bv-fondo" style="background:' + s.bg + ';opacity:' + (i === 0 ? 1 : 0) + '"></i>';
     }).join('');
@@ -856,6 +1091,12 @@ window.Bienvenida = (function () {
         '<button type="button" class="bv-saltar" data-saltar>Saltar</button>' +
       '</div>' +
       '<div class="bv-slides">' + secciones + '</div>' +
+      // Fuerza a cargar/rasterizar la fuente Caveat YA (solo se usa en la
+      // firma del cierre; si carga justo al llegar allí, parpadea).
+      '<span aria-hidden="true" style="position:fixed;left:-9999px;top:0;' +
+        'font-family:\'Caveat\',cursive;font-weight:700;font-size:34px;opacity:0">Endika</span>' +
+      // Resplandor del marco al llegar al cierre (solo opacidad).
+      '<div class="bv-luz" aria-hidden="true"></div>' +
       '<div class="bv-pie">' +
         '<p class="bv-hint is-fuera" data-hint></p>' +
       '</div>' +
@@ -924,6 +1165,7 @@ window.Bienvenida = (function () {
     }
 
     mostrar(0, 1);
+    pedirWakeLock();
     arrancarAudio();
     iniMs = _now();
     pausaMs = 0; enPausa = false;
@@ -943,10 +1185,36 @@ window.Bienvenida = (function () {
       audio.preload = 'auto';
       audio.loop = false;
       audio.volume = 0;
+      // Al terminar inner-light entra kassandra subiendo muy despacio.
+      audio.addEventListener('ended', arrancarAudio2, { once: true });
       var p = audio.play();
       if (p && p.catch) p.catch(function () { armarGesto(); });
       fadeAudio(audio, VOL, 1600);
     } catch (e) { audio = null; }
+  }
+
+  /* Segunda pieza (kassandra): arranca desde AUDIO2_DESDE y sube el volumen
+     durante AUDIO2_FADE ms. Se llama al acabar inner-light (evento 'ended')
+     o, de red, desde tick() si el evento no llega. */
+  function arrancarAudio2() {
+    if (audio2 || !raiz || rematando) return;
+    try {
+      audio2 = new Audio(AUDIO_SRC2);
+      audio2.preload = 'auto';
+      audio2.loop = false;
+      audio2.volume = 0;
+      var alSitio = function () {
+        try { if (audio2.currentTime < AUDIO2_DESDE) audio2.currentTime = AUDIO2_DESDE; } catch (e) {}
+      };
+      audio2.addEventListener('loadedmetadata', alSitio, { once: true });
+      var p = audio2.play();
+      if (p && p.catch) p.catch(function () {});
+      alSitio();
+      fadeAudio(audio2, VOL, AUDIO2_FADE);
+      // Si la bienvenida estaba en pausa justo al hacer el relevo, congela
+      // también la nueva pieza (reanudar() la vuelve a poner en marcha).
+      if (enPausa) { try { audio2.pause(); } catch (e) {} }
+    } catch (e) { audio2 = null; }
   }
 
   // Si el navegador bloquea el autoplay (en el APK no pasa), arrancar al
@@ -999,6 +1267,13 @@ window.Bienvenida = (function () {
       var f2 = ultima ? 1
         : (t2 - ACTO2_BORDES[k]) / Math.max(0.001, ACTO2_BORDES[k + 1] - ACTO2_BORDES[k]);
       pintarProgreso(IDX_ACTO2, idx, f2);
+
+      // Relevo a kassandra si el evento 'ended' de inner-light no llegó
+      // (algunos WebView no lo disparan si la pestaña estuvo en 2º plano).
+      if (!audio2 && audio && !enPausa && audio.duration &&
+          (audio.ended || audio.currentTime >= audio.duration - 0.4)) {
+        arrancarAudio2();
+      }
       // El cierre NO entra solo: espera a que Ama pulse "Entrar".
     }
 
@@ -1006,11 +1281,17 @@ window.Bienvenida = (function () {
   }
 
   // Pinta la barra: segStart = sector del primer segmento; cur = sector
-  // actual; frac = avance (0-1) dentro del sector actual.
+  // actual; frac = avance (0-1) dentro del sector actual. La barra NO necesita
+  // 120 fps: se refresca ~1 de cada 5 frames y los `.bv-seg b` se cachean
+  // (antes se hacía un `querySelectorAll` por frame).
+  var _progT = 0;
   function pintarProgreso(segStart, cur, frac) {
-    var segs = raiz.querySelectorAll('.bv-seg');
+    if ((_progT++ % 5) !== 0) return;
+    var segs = raiz._segs;
+    if (!segs) segs = raiz._segs = Array.prototype.map.call(
+      raiz.querySelectorAll('.bv-seg'), function (s) { return s.firstElementChild; });
     for (var i = 0; i < segs.length; i++) {
-      var b = segs[i].firstElementChild;
+      var b = segs[i];
       if (!b) continue;
       var sec = segStart + i;
       var p = sec < cur ? 1 : sec > cur ? 0 : frac;
@@ -1033,6 +1314,7 @@ window.Bienvenida = (function () {
     // La barra pasa a mostrar los sectores del ACTO 2 (sin contar el cierre).
     var prog = raiz.querySelector('.bv-prog');
     if (prog) prog.innerHTML = construirProgreso(slides.length - 1 - IDX_ACTO2);
+    raiz._segs = null;   // se recachea (la barra se ha reconstruido)
 
     // Recuérdale que se sigue pasando solo.
     var h = raiz.querySelector('[data-hint]');
@@ -1064,13 +1346,14 @@ window.Bienvenida = (function () {
   function onVisibilidad() {
     if (!empezado || rematando) return;
     if (document.hidden) pausar();
-    else reanudar();
+    else { reanudar(); if (empezado && !rematando) pedirWakeLock(); }
   }
   function pausar() {
     if (enPausa || rematando) return;
     enPausa = true;
     pausaIni = _now();
     if (audio) { try { audio.pause(); } catch (e) {} }
+    if (audio2) { try { audio2.pause(); } catch (e) {} }
     raiz.classList.add('is-pausa');
   }
   function reanudar() {
@@ -1078,6 +1361,7 @@ window.Bienvenida = (function () {
     pausaMs += _now() - pausaIni;
     enPausa = false;
     if (audio) { var p = audio.play(); if (p && p.catch) p.catch(function () {}); }
+    if (audio2) { var p2 = audio2.play(); if (p2 && p2.catch) p2.catch(function () {}); }
     raiz.classList.remove('is-pausa');
   }
 
@@ -1101,6 +1385,38 @@ window.Bienvenida = (function () {
     entra.classList.remove('is-ent-izq', 'is-ent-der');
     entra.classList.add('is-activo');
 
+    // El cierre, TODO ESCALONADO para que nada compita con nada:
+    //   0 ms    : entra el sector (deslizamiento + fondo + texto + check)
+    //   ~480 ms : `bv--precierre` — ya asentada la transición, promovemos la
+    //             capa de luz (opacidad casi nula, se rasteriza tranquila)
+    //   ~1900 ms: `bv--cierre` — cuando YA HA TERMINADO de escribirse la
+    //             firma "— Endika" (entra a los 1100 ms, dura 620 ms), los
+    //             bordes se encienden y se quedan brillando más y menos.
+    var esCierre = entra.classList.contains('bv-s--cierre');
+    window.clearTimeout(raiz._cierreT);
+    window.clearTimeout(raiz._cierreT2);
+    if (esCierre) {
+      raiz._cierreT = window.setTimeout(function () {
+        if (raiz && slides[idx] === entra) raiz.classList.add('bv--precierre');
+      }, 480);
+      raiz._cierreT2 = window.setTimeout(function () {
+        if (raiz && slides[idx] === entra) raiz.classList.add('bv--cierre');
+      }, 1900);
+    } else {
+      raiz.classList.remove('bv--cierre', 'bv--precierre');
+    }
+
+    // Durante la transición congela la decoración de los sectores en juego:
+    // esos ~440 ms el navegador solo funde/desliza dos capas, sin repintar
+    // decenas de animaciones. El texto (`.bv-in`) sí sigue.
+    if (prev !== n) {
+      raiz.classList.add('bv--transicion');
+      window.clearTimeout(raiz._trT);
+      raiz._trT = window.setTimeout(function () {
+        if (raiz) raiz.classList.remove('bv--transicion');
+      }, 470);
+    }
+
     if (prev !== n && slides[prev]) {
       var sale = slides[prev];
       sale.classList.remove('is-activo', 'is-ent-izq', 'is-ent-der');
@@ -1113,6 +1429,12 @@ window.Bienvenida = (function () {
 
     // Fondo en fundido cruzado.
     fondos.forEach(function (f, i) { f.style.opacity = i === n ? 1 : 0; });
+
+    lanzarExtras(entra, prev, n);
+  }
+
+  /* Cosas que se disparan al mostrar un sector (contadores, toque háptico). */
+  function lanzarExtras(entra, prev, n) {
 
     // Contador de las cifras grandes (una sola vez, escalonadas).
     var cuentas = entra.querySelectorAll('[data-cuenta]');
@@ -1199,6 +1521,7 @@ window.Bienvenida = (function () {
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('visibilitychange', onVisibilidad);
     window.clearTimeout(holdT);
+    soltarWakeLock();
     // `bv-abierta` bloquea el scroll del body. Quitarlo puede reajustar el
     // layout unos px (barra de scroll en navegador) — la barra de nav
     // "se metía para adentro" a media animación. Lo quitamos YA, mientras
@@ -1206,12 +1529,13 @@ window.Bienvenida = (function () {
     // el layout de debajo ya está asentado.
     document.body.classList.remove('bv-abierta');
 
-    if (audio) {
-      var a = audio; audio = null;
+    [audio, audio2].forEach(function (a) {
+      if (!a) return;
       fadeAudio(a, 0, rapido ? 450 : 5200, function () {
         try { a.pause(); a.src = ''; } catch (e) {}
       });
-    }
+    });
+    audio = null; audio2 = null;
 
     if (!r) return;
     var quita = function () {
@@ -1236,14 +1560,21 @@ window.Bienvenida = (function () {
         var _ss = r.querySelector('.bv-slides'); if (_ss) _ss.scrollTop = 0;
         var _sa = r.querySelector('.bv-slide.is-activo'); if (_sa) _sa.scrollTop = 0;
       } catch (e) {}
-      r.classList.add('bv--entrando-app');
+      // `will-change` un frame ANTES: así el WebView tiene `.bv` ya en su
+      // propia capa cuando arranca el fundido → una sola textura, suave.
+      r.style.willChange = 'opacity';
+      if (!reducido()) document.body.classList.add('bv-aterriza');
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          if (r.parentNode) r.classList.add('bv--entrando-app');
+        });
+      });
       if (!reducido()) {
-        document.body.classList.add('bv-aterriza');
         window.setTimeout(function () {
           document.body.classList.remove('bv-aterriza');
-        }, 1600);
+        }, 1550);
       }
-      setTimeout(quita, reducido() ? 300 : 1700);
+      setTimeout(quita, reducido() ? 300 : 1420);
     }
   }
 

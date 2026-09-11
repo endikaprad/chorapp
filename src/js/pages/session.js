@@ -19,7 +19,7 @@ window.Pagina_session = (function () {
   var sono = false;   // el audio del ensayo ha sonado en esta visita
   var hoja, form, marcaEditando = null;
   var inicioSel = 0, finSel = null;         // tiempos elegidos en la hoja
-  var archivosPendientes = {};              // { letra: File|'quitar', ... }
+  var ctrlArchivos = {};                    // { letra: ctrlAdjuntos, fonetica, partitura }
   var selCancionId = null;                  // ficha del repertorio elegida, o null
   var selModoNueva = false;                 // true => se está creando una ficha nueva
 
@@ -93,26 +93,18 @@ window.Pagina_session = (function () {
       pintarTiemposHoja();
     });
 
-    // Inputs de archivo de la hoja
-    Array.prototype.forEach.call(hoja.querySelectorAll('[data-input]'), function (inp) {
-      inp.addEventListener('change', function () {
-        var tipo = inp.getAttribute('data-input');
-        var f = inp.files && inp.files[0];
-        if (f) { archivosPendientes[tipo] = f; pintarFilaArchivo(tipo, f.name); }
-        inp.value = '';
-      });
-    });
-    Array.prototype.forEach.call(hoja.querySelectorAll('[data-quitar]'), function (btn) {
-      btn.addEventListener('click', function () {
-        var tipo = btn.getAttribute('data-quitar');
-        archivosPendientes[tipo] = 'quitar';
-        pintarFilaArchivo(tipo, null);
-      });
+    // Campos de archivo de la hoja: cada uno admite varias páginas
+    // (window.Adjuntos).
+    TIPOS_ARCHIVO.forEach(function (tipo) {
+      var fila = hoja.querySelector('[data-fila="' + tipo + '"]');
+      if (fila) ctrlArchivos[tipo] = window.Adjuntos.montar(fila);
     });
 
     Array.prototype.forEach.call(hoja.querySelectorAll('[data-cerrar]'), function (el) {
       el.addEventListener('click', cerrarHoja);
     });
+
+    conectarBuscarLetra();
 
     // Selector de canción del repertorio
     hq('[data-sel-input]').addEventListener('input', pintarListaSel);
@@ -139,7 +131,7 @@ window.Pagina_session = (function () {
     if (hoja && hoja.parentNode === document.body) hoja.remove();
     hoja = form = marcaEditando = null;
     tiempoActual = 0; duracionAudio = 0;
-    archivosPendientes = {};
+    ctrlArchivos = {};
     selCancionId = null; selModoNueva = false;
   }
 
@@ -343,7 +335,6 @@ window.Pagina_session = (function () {
     if (hoja.parentNode !== document.body) document.body.appendChild(hoja);
 
     marcaEditando = m || null;
-    archivosPendientes = {};
 
     inicioSel = m ? (m.segundo || 0) : Math.max(0, Math.round(tiempoActual));
     finSel = m ? (m.finSegundo != null ? m.finSegundo : null) : null;
@@ -357,10 +348,10 @@ window.Pagina_session = (function () {
     form.idioma.value = cancion ? (cancion.idioma || '') : '';
     form.letraTexto.value = cancion ? (cancion.letraTexto || '') : '';
     form.letraFonetica.value = cancion ? (cancion.letraFonetica || '') : '';
+    actualizarSubFonetica(cancion);
 
     TIPOS_ARCHIVO.forEach(function (tipo) {
-      var meta = cancion && cancion.archivos ? cancion.archivos[tipo] : null;
-      pintarFilaArchivo(tipo, meta ? meta.nombre : null);
+      if (ctrlArchivos[tipo]) ctrlArchivos[tipo].fijar(window.Adjuntos.lista(cancion, tipo));
     });
 
     // Estado del selector de canción
@@ -377,6 +368,15 @@ window.Pagina_session = (function () {
 
     hq('[data-borrar-marca]').hidden = !m;
     pintarTiemposHoja();
+
+    var btnBL = hoja.querySelector('[data-buscar-letra]');
+    if (btnBL) {
+      btnBL.disabled = false;
+      btnBL.classList.remove('is-cargando');
+      var blTxt = btnBL.querySelector('[data-buscar-letra-txt]');
+      if (blTxt) blTxt.textContent = 'Buscar la letra con IA';
+    }
+    actualizarBotonBuscarLetra();
 
     // Mientras la hoja está en pantalla, esconde el mini reproductor flotante.
     if (window.CancionActiva) window.CancionActiva.fijarOculta(true);
@@ -457,6 +457,8 @@ window.Pagina_session = (function () {
       form.letraTexto.value = c.letraTexto || '';
       form.letraFonetica.value = c.letraFonetica || '';
     }
+    actualizarSubFonetica(c);
+    actualizarBotonBuscarLetra();
     sincronizarSel('elegida');
   }
 
@@ -468,8 +470,11 @@ window.Pagina_session = (function () {
     form.idioma.value = '';
     form.letraTexto.value = '';
     form.letraFonetica.value = '';
-    TIPOS_ARCHIVO.forEach(function (tipo) { pintarFilaArchivo(tipo, null); });
-    archivosPendientes = {};
+    actualizarSubFonetica(null);
+    TIPOS_ARCHIVO.forEach(function (tipo) {
+      if (ctrlArchivos[tipo]) ctrlArchivos[tipo].fijar([]);
+    });
+    actualizarBotonBuscarLetra();
     sincronizarSel('nueva');
     setTimeout(function () { form.titulo.focus(); }, 40);
   }
@@ -494,29 +499,74 @@ window.Pagina_session = (function () {
     });
   }
 
-  var ETIQUETA_BASE = {
-    letra: 'Letra (PDF, imagen o texto)',
-    fonetica: 'Cómo se pronuncia (PDF o imagen)',
-    partitura: 'Partitura (imagen o PDF)',
-  };
+  // Los campos de archivo (letra / fonetica / partitura) los gestiona
+  // window.Adjuntos a través de ctrlArchivos[tipo].
 
-  function pintarFilaArchivo(tipo, nombre) {
-    var fila = hoja.querySelector('[data-fila="' + tipo + '"]');
-    if (!fila) return;
-    var txt = fila.querySelector('[data-nombre="' + tipo + '"]');
-    var quitar = fila.querySelector('[data-quitar="' + tipo + '"]');
-    var accion = fila.querySelector('.archivo-fila__accion');
-    if (nombre) {
-      txt.textContent = nombre;
-      fila.classList.add('archivo-fila--con-archivo');
-      quitar.hidden = false;
-      accion.firstChild.textContent = 'Cambiar';
-    } else {
-      txt.textContent = ETIQUETA_BASE[tipo];
-      fila.classList.remove('archivo-fila--con-archivo');
-      quitar.hidden = true;
-      accion.firstChild.textContent = 'Añadir';
-    }
+  /* ---------- Buscar la letra con IA ---------- */
+
+  // Solo tiene sentido si aún no hay letra escrita y hay un título.
+  function actualizarBotonBuscarLetra() {
+    var btn = hoja && hoja.querySelector('[data-buscar-letra]');
+    if (!btn || !form) return;
+    var hayIA = !!(window.IA && window.IA.buscarLetra);
+    var hayTexto = !!(form.letraTexto && form.letraTexto.value.trim());
+    btn.hidden = !hayIA || hayTexto;
+  }
+
+  // "Cómo se pronuncia" se genera desde el Modo estudio (IA). En esta hoja
+  // solo se ve al editar una canción del repertorio que ya lo tiene.
+  function actualizarSubFonetica(cancion) {
+    var caja = hoja && hoja.querySelector('[data-sub-fonetica]');
+    if (!caja) return;
+    var tiene = !!(cancion && (
+      (cancion.letraFonetica && cancion.letraFonetica.trim()) ||
+      (cancion.archivos && cancion.archivos.fonetica)
+    ));
+    caja.hidden = !tiene;
+  }
+
+  function conectarBuscarLetra() {
+    var btn = hoja.querySelector('[data-buscar-letra]');
+    if (!btn) return;
+    var txtEl = btn.querySelector('[data-buscar-letra-txt]');
+
+    form.letraTexto.addEventListener('input', actualizarBotonBuscarLetra);
+
+    btn.addEventListener('click', function () {
+      if (btn.disabled) return;
+      var titulo = form.titulo.value.trim();
+      if (!titulo) {
+        form.titulo.classList.add('campo--error');
+        form.titulo.focus();
+        window.UI.aviso('Escribe primero el título de la canción.');
+        return;
+      }
+      var idiomaSel = form.idioma;
+      var idioma = (form.idioma.value && idiomaSel.options[idiomaSel.selectedIndex])
+        ? idiomaSel.options[idiomaSel.selectedIndex].text : '';
+
+      btn.disabled = true;
+      btn.classList.add('is-cargando');
+      txtEl.textContent = 'Buscando la letra…';
+
+      window.IA.buscarLetra(titulo, {
+        compositor: form.compositor.value.trim(),
+        idioma: idioma,
+      }).then(function (letra) {
+        form.letraTexto.value = letra;
+        actualizarBotonBuscarLetra();
+        window.UI.aviso('Letra encontrada. Revísala por si acaso antes de guardar.', { tipo: 'ok' });
+      }).catch(function (e) {
+        var msg = (e && e.message === 'no encontrada')
+          ? 'No he encontrado la letra de esa canción. Prueba a afinar el título o el compositor, o pégala a mano.'
+          : 'No se ha podido buscar la letra ahora mismo. Prueba dentro de un rato.';
+        window.UI.aviso(msg, { tipo: 'error' });
+      }).then(function () {
+        btn.disabled = false;
+        btn.classList.remove('is-cargando');
+        txtEl.textContent = 'Buscar la letra con IA';
+      });
+    });
   }
 
   function onGuardarMarca(ev) {
@@ -575,18 +625,12 @@ window.Pagina_session = (function () {
   }
 
   function aplicarArchivos(cancionId) {
+    var cancion = window.Canciones.obtener(cancionId);
     var tareas = TIPOS_ARCHIVO.map(function (tipo) {
-      var cambio = archivosPendientes[tipo];
-      if (!cambio) return Promise.resolve();
-      var clave = cancionId + ':' + tipo;
-      if (cambio === 'quitar') {
-        return window.Archivos.borrar(clave).then(function () {
-          window.Canciones.fijarArchivo(cancionId, tipo, null);
-        });
-      }
-      return window.Archivos.guardar(clave, cambio).then(function (meta) {
-        window.Canciones.fijarArchivo(cancionId, tipo, meta);
-      });
+      if (!ctrlArchivos[tipo]) return Promise.resolve();
+      return window.Adjuntos.aplicar(
+        cancionId, tipo, ctrlArchivos[tipo].pendiente(),
+        window.Adjuntos.lista(cancion, tipo));
     });
     return Promise.all(tareas).catch(function (e) {
       console.error('No se pudo guardar un archivo:', e);

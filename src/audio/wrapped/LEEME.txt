@@ -1,0 +1,18 @@
+AUDIOS DE LOS WRAPPED DE TODOS LOS MESES + ANUAL
+
+A continuación se pondrá desde que duración exacta se deberá reproducir dicha canción, no antes. 
+Además los meses enumerados del 01 al 11 serán para dejar claro de que mes será cada canción, siendo
+el mes 01 enero y el 11 noviembre:
+
+- anual (anual-gran-via.mp3) - 0:41
+- 01 (01-dtmf.mp3) - 0:00
+- 02 (02-detras-de-tu-alma.mp3) - 0:11
+- 03 (03-cosa-nuestra.mp3) - 0:12
+- 04 (04-alambre-pua.mp3) - 0:00
+- 05 (05-amar-de-nuevo.mp3) - 0:50 y medio
+- 06 (06-tu-con-el.mp3) - 0:00
+- 07 (07-committed.mp3)- 0:15
+- 08 (08-si-estas-con-alguien.mp3) - 0:00
+- 09 (09-carita-linda.mp3) - 0:00
+- 10 (10-dios-es-un-stalker.mp3) - 0:00
+- 11 (11-buenas-noches.mp3) - 0:10

@@ -5,8 +5,8 @@
 // Sin dependencias: solo módulos de Node.
 // =========================================================
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
+import { createReadStream, existsSync } from 'node:fs';
 import { extname, join, resolve, dirname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -108,13 +108,76 @@ createServer(async (req, res) => {
     return;
   }
 
+  // Proxy solo-desarrollo para la ayuda de IA (fonética / traducción /
+  // sincronía). En el APK la app llama al Worker directamente; aquí hacemos
+  // de puente al mismo Worker (URL + token en src/data/coro.json).
+  if (url.pathname === '/api/ia' && req.method === 'POST') {
+    try {
+      const cfgTxt = await readFile(join(base, 'data', 'coro.json'), 'utf8').catch(() => '{}');
+      const cfg = JSON.parse(cfgTxt || '{}');
+      const destino = String(cfg.worker || '').replace(/\/+$/, '');
+      if (!destino) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'sin "worker" en src/data/coro.json' }));
+        return;
+      }
+      const trozos = [];
+      for await (const c of req) trozos.push(c);
+      const cabeceras = { 'Content-Type': 'application/json' };
+      if (cfg.iaToken) cabeceras['X-IA-Token'] = String(cfg.iaToken);
+      const r = await fetch(destino + '/ia', {
+        method: 'POST', headers: cabeceras, body: Buffer.concat(trozos),
+      });
+      const cuerpo = await r.text();
+      res.writeHead(r.status, {
+        'Content-Type': r.headers.get('content-type') || 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      res.end(cuerpo);
+    } catch (e) {
+      res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: 'proxy ia: ' + e.message }));
+    }
+    return;
+  }
+
   let archivo = join(base, ruta);
   if (!existsSync(archivo) && !extname(archivo)) archivo = join(base, 'index.html');
 
+  const tipo = TIPOS[extname(archivo)] || 'application/octet-stream';
+
   try {
+    const info = await stat(archivo);
+    // Range: imprescindible para poder saltar (currentTime) en audio/vídeo.
+    // Sin esto el navegador tiene que re-descargar el archivo entero al
+    // buscar una posición, y en pistas que arrancan en un segundo > 0
+    // (como el Wrapped) el seek nunca "cuaja": vuelve a 0 en bucle.
+    const rango = req.headers.range;
+    if (rango) {
+      const m = /^bytes=(\d*)-(\d*)$/.exec(rango);
+      let inicio = m && m[1] ? parseInt(m[1], 10) : 0;
+      let fin = m && m[2] ? parseInt(m[2], 10) : info.size - 1;
+      if (!m || isNaN(inicio) || isNaN(fin) || inicio > fin || fin >= info.size) {
+        res.writeHead(416, { 'Content-Range': `bytes */${info.size}` });
+        res.end();
+        return;
+      }
+      res.writeHead(206, {
+        'Content-Type': tipo,
+        'Content-Length': fin - inicio + 1,
+        'Content-Range': `bytes ${inicio}-${fin}/${info.size}`,
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'no-store',
+      });
+      createReadStream(archivo, { start: inicio, end: fin }).pipe(res);
+      return;
+    }
+
     const datos = await readFile(archivo);
     res.writeHead(200, {
-      'Content-Type': TIPOS[extname(archivo)] || 'application/octet-stream',
+      'Content-Type': tipo,
+      'Content-Length': info.size,
+      'Accept-Ranges': 'bytes',
       'Cache-Control': 'no-store',
     });
     res.end(datos);

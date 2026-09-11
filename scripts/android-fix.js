@@ -101,6 +101,29 @@ if (hayFCM) {
   console.log('android-fix: sin resources/google-services.json — push (FCM) desactivada, APK compila igual.');
 }
 
+// --- Recibir "Compartir con ChorApp" desde WhatsApp/Galería (plugin propio) ---
+// android/ está en .gitignore; las fuentes viven en native/plantillas-android/
+// (NO "native/android/": .gitignore tiene "android/" sin barra inicial, que
+// ignora cualquier carpeta llamada así a cualquier profundidad) y se copian
+// aquí. CompartidoPlugin.java es nuevo; MainActivity.java sustituye al stub
+// que genera `cap add android` para registrar el plugin y capturar el
+// Intent. Ver src/js/compartido.js.
+{
+  const javaDir = resolve(raiz, 'android/app/src/main/java/com/chorapp/ama');
+  const archivos = ['CompartidoPlugin.java', 'MainActivity.java'];
+  for (const nombre of archivos) {
+    const src = resolve(raiz, 'native/plantillas-android', nombre);
+    const dst = resolve(javaDir, nombre);
+    if (!existsSync(src)) continue;
+    const contenido = readFileSync(src, 'utf8');
+    if (!existsSync(dst) || readFileSync(dst, 'utf8') !== contenido) {
+      mkdirSync(javaDir, { recursive: true });
+      writeFileSync(dst, contenido);
+      console.log(`android-fix: ${nombre} (recibir compartido) actualizado.`);
+    }
+  }
+}
+
 // Nota: el modo oscuro NO necesita tocar el MainActivity ni
 // setAlgorithmicDarkeningAllowed. Basta con que la web declare
 // `color-scheme` y ponga `data-theme` (lo hace el script del <head> de
@@ -122,6 +145,19 @@ if (!xml.includes('android:hardwareAccelerated')) {
   xml = xml.replace(
     /<application\b/,
     '<application android:hardwareAccelerated="true" android:largeHeap="true"'
+  );
+  cambiado = true;
+}
+
+// --- Bloqueo de orientación: la app es solo vertical ------------------
+// Maite la usa siempre en vertical. El giro descoloca el modo estudio,
+// la bienvenida a pantalla completa y el reproductor, y no aporta nada.
+// Se fija en la <activity> principal (además del configChanges que ya
+// trae Capacitor, que evita recrear la Activity al girar el sensor).
+if (!xml.includes('android:screenOrientation')) {
+  xml = xml.replace(
+    /(<activity\b)/,
+    '$1 android:screenOrientation="portrait"'
   );
   cambiado = true;
 }
@@ -160,6 +196,25 @@ for (const p of permisos) {
     );
     cambiado = true;
   }
+}
+
+// --- Recibir "Compartir con ChorApp" ------------------------------------
+// Intent-filter para aparecer en el menú "Compartir con..." de Android al
+// compartir un audio, PDF o imagen (p. ej. desde WhatsApp). Lo captura
+// CompartidoPlugin.java / MainActivity.java (ver más arriba).
+if (!xml.includes('compartir-whatsapp')) {
+  const filtroCompartir =
+    '\n            <!-- compartir-whatsapp: recibir audio/PDF/imagen compartidos -->\n' +
+    '            <intent-filter>\n' +
+    '                <action android:name="android.intent.action.SEND" />\n' +
+    '                <category android:name="android.intent.category.DEFAULT" />\n' +
+    '                <data android:mimeType="audio/*" />\n' +
+    '                <data android:mimeType="image/*" />\n' +
+    '                <data android:mimeType="application/pdf" />\n' +
+    '            </intent-filter>\n' +
+    '        ';
+  xml = xml.replace(/(\s*)(<\/activity>)/, filtroCompartir + '$2');
+  cambiado = true;
 }
 
 if (cambiado) {

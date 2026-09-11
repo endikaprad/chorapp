@@ -19,28 +19,55 @@ window.Pagina_practice = (function () {
 
     var dias = window.Practica ? window.Practica.diasPracticados() : [];
 
+    // Solo lo que se ve nada más entrar se pinta ya, para no retrasar el
+    // primer fotograma (y con él la animación de entrada). El resto —
+    // logros, calendario, resumen, listas— es trabajo pesado que puede
+    // esperar al frame siguiente sin que Maite note la diferencia.
     pintarRachaHero(raiz);
-    pintarLogros(raiz);
-    pintarResumenMes(raiz);
-
     raiz.querySelector('[data-vacio]').hidden = dias.length > 0;
 
-    pintarRepasar(raiz);
+    // setTimeout, no requestAnimationFrame: un rAF corre justo antes del
+    // pintado, así que seguiría contando dentro del mismo "presentation
+    // delay" del toque. Con setTimeout el navegador ya ha podido pintar
+    // el frame de entrada antes de que arranque este trabajo pesado.
+    setTimeout(function () {
+      if (!document.body.contains(raiz)) return;
+      // DIAGNÓSTICO TEMPORAL — quitar cuando se resuelva el lag de Práctica.
+      var _dT0 = performance.now();
+      var _d = function (etq) { console.info('[perf] practica/' + etq + ': ' + (performance.now() - _dT0).toFixed(1) + 'ms'); };
 
-    montarCalendario(raiz);
+      // Se calculan una sola vez aquí y se reparten: Logros y "repasar"
+      // necesitan el mismo listar() de canciones/sesiones (que relee y
+      // sanea/ordena todo cada vez que se pide), así que antes se pedía
+      // por duplicado en cada sitio.
+      var pre = {
+        canciones: window.Canciones ? window.Canciones.listar() : [],
+        sesiones: window.Sesiones ? window.Sesiones.listar() : [],
+      };
+      _d('listar canciones+sesiones');
+      pintarLogros(raiz, pre);
+      _d('pintarLogros');
+      pintarResumenMes(raiz);
+      _d('pintarResumenMes');
+      pintarRepasar(raiz, pre);
+      _d('pintarRepasar');
+      montarCalendario(raiz);
+      _d('montarCalendario');
 
-    var btnConc = raiz.querySelector('[data-ir-conciertos]');
-    if (btnConc) {
-      var nConc = window.Conciertos ? window.Conciertos.listar().length : 0;
-      var txt = raiz.querySelector('[data-ir-conciertos-txt]');
-      if (txt) txt.textContent = nConc ? 'Conciertos del coro · ' + nConc : 'Conciertos del coro';
-      btnConc.addEventListener('click', function () { window.App.ir('conciertos'); });
-    }
-    // Compatibilidad: si aún existe el botón viejo de "Añadir día de concierto".
-    var btnAdd = raiz.querySelector('[data-add-concierto]');
-    if (btnAdd) btnAdd.addEventListener('click', function () { abrirFormConcierto(null); });
+      var btnConc = raiz.querySelector('[data-ir-conciertos]');
+      if (btnConc) {
+        var nConc = window.Conciertos ? window.Conciertos.listar().length : 0;
+        var txt = raiz.querySelector('[data-ir-conciertos-txt]');
+        if (txt) txt.textContent = nConc ? 'Conciertos del coro · ' + nConc : 'Conciertos del coro';
+        btnConc.addEventListener('click', function () { window.App.ir('conciertos'); });
+      }
+      // Compatibilidad: si aún existe el botón viejo de "Añadir día de concierto".
+      var btnAdd = raiz.querySelector('[data-add-concierto]');
+      if (btnAdd) btnAdd.addEventListener('click', function () { abrirFormConcierto(null); });
 
-    pintarDatos(raiz);
+      pintarDatos(raiz);
+      _d('pintarDatos (fin)');
+    }, 0);
 
     // Se ha llegado aquí tocando un aviso de logro: llevar a ESE logro.
     if (datos && datos.logroId) {
@@ -84,10 +111,8 @@ window.Pagina_practice = (function () {
     contarHasta(elNum, n);
     elLabel.textContent = n === 1 ? 'día seguido' : 'días seguidos';
 
-    // El fuego y el número se amoldan a las cifras: cuantos más dígitos,
-    // más grande la llama y más pequeño el número para que quepa.
-    var cifras = String(Math.max(n, 0)).length;
-    hero.setAttribute('data-cifras', cifras);
+    // El número se amolda a las cifras para no salirse de la llama.
+    hero.setAttribute('data-cifras', String(Math.max(n, 0)).length);
 
     hero.classList.toggle('racha-hero--activa', n > 0 && !info.enPeligro);
     hero.classList.toggle('racha-hero--peligro', info.enPeligro);
@@ -178,14 +203,14 @@ window.Pagina_practice = (function () {
      conseguidos van en cobalto con su check; los pendientes en
      gris con el progreso ("3/7"). Tocar uno abre su detalle.
      ---------------------------------------------------------- */
-  function pintarLogros(raiz) {
+  function pintarLogros(raiz, pre) {
     var sec = raiz.querySelector('[data-logros]');
     if (!sec || !window.Logros) return;
 
-    var lista = window.Logros.listar();
+    var lista = window.Logros.listar(pre);
     if (!lista.length) return;
 
-    var res = window.Logros.resumen();
+    var res = window.Logros.resumen(lista);
     raiz.querySelector('[data-logros-cuenta]').textContent =
       res.hechos + ' de ' + res.total;
 
@@ -1314,14 +1339,20 @@ window.Pagina_practice = (function () {
      Fragmentos difíciles pendientes — invita a repasarlos.
      Solo cuentan las canciones que aún no están aprendidas.
      ---------------------------------------------------------- */
-  function pintarRepasar(raiz) {
+  function pintarRepasar(raiz, pre) {
     var btn = raiz.querySelector('[data-repasar]');
     if (!btn || !window.Sesiones) return;
 
-    var pend = window.Sesiones.repasoPendiente().filter(function (p) {
+    // Un solo listar() + mapa, en vez de Canciones.obtener() (que relee y
+    // reordena TODO el repertorio con localeCompare) por cada trozo pendiente.
+    // `pre`: listar() de canciones/sesiones ya hechos por iniciar(), para no
+    // repetirlos (Práctica los necesita también para los logros).
+    var estadoPorId = {};
+    (pre.canciones || window.Canciones.listar()).forEach(function (c) { estadoPorId[c.id] = c.estado; });
+    var pend = window.Sesiones.repasoPendiente(pre.sesiones).filter(function (p) {
       if (!p.cancionId) return true;
-      var c = window.Canciones.obtener(p.cancionId);
-      return !c || c.estado !== 'aprendida';
+      var estado = estadoPorId[p.cancionId];
+      return estado === undefined || estado !== 'aprendida';
     }).sort(function (a, b) { return b.trozos - a.trozos; });
     if (pend.length === 0) return;
 

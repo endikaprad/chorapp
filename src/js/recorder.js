@@ -154,6 +154,7 @@ window.Grabadora = (function () {
         onda = [];
         rec.ondataavailable = function (e) { if (e.data && e.data.size) trozos.push(e.data); };
         rec.start();
+        try { if (window.Vibra) window.Vibra.toque(); } catch (e) {}
         _marcoGrabando(true);
         _escucharNiveles();
       });
@@ -173,6 +174,7 @@ window.Grabadora = (function () {
           _soltarStream();
           resolve(blob);
         };
+        try { if (window.Vibra) window.Vibra.toque(); } catch (e) {}
         rec.stop();
       });
     }
