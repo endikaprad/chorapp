@@ -11,6 +11,10 @@
     "backups": {
       ".read": "auth != null",
       ".write": true
+    },
+    "updates": {
+      ".read": true,
+      ".write": "auth != null"
     }
   }
 }
