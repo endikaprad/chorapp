@@ -96,6 +96,17 @@ window.Calendario = (function () {
       vistaMes++; if (vistaMes > 11) { vistaMes = 0; vistaAnio++; } pintar(1);
     });
 
+    // El fondo animado de la app se queda quieto mientras se desliza el mes:
+    // son los mismos fotogramas que necesita la transición del calendario.
+    var tFondo = null;
+    function quietoFondo(si) {
+      if (!window.FondoQuieto) return;
+      try { window.FondoQuieto(si, 'calendario'); } catch (e) {}
+      if (!si) return;
+      clearTimeout(tFondo);
+      tFondo = setTimeout(function () { quietoFondo(false); }, 320);
+    }
+
     function pintar(dir) {
       elMes.textContent = MESES[vistaMes] + ' ' + vistaAnio;
 
@@ -127,25 +138,36 @@ window.Calendario = (function () {
             ' aria-label="' + etq + '"' : '') +
           '>' + d + '</span>';
       }
-      elGrid.innerHTML = celdas;
+      /* RENDIMIENTO — cambiar de mes era el momento más caro del calendario:
+         se reescribía la rejilla entera, se forzaban DOS reflujos seguidos,
+         arrancaba el deslizamiento y encima se sellaban de golpe todos los
+         días practicados. En el APK eso es el tirón del fondo al pasar de
+         mes. Ahora: se quitan las clases ANTES de reescribir (el propio
+         innerHTML hace de reflujo, ya no hace falta forzar ninguno), los
+         sellos se desactivan durante el cambio y el fondo animado se para
+         mientras dura la transición, igual que al cambiar de pantalla. */
+      if (dir) {
+        elGrid.classList.add('cal__grid--sin-sello');
+        elGrid.classList.remove('cal__grid--der', 'cal__grid--izq');
+        elMes.classList.remove('cal__mes--der', 'cal__mes--izq');
+        quietoFondo(true);
+      }
 
-      // Animación de "sello" escalonada solo para los días practicados.
-      var hechos = elGrid.querySelectorAll('.cal__dia--hecho');
-      Array.prototype.forEach.call(hechos, function (el, n) {
-        el.style.animationDelay = (n * 35) + 'ms';
-      });
+      /* El calendario SIEMPRE ocupa seis filas, aunque el mes solo llene
+         cinco. Si no, pasar de un mes de cinco filas a uno de seis (o al
+         revés) cambia la altura de la página unos 60 px de golpe: la
+         pantalla entera da un salto y parece que la barra de abajo se
+         mueve. Las celdas de relleno son invisibles y no se pueden pulsar. */
+      var SEMANAS = 6;
+      for (var v = primero + totalDias; v < SEMANAS * 7; v++) {
+        celdas += '<span class="cal__dia cal__dia--vacio"></span>';
+      }
+
+      elGrid.innerHTML = celdas;
 
       // Transición al cambiar de mes: desliza según la dirección.
       if (dir) {
-        elGrid.style.animation = 'none';
-        elMes.style.animation = 'none';
-        /* forzar reflow para reiniciar la animación */
-        void elGrid.offsetWidth;
-        elGrid.style.animation = '';
-        elMes.style.animation = '';
-        elGrid.classList.remove('cal__grid--der', 'cal__grid--izq');
-        elMes.classList.remove('cal__mes--der', 'cal__mes--izq');
-        void elGrid.offsetWidth;
+        void elGrid.offsetWidth;   // reinicia la animación con las clases nuevas
         elGrid.classList.add(dir > 0 ? 'cal__grid--der' : 'cal__grid--izq');
         elMes.classList.add(dir > 0 ? 'cal__mes--der' : 'cal__mes--izq');
       }

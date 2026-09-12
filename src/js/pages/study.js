@@ -178,7 +178,12 @@ window.Pagina_study = (function () {
     obs = new MutationObserver(function () {
       if (!document.body.contains(cont)) destruir();
     });
-    obs.observe(vista, { childList: true, subtree: true });
+    // RENDIMIENTO — basta con `childList` en #vista, SIN `subtree`: las
+    // pantallas son hijas directas de #vista, así que su retirada ya es un
+    // cambio en esa lista. Con `subtree` el observador se disparaba en CADA
+    // inserción del DOM de la pantalla (el Modo estudio cambia mucho: letra,
+    // marcas, listas) y en cada una hacía un `document.body.contains()`.
+    obs.observe(vista, { childList: true });
 
     // Mini-tutorial: solo la primera vez que se abre el Modo estudio.
     var visto = false;
@@ -209,6 +214,7 @@ window.Pagina_study = (function () {
     urls = [];
     if (window.VisorPDF) window.VisorPDF.cerrar();
     desmontarTransporte();
+    confirmarBorradorAnot();   // si se sale a medio dibujar, no se pierde el trazo
     desmontarLightbox();
     cerrarTour();
     cerrarCompartirCancion();
@@ -683,7 +689,7 @@ window.Pagina_study = (function () {
       btn.removeAttribute('aria-expanded');
       btn.disabled = true;
       var esOrig = actual.sesion.suelta;
-      q('[data-dia-sel-txt]').textContent = esOrig ? 'La canción original' : etiquetaToma(actual, true);
+      q('[data-dia-sel-txt]').textContent = esOrig ? 'Canción original' : etiquetaToma(actual, true);
       var icF = q('[data-dia-ic]');
       if (icF) icF.innerHTML = esOrig ? IC_NOTA : IC_CAL;
       return;
@@ -880,12 +886,22 @@ window.Pagina_study = (function () {
       }
     });
 
+    /* RENDIMIENTO — este suscriptor corre en cada `timeupdate` (unas 4
+       veces por segundo) durante toda la canción, y antes reescribía TODO
+       en cada pasada aunque nada hubiera cambiado: los iconos de play, los
+       textos de los botones A/B, la velocidad, la duración total… Cada
+       escritura ensucia el estilo y el layout de ese nodo. Ahora solo se
+       toca lo que de verdad ha cambiado desde la última vez. */
+    var _ui = { son: null, act: null, tot: null, vel: null, velB: null, bucle: null, replay: null };
     vistaSub = window.CancionActiva.suscribir(function (s) {
       // .hidden como propiedad no existe en <svg>: hay que tocar el atributo.
-      icPlay.toggleAttribute('hidden', s.reproduciendo);
-      icPause.toggleAttribute('hidden', !s.reproduciendo);
-      btnPlay.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
-      btnPlay.classList.toggle('is-sonando', s.reproduciendo);
+      if (_ui.son !== s.reproduciendo) {
+        _ui.son = s.reproduciendo;
+        icPlay.toggleAttribute('hidden', s.reproduciendo);
+        icPause.toggleAttribute('hidden', !s.reproduciendo);
+        btnPlay.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
+        btnPlay.classList.toggle('is-sonando', s.reproduciendo);
+      }
       tiempoActual = s.actual || 0;
       if (s.total && s.total !== duracionAudio) { duracionAudio = s.total; pintarMarcas(); }
       // Colocar el audio al principio de la canción en cuanto haya duración.
@@ -907,15 +923,26 @@ window.Pagina_study = (function () {
       }
       // Carril relativo a la canción: 0:00 → duración de la canción.
       var relAct = rel(s.actual), relTot = segTotal();
-      tAct.textContent = fmtTiempo(relAct);
-      tTot.textContent = fmtTiempo(relTot);
+      var sAct = fmtTiempo(relAct);
+      if (_ui.act !== sAct) { _ui.act = sAct; tAct.textContent = sAct; }
+      var sTot = fmtTiempo(relTot);
+      if (_ui.tot !== sTot) { _ui.tot = sTot; tTot.textContent = sTot; }
       if (relTot && !barra.matches(':active')) {
-        barra.value = String(Math.round((relAct / relTot) * 1000));
+        var v = String(Math.round((relAct / relTot) * 1000));
+        if (_ui.velB !== v) { _ui.velB = v; barra.value = v; }
       }
-      velValor.textContent = fmtVel(s.velocidad);
-      if (!velBarra.matches(':active')) velBarra.value = String(s.velocidad);
-      pintarBucle(s.bucle);
-      pintarReplay();
+      var sVel = fmtVel(s.velocidad);
+      if (_ui.vel !== sVel) {
+        _ui.vel = sVel;
+        velValor.textContent = sVel;
+        if (!velBarra.matches(':active')) velBarra.value = String(s.velocidad);
+      }
+      // Firma del bucle: incluye `bucleA` porque los botones A/B lo cambian
+      // y llaman a pintarBucle por su cuenta; así el suscriptor se entera.
+      var fb = (s.bucle ? s.bucle.a + '/' + s.bucle.b : '-') + '|' + bucleA + '|' + relTot;
+      if (_ui.bucle !== fb) { _ui.bucle = fb; pintarBucle(s.bucle); }
+      var rep = enBucle();
+      if (_ui.replay !== rep) { _ui.replay = rep; pintarReplay(); }
       sincronizarTransporte(s);
     });
 
@@ -1085,9 +1112,16 @@ window.Pagina_study = (function () {
     });
 
     // Mostrarlo solo cuando hay un visor a pantalla completa abierto.
-    transObs = new MutationObserver(evaluarTransporte);
+    // RENDIMIENTO — antes este observador vigilaba también `class` en TODO
+    // el documento. En el Modo estudio las clases cambian sin parar (el
+    // karaoke marca el verso activo, el botón de play, el fondo…), así que
+    // saltaba decenas de veces por segundo y cada salto hacía dos
+    // `querySelector` sobre el documento entero. Los visores a pantalla
+    // completa se detectan por su INSERCIÓN (visor de PDF) o por su atributo
+    // `hidden` (lightbox): con eso basta, `class` sobra.
+    transObs = new MutationObserver(pedirEvaluarTransporte);
     transObs.observe(document.body, {
-      childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class'],
+      childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'],
     });
     evaluarTransporte();
   }
@@ -1109,11 +1143,27 @@ window.Pagina_study = (function () {
               document.querySelector('.lightbox:not([hidden])'));
   }
 
+  // Varias mutaciones seguidas (abrir un visor mueve muchos nodos) se
+  // resuelven en UNA sola evaluación, en el frame siguiente.
+  var _evalPedida = 0;
+  function pedirEvaluarTransporte() {
+    if (_evalPedida) return;
+    _evalPedida = requestAnimationFrame(function () {
+      _evalPedida = 0;
+      evaluarTransporte();
+    });
+  }
+
   function evaluarTransporte() {
     if (!transporte) return;
+    var visor = visorAPantallaCompletaAbierto();
+    // Si hay un visor tapando la pantalla entera, el fondo animado no se ve:
+    // que deje de gastar fotogramas mientras Ama mira la partitura. El
+    // lightbox no se detecta solo desde app.js (se enseña quitando `hidden`,
+    // y eso cambia sin parar aquí dentro), así que se avisa desde aquí.
+    if (window.FondoQuieto) window.FondoQuieto(visor, 'visor-estudio');
     // A mano cuando hay un visor a pantalla completa abierto o mientras se graba.
-    transporte.classList.toggle('is-visible',
-      visorAPantallaCompletaAbierto() || estaGrabando);
+    transporte.classList.toggle('is-visible', visor || estaGrabando);
     evaluarBarraFlotante();
   }
 
@@ -1133,31 +1183,58 @@ window.Pagina_study = (function () {
     if (raiz) raiz.classList.toggle('estudio--barra-repro', mostrar);
   }
 
-  function sincronizarTransporte(s) {
-    if (!transporte) return;
-    var btn = transporte.querySelector('[data-tp-play]');
-    var icPlay = transporte.querySelector('.tp-ic-play');
-    var icPause = transporte.querySelector('.tp-ic-pause');
-    icPlay.toggleAttribute('hidden', s.reproduciendo);
-    icPause.toggleAttribute('hidden', !s.reproduciendo);
-    btn.classList.toggle('is-sonando', s.reproduciendo);
-    btn.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
-    var tRep = transporte.querySelector('[data-tp-replay]');
-    if (tRep) {
-      var on = enBucle();
-      tRep.classList.toggle('is-activo', on);
-      tRep.setAttribute('aria-pressed', on ? 'true' : 'false');
+  /* RENDIMIENTO — también corre 4 veces por segundo toda la canción, y
+     hacía cinco `querySelector` cada vez. Nodos cacheados (la píldora del
+     transporte se crea una vez) y escritura solo cuando cambia el valor. */
+  var _tp = null;
+  function refsTransporte() {
+    if (!transporte) return null;
+    if (!_tp || _tp.raiz !== transporte) {
+      _tp = {
+        raiz: transporte,
+        btn: transporte.querySelector('[data-tp-play]'),
+        icPlay: transporte.querySelector('.tp-ic-play'),
+        icPause: transporte.querySelector('.tp-ic-pause'),
+        rep: transporte.querySelector('[data-tp-replay]'),
+        t: transporte.querySelector('[data-tp-tiempo]'),
+        vSon: null, vRep: null, vT: null
+      };
     }
-    transporte.querySelector('[data-tp-tiempo]').textContent = fmtTiempo(rel(s.actual));
+    return _tp;
+  }
+
+  function sincronizarTransporte(s) {
+    var R = refsTransporte();
+    if (!R) return;
+    if (R.vSon !== s.reproduciendo) {
+      R.vSon = s.reproduciendo;
+      R.icPlay.toggleAttribute('hidden', s.reproduciendo);
+      R.icPause.toggleAttribute('hidden', !s.reproduciendo);
+      R.btn.classList.toggle('is-sonando', s.reproduciendo);
+      R.btn.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
+    }
+    if (R.rep) {
+      var on = enBucle();
+      if (R.vRep !== on) {
+        R.vRep = on;
+        R.rep.classList.toggle('is-activo', on);
+        R.rep.setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
+    }
+    var st = fmtTiempo(rel(s.actual));
+    if (R.vT !== st) { R.vT = st; R.t.textContent = st; }
   }
 
   function desmontarTransporte() {
+    if (window.FondoQuieto) window.FondoQuieto(false, 'visor-estudio');
     if (transObs) { transObs.disconnect(); transObs = null; }
+    if (_evalPedida) { cancelAnimationFrame(_evalPedida); _evalPedida = 0; }
     if (playerObs) { playerObs.disconnect(); playerObs = null; }
     playerFuera = false;
     if (window.CancionActiva) window.CancionActiva.fijarForzarBarra(false);
     if (transporte && transporte.parentNode) transporte.parentNode.removeChild(transporte);
     transporte = null;
+    _tp = null;
   }
 
   /* ---------- Dame el tono ---------- */
@@ -1374,9 +1451,12 @@ window.Pagina_study = (function () {
               '<img class="visor-doc__img" alt="' + escapar(etq) + '" />' +
               '<svg class="visor-doc__anot" data-clave="' + escapar(meta.clave) + '"></svg></div>';
             var imA = item.querySelector('img');
-            imA.src = ui;
             var svgA = item.querySelector('svg');
-            if (cancion) svgA.innerHTML = marcasAnotSVG(window.Canciones.anotacionesPartitura(cancion, meta.clave), false);
+            // Los trazos a mano se pintan en píxeles del SVG, así que hay que
+            // esperar a que la imagen cargue para saber de qué tamaño es.
+            imA.addEventListener('load', function () { refrescarAnotInline(meta.clave); });
+            imA.src = ui;
+            if (cancion) svgA.innerHTML = marcasAnotSVG(window.Canciones.anotacionesPartitura(cancion, meta.clave), false, svgA);
             imA.addEventListener('click', function () { abrirLightbox(ui, { clave: meta.clave }); });
           } else {
             item.innerHTML = '<img class="visor-doc__img" alt="' + escapar(etq) + '" />';
@@ -2318,10 +2398,27 @@ window.Pagina_study = (function () {
   var anotSvg, anotBarra, anotPista, anotBtnLapiz;
   var anotClave = null;      // clave del adjunto abierto (null si no admite marcas)
   var anotEditando = false;
-  var anotModo = 'circulo';  // 'circulo' | 'flecha'
+  // Se empieza dibujando a mano, como en una partitura de papel; las formas
+  // (círculo / flecha) están ahí para quien las quiera.
+  var anotModo = 'trazo';    // 'trazo' | 'circulo' | 'flecha' | 'goma'
   var anotColorId = 'cobalto';
-  var anotInicio = null;     // punto de partida {x,y} (fracción 0..1) al arrastrar una flecha
-  var anotLineaTmp = null;   // <line> de previsualización mientras se arrastra
+  var anotInicio = null;     // punto de partida {x,y} (fracción 0..1) al arrastrar
+  var anotLineaTmp = null;   // <line>/<polyline> de previsualización mientras se dibuja
+  var anotPuntos = null;     // recorrido del dedo (fracciones) en el modo trazo
+
+  // Borrador de la sesión de edición actual: nada de esto toca el disco
+  // hasta que se pulsa "Hecho" (o se cierra el visor). Así se puede dibujar,
+  // deshacer y borrar marcas sin miedo mientras se decide el resultado.
+  var anotBorrador = [];    // anotaciones nuevas, aún sin guardar
+  var anotBorradas = [];    // ids de anotaciones YA guardadas, marcadas para quitar
+
+  // Lo que se explica arriba mientras se dibuja, según la herramienta elegida.
+  var PISTA_ANOT = {
+    circulo: 'Toca donde quieras marcar un círculo',
+    flecha: 'Arrastra para dibujar una flecha',
+    trazo: 'Dibuja con el dedo, como en papel',
+    goma: 'Pasa el dedo por encima de lo que quieras borrar',
+  };
 
   function montarLightbox() {
     lb = q('[data-lightbox]');
@@ -2342,6 +2439,10 @@ window.Pagina_study = (function () {
     document.addEventListener('keydown', cerrarConEsc);
 
     lbZoom = crearZoom(lb, lbLienzo, function () { return anotEditando; });
+
+    // Hasta que la imagen no carga no se sabe el tamaño del lienzo, y los
+    // trazos a mano se pintan en píxeles: repintar en cuanto se sepa.
+    lbImg.addEventListener('load', pintarAnotLB);
 
     montarAnotaciones();
   }
@@ -2380,11 +2481,19 @@ window.Pagina_study = (function () {
 
   /* ---------- Marcas dibujadas sobre la partitura (círculo / flecha) ---------- */
 
-  // Construye el <defs>+cuerpo SVG de una lista de anotaciones. Coordenadas
-  // en % (fracción del tamaño real de la imagen): valen igual a cualquier
-  // zoom, sin recalcular nada. `editable`: añade el manejador de borrado.
-  function marcasAnotSVG(anots, editable) {
+  // Construye el <defs>+cuerpo SVG de una lista de anotaciones.
+  //
+  // Círculos y flechas van en % (fracción del tamaño real de la imagen):
+  // valen igual a cualquier zoom, sin recalcular nada. Los trazos a mano NO
+  // pueden ir en %: el atributo `points` de <polyline> solo admite números,
+  // así que se convierten a píxeles del propio SVG (su caja de maquetación,
+  // que el zoom del visor no cambia porque es un `transform`). Por eso hay
+  // que repintar cuando la imagen termina de cargar y ya se sabe su tamaño.
+  // `editable`: añade el manejador de borrado.
+  function marcasAnotSVG(anots, editable, svgEl) {
     var defs = '', cuerpo = '';
+    var anchoPx = (svgEl && svgEl.clientWidth) || 0;
+    var altoPx = (svgEl && svgEl.clientHeight) || 0;
     anots.forEach(function (a) {
       var color = colorFrag(a);
       var attr = editable ? ' data-anot-borrar="' + escapar(a.id) + '" tabindex="0" aria-label="Quitar marca"' : '';
@@ -2396,6 +2505,14 @@ window.Pagina_study = (function () {
         cuerpo += '<g class="anot-marca"' + attr + '>' +
           '<line x1="' + (a.x * 100) + '%" y1="' + (a.y * 100) + '%" x2="' + (a.x2 * 100) + '%" y2="' + (a.y2 * 100) + '%" ' +
           'stroke="' + color + '" stroke-width="4.5" stroke-linecap="round" marker-end="url(#' + mid + ')" /></g>';
+      } else if (a.tipo === 'trazo' && Array.isArray(a.puntos) && a.puntos.length > 1) {
+        if (!anchoPx || !altoPx) return;   // aún sin tamaño: se repinta al cargar la imagen
+        var pts = a.puntos.map(function (p) {
+          return (p.x * anchoPx).toFixed(1) + ',' + (p.y * altoPx).toFixed(1);
+        }).join(' ');
+        cuerpo += '<g class="anot-marca"' + attr + '>' +
+          '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="4" ' +
+          'stroke-linecap="round" stroke-linejoin="round" /></g>';
       } else {
         cuerpo += '<g class="anot-marca"' + attr + '>' +
           '<circle cx="' + (a.x * 100) + '%" cy="' + (a.y * 100) + '%" r="16" fill="none" stroke="' + color + '" stroke-width="4" /></g>';
@@ -2404,22 +2521,99 @@ window.Pagina_study = (function () {
     return (defs ? '<defs>' + defs + '</defs>' : '') + cuerpo;
   }
 
-  // Repinta el visor a pantalla completa con las anotaciones guardadas de
-  // `anotClave`. Si se está editando, cada marca se puede tocar para borrarla.
+  // Anotaciones ya guardadas de `anotClave`, con el borrador de esta sesión
+  // de edición aplicado encima: sin las marcadas para quitar, más las nuevas
+  // que aún no se han confirmado con "Hecho".
+  function anotacionesConBorrador() {
+    var guardadas = (cancion && anotClave) ? window.Canciones.anotacionesPartitura(cancion, anotClave) : [];
+    if (anotBorradas.length) {
+      guardadas = guardadas.filter(function (a) { return anotBorradas.indexOf(a.id) === -1; });
+    }
+    return guardadas.concat(anotBorrador);
+  }
+
+  // Repinta el visor a pantalla completa. Mientras se edita se ve el
+  // borrador (lo guardado + los cambios sin confirmar) y cada marca se puede
+  // tocar para quitarla; fuera de edición se ve solo lo que hay guardado.
   function pintarAnotLB() {
     if (!anotSvg) return;
-    var anots = (cancion && anotClave) ? window.Canciones.anotacionesPartitura(cancion, anotClave) : [];
-    anotSvg.innerHTML = marcasAnotSVG(anots, anotEditando);
+    var anots = anotEditando ? anotacionesConBorrador()
+      : ((cancion && anotClave) ? window.Canciones.anotacionesPartitura(cancion, anotClave) : []);
+    anotSvg.innerHTML = marcasAnotSVG(anots, anotEditando, anotSvg);
     if (anotEditando) {
       anotSvg.querySelectorAll('[data-anot-borrar]').forEach(function (g) {
         g.addEventListener('click', function (e) {
           e.stopPropagation();
-          window.Canciones.borrarAnotacionPartitura(cancion.id, anotClave, g.getAttribute('data-anot-borrar'));
-          pintarAnotLB();
-          refrescarAnotInline(anotClave);
+          if (quitarDelBorrador(g.getAttribute('data-anot-borrar'))) pintarAnotLB();
         });
       });
     }
+  }
+
+  // Quita una marca del borrador de esta sesión: si era nueva (sin
+  // confirmar aún) se descarta sin más; si ya estaba guardada, se apunta
+  // para borrarla al pulsar "Hecho". Devuelve true si de verdad quitó algo
+  // (para no repintar de más mientras la goma pasa por encima dos veces).
+  function quitarDelBorrador(id) {
+    var iBorrador = anotBorrador.findIndex(function (a) { return a.id === id; });
+    if (iBorrador !== -1) { anotBorrador.splice(iBorrador, 1); return true; }
+    if (anotBorradas.indexOf(id) === -1) { anotBorradas.push(id); return true; }
+    return false;
+  }
+
+  // Distancia de un punto a un segmento (todo en fracciones 0..1): hace de
+  // "radio de la goma" para las flechas y los trazos, que son líneas, no
+  // puntos.
+  function distAPunto(p, a) { return Math.hypot(p.x - a.x, p.y - a.y); }
+  function distASegmento(p, a, b) {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var largo2 = dx * dx + dy * dy;
+    var t = largo2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / largo2)) : 0;
+    return distAPunto(p, { x: a.x + t * dx, y: a.y + t * dy });
+  }
+  var RADIO_GOMA = 0.035;   // fracción del tamaño de la imagen: vale a cualquier zoom
+  function tocaConGoma(p, a) {
+    if (a.tipo === 'flecha' && typeof a.x2 === 'number') {
+      return distASegmento(p, { x: a.x, y: a.y }, { x: a.x2, y: a.y2 }) < RADIO_GOMA;
+    }
+    if (a.tipo === 'trazo' && Array.isArray(a.puntos) && a.puntos.length) {
+      if (a.puntos.length === 1) return distAPunto(p, a.puntos[0]) < RADIO_GOMA;
+      for (var i = 0; i < a.puntos.length - 1; i++) {
+        if (distASegmento(p, a.puntos[i], a.puntos[i + 1]) < RADIO_GOMA) return true;
+      }
+      return false;
+    }
+    return distAPunto(p, a) < RADIO_GOMA + 0.02;   // +radio del círculo dibujado
+  }
+
+  // Borra con la goma todo lo que toque el punto `p` (fracción 0..1).
+  // Se llama en cada pointerdown/pointermove del modo "goma": arrastrar el
+  // dedo va borrando todo lo que va pasando por debajo, como una goma real.
+  function borrarConGoma(p) {
+    var tocada = false;
+    anotacionesConBorrador().forEach(function (a) {
+      if (tocaConGoma(p, a) && quitarDelBorrador(a.id)) tocada = true;
+    });
+    if (tocada) pintarAnotLB();
+  }
+
+  // Vuelca el borrador de esta sesión de edición a disco: borra lo marcado
+  // para quitar y guarda las marcas nuevas. Se llama al salir de edición
+  // (con "Hecho", o al cerrar el visor), nunca en cada trazo.
+  function confirmarBorradorAnot() {
+    if (!cancion || !anotClave) { anotBorrador = []; anotBorradas = []; return; }
+    if (!anotBorrador.length && !anotBorradas.length) return;
+    anotBorradas.forEach(function (id) {
+      window.Canciones.borrarAnotacionPartitura(cancion.id, anotClave, id);
+    });
+    anotBorrador.forEach(function (a) {
+      window.Canciones.agregarAnotacionPartitura(cancion.id, anotClave, a);
+    });
+    var clave = anotClave;
+    anotBorrador = [];
+    anotBorradas = [];
+    refrescar();
+    refrescarAnotInline(clave);
   }
 
   // Repinta solo el SVG de lectura bajo el visor (sin recrear la imagen ni
@@ -2429,7 +2623,7 @@ window.Pagina_study = (function () {
     var doc = q('[data-partitura-doc]');
     if (!doc || !window.CSS || !CSS.escape) return;
     var svg = doc.querySelector('svg[data-clave="' + CSS.escape(clave) + '"]');
-    if (svg) svg.innerHTML = marcasAnotSVG(window.Canciones.anotacionesPartitura(cancion, clave), false);
+    if (svg) svg.innerHTML = marcasAnotSVG(window.Canciones.anotacionesPartitura(cancion, clave), false, svg);
   }
 
   function pintarColoresAnot() {
@@ -2448,12 +2642,26 @@ window.Pagina_study = (function () {
   }
 
   function fijarEdicionAnot(on) {
+    var estabaEditando = anotEditando;
     anotEditando = !!on && !!anotClave;
+    // Al SALIR de edición (por "Hecho", Escape o cerrar el visor) es cuando
+    // el borrador de esta sesión se escribe de verdad. Mientras se dibuja,
+    // nada toca el disco: así deshacer y borrar son gratis.
+    if (estabaEditando && !anotEditando) confirmarBorradorAnot();
+    // Cada vez que se ENTRA a dibujar se vuelve al trazo libre por defecto,
+    // para no dejar una forma seleccionada de la sesión anterior sin avisar.
+    if (!estabaEditando && anotEditando) {
+      anotModo = 'trazo';
+      if (lb) lb.querySelectorAll('[data-anot-modo]').forEach(function (o) { o.classList.remove('is-activo'); });
+    }
     if (anotBarra) anotBarra.hidden = !anotEditando;
     if (anotPista) anotPista.hidden = !anotEditando;
     if (anotSvg) anotSvg.classList.toggle('is-editando', anotEditando);
     if (anotBtnLapiz) anotBtnLapiz.classList.toggle('is-activo', anotEditando);
+    if (lb) lb.classList.toggle('lightbox--editando', anotEditando);
+    if (anotPista) anotPista.textContent = PISTA_ANOT[anotModo] || '';
     anotInicio = null;
+    anotPuntos = null;
     quitarLineaTmp();
     pintarAnotLB();
   }
@@ -2474,20 +2682,22 @@ window.Pagina_study = (function () {
     };
   }
 
+  // Añade una marca al borrador de esta sesión de edición. No se guarda en
+  // disco hasta "Hecho" (ver confirmarBorradorAnot).
   function guardarAnotacion(datos) {
     if (!cancion || !anotClave) return;
-    window.Canciones.agregarAnotacionPartitura(cancion.id, anotClave, datos);
+    datos.id = 'tmp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    datos.creado = Date.now();
+    anotBorrador.push(datos);
     pintarAnotLB();
-    refrescarAnotInline(anotClave);
   }
 
+  // Deshacer solo actúa sobre lo dibujado en ESTA sesión: si no hay nada
+  // pendiente, no hay nada que deshacer (lo ya guardado se quita tocándolo).
   function deshacerAnot() {
-    if (!cancion || !anotClave) return;
-    var lista = window.Canciones.anotacionesPartitura(cancion, anotClave);
-    if (!lista.length) return;
-    window.Canciones.borrarAnotacionPartitura(cancion.id, anotClave, lista[lista.length - 1].id);
+    if (!anotBorrador.length) return;
+    anotBorrador.pop();
     pintarAnotLB();
-    refrescarAnotInline(anotClave);
   }
 
   function montarAnotaciones() {
@@ -2495,56 +2705,109 @@ window.Pagina_study = (function () {
     pintarColoresAnot();
 
     anotBtnLapiz.addEventListener('click', function () { fijarEdicionAnot(!anotEditando); });
+    // Por defecto se dibuja a mano (sin botón propio: es lo que pasa si no
+    // hay ninguna forma elegida). Tocar una forma la activa; tocarla otra
+    // vez la desactiva y vuelve al trazo libre — así no hace falta un
+    // tercer botón "lápiz" compitiendo visualmente con las formas.
     lb.querySelectorAll('[data-anot-modo]').forEach(function (b) {
       b.addEventListener('click', function () {
-        anotModo = b.getAttribute('data-anot-modo');
-        lb.querySelectorAll('[data-anot-modo]').forEach(function (o) { o.classList.toggle('is-activo', o === b); });
+        var forma = b.getAttribute('data-anot-modo');
+        anotModo = (anotModo === forma) ? 'trazo' : forma;
+        lb.querySelectorAll('[data-anot-modo]').forEach(function (o) {
+          o.classList.toggle('is-activo', o.getAttribute('data-anot-modo') === anotModo);
+        });
+        if (anotPista) anotPista.textContent = PISTA_ANOT[anotModo] || '';
       });
     });
     lb.querySelector('[data-anot-deshacer]').addEventListener('click', deshacerAnot);
     lb.querySelector('[data-anot-listo]').addEventListener('click', function () { fijarEdicionAnot(false); });
 
     var ns = 'http://www.w3.org/2000/svg';
+
+    // Píxeles del SVG (su caja de maquetación, que el zoom no cambia): es la
+    // unidad en la que se pinta el trazo a mano, igual que en marcasAnotSVG.
+    function aPx(f) {
+      return (f.x * anotSvg.clientWidth).toFixed(1) + ',' + (f.y * anotSvg.clientHeight).toFixed(1);
+    }
+
+    function nuevaLineaTmp(tag) {
+      var el = document.createElementNS(ns, tag);
+      el.setAttribute('class', 'anot-tmp');
+      el.setAttribute('fill', 'none');
+      el.setAttribute('stroke', COLORES_FRAG[anotColorId].hex);
+      anotSvg.appendChild(el);
+      return el;
+    }
+
     anotSvg.addEventListener('pointerdown', function (e) {
       if (!anotEditando || e.target.closest('[data-anot-borrar]')) return;
       e.stopPropagation();
       anotSvg.setPointerCapture(e.pointerId);
       anotInicio = fraccionDesde(e);
-      if (anotModo === 'flecha') {
-        anotLineaTmp = document.createElementNS(ns, 'line');
+      if (anotModo === 'goma') {
+        borrarConGoma(anotInicio);
+      } else if (anotModo === 'flecha') {
+        anotLineaTmp = nuevaLineaTmp('line');
         anotLineaTmp.setAttribute('x1', (anotInicio.x * 100) + '%');
         anotLineaTmp.setAttribute('y1', (anotInicio.y * 100) + '%');
         anotLineaTmp.setAttribute('x2', (anotInicio.x * 100) + '%');
         anotLineaTmp.setAttribute('y2', (anotInicio.y * 100) + '%');
-        anotLineaTmp.setAttribute('class', 'anot-tmp');
-        anotLineaTmp.setAttribute('stroke', COLORES_FRAG[anotColorId].hex);
-        anotSvg.appendChild(anotLineaTmp);
+      } else if (anotModo === 'trazo') {
+        anotPuntos = [anotInicio];
+        anotLineaTmp = nuevaLineaTmp('polyline');
+        anotLineaTmp.setAttribute('points', aPx(anotInicio));
       }
     });
+
     anotSvg.addEventListener('pointermove', function (e) {
-      if (!anotEditando || !anotInicio || anotModo !== 'flecha' || !anotLineaTmp) return;
+      if (!anotEditando || !anotInicio) return;
+      if (anotModo === 'goma') { borrarConGoma(fraccionDesde(e)); return; }
+      if (!anotLineaTmp) return;
       var f = fraccionDesde(e);
-      anotLineaTmp.setAttribute('x2', (f.x * 100) + '%');
-      anotLineaTmp.setAttribute('y2', (f.y * 100) + '%');
+      if (anotModo === 'flecha') {
+        anotLineaTmp.setAttribute('x2', (f.x * 100) + '%');
+        anotLineaTmp.setAttribute('y2', (f.y * 100) + '%');
+      } else if (anotModo === 'trazo' && anotPuntos) {
+        // Solo se apunta el dedo cuando se ha movido algo: evita listas de
+        // miles de puntos pegados que no se distinguen al dibujar.
+        var ult = anotPuntos[anotPuntos.length - 1];
+        if (Math.hypot(f.x - ult.x, f.y - ult.y) < 0.004) return;
+        anotPuntos.push(f);
+        anotLineaTmp.setAttribute('points', anotPuntos.map(aPx).join(' '));
+      }
     });
+
     function terminar(e) {
       if (!anotEditando || !anotInicio) return;
-      if (anotModo === 'flecha') {
-        var fin = fraccionDesde(e);
-        quitarLineaTmp();
-        var dist = Math.hypot(fin.x - anotInicio.x, fin.y - anotInicio.y);
-        if (dist > 0.02) {
-          guardarAnotacion({ tipo: 'flecha', x: anotInicio.x, y: anotInicio.y, x2: fin.x, y2: fin.y, color: anotColorId });
-        } else {
-          guardarAnotacion({ tipo: 'circulo', x: anotInicio.x, y: anotInicio.y, color: anotColorId });
-        }
-      } else {
-        guardarAnotacion({ tipo: 'circulo', x: anotInicio.x, y: anotInicio.y, color: anotColorId });
-      }
+      var fin = fraccionDesde(e);
+      var puntos = anotPuntos;
+      var inicio = anotInicio;
       anotInicio = null;
+      anotPuntos = null;
+      quitarLineaTmp();
+
+      if (anotModo === 'goma') return;   // ya se borró en pointerdown/pointermove
+      if (anotModo === 'trazo') {
+        // Un toque suelto sin recorrido no es un garabato: no guarda nada.
+        if (puntos && puntos.length > 1) {
+          guardarAnotacion({ tipo: 'trazo', puntos: puntos, color: anotColorId });
+        }
+        return;
+      }
+      // En modo flecha, un toque sin arrastrar vale como círculo.
+      var dist = Math.hypot(fin.x - inicio.x, fin.y - inicio.y);
+      if (anotModo === 'flecha' && dist > 0.02) {
+        guardarAnotacion({ tipo: 'flecha', x: inicio.x, y: inicio.y, x2: fin.x, y2: fin.y, color: anotColorId });
+      } else {
+        guardarAnotacion({ tipo: 'circulo', x: inicio.x, y: inicio.y, color: anotColorId });
+      }
     }
     anotSvg.addEventListener('pointerup', terminar);
-    anotSvg.addEventListener('pointercancel', function () { anotInicio = null; quitarLineaTmp(); });
+    anotSvg.addEventListener('pointercancel', function () {
+      anotInicio = null;
+      anotPuntos = null;
+      quitarLineaTmp();
+    });
   }
 
   /* Zoom/desplazamiento del visor: rueda, doble toque y pellizco con dos dedos.

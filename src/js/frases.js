@@ -248,18 +248,29 @@ window.Frases = (function () {
     // --- Cumpleaños de Maite (12 de septiembre de 1971) ---
     '09-12': function (d) {
       var edad = d.getFullYear() - 1971;
-      return 'Feliz cumpleaños, Ama. ' + edad + ' años y sigues cantando igual de mal.';
+      return 'Zorionak, Ama. ' + edad + ' años y sigues cantando igual de mal.';
     },
 
     // --- Concierto de Bihotsak ---
     // (este año cae el mismo día que tu cumpleaños)
     // Este año: cumpleaños + concierto + el solo que le han propuesto.
     // Hoy no toca pulla: hoy toca empujarla a subir sin miedo.
-    '2026-09-12':
-      'Feliz cumpleaños, Ama. 55 tacos y hoy, encima, concierto de Bihotsak. ' +
-      'Y sé lo del solo. Súbete y cántalo sin miedo: si te lo han pedido a ti ' +
-      'es porque lo haces bien, por mucho que aquí siempre diga lo contrario. ' +
-      'El escenario es tuyo. Un par de huevos y para alante. Te vamos a estar oyendo.',
+    '2026-09-12': [
+      'Zorionak, Ama. 55 tacos y hoy, encima, concierto de Bihotsak. ' +
+        'Y sé lo del solo. Súbete y cántalo sin miedo: si te lo han pedido a ti ' +
+        'es porque lo haces bien, por mucho que aquí siempre diga lo contrario. ' +
+        'El escenario es tuyo. Un par de huevos y para alante. Te vamos a estar oyendo.',
+      '55 años, Ama, y encima te dan un solo el mismo día. A este paso te van a jubilar del coro por decreto, ' +
+        'no por edad. Sal y cántalo como si no te temblara nada, que hoy nadie se atreve a corregirte.',
+      'Zorionak. 55 y con concierto hoy mismo: el universo tiene sentido del humor contigo. ' +
+        'Lo del solo va en serio, así que déjate de nervios de últimas horas y sal a comerte el escenario.',
+      'Hoy es tu cumpleaños y tu solo, todo junto, porque a ti nunca te dan las cosas de una en una. ' +
+        '55 tacos y aún con ganas de subirte ahí arriba: eso ya dice más de ti que cualquier nota que vayas a dar.',
+      'Ama, 55 años hoy y un solo esta tarde. Si te sale mal, échale la culpa a la edad; si te sale bien, ' +
+        'que quede claro que fue mérito tuyo y no de los ensayos, que buena falta te hacían.',
+      'Zorionak. Cumples 55 y te toca cantar sola delante de todos el mismo día: o te quieren mucho ' +
+        'o se quieren reír un rato. Yo apuesto por lo primero. Sube y demuéstralo.',
+    ],
   };
 
   /* ---------- Texto para la NOTIFICACIÓN de cada fecha ----------
@@ -267,7 +278,7 @@ window.Frases = (function () {
      notificación es más corta y directa. Si una clave no está aquí,
      la notificación usa el mismo texto que la app. */
   var AVISOS_FECHA = {
-    '01-01': 'Feliz año, Ama. Que este traiga más notas buenas que el anterior.',
+    '01-01': 'Urte berri on, Ama. Que este traiga más notas buenas que el anterior.',
     '01-06': 'Feliz día de Reyes. Hoy no se ensaya, es una orden.',
     '12-24': 'Feliz Nochebuena. Villancico listo por si acaso.',
     '12-25': 'Feliz Navidad, Ama. Un abrazo enorme.',
@@ -299,9 +310,9 @@ window.Frases = (function () {
     '10-27': 'Es mi cumpleaños. Como regalo, un descanso de escalas :)',
 
     '09-12': function (d) {
-      return 'Feliz cumpleaños, Ama. ' + (d.getFullYear() - 1971) + ' tacos. Que sea genial.';
+      return 'Zorionak, Ama. ' + (d.getFullYear() - 1971) + ' tacos. Que sea genial.';
     },
-    '2026-09-12': 'Feliz cumpleaños, Ama. Hoy concierto y hoy tu solo. Súbete sin miedo: te lo han pedido porque lo haces bien. A por todas.',
+    '2026-09-12': 'Zorionak, Ama. Hoy concierto y hoy tu solo. Súbete sin miedo: te lo han pedido porque lo haces bien. A por todas.',
   };
 
   /* ---------- Días de concierto ----------
@@ -474,21 +485,37 @@ window.Frases = (function () {
     }
     if (Array.isArray(valor)) {
       if (!valor.length) return null;
-      return valor[Math.abs(d.getFullYear()) % valor.length];
+      return valor[Math.floor(Math.random() * valor.length)];
     }
     return valor || null;
   }
 
   /* ---------- API ---------- */
 
+  // Fechas de FECHAS que son un mensaje único de "una sola vez este año"
+  // (no la pulla normal de cumpleaños): solo se enseñan la primera vez
+  // que se abre la app ese día; el resto de veces cae a la siguiente
+  // clave (la de MM-DD de siempre).
+  var UNA_VEZ_AL_DIA = [];
+
+  function yaMostradaHoy(clave, d) {
+    var hoy = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+      '-' + String(d.getDate()).padStart(2, '0');
+    var almacenClave = 'frase-unica-' + clave;
+    if (window.Almacen.leer(almacenClave) === hoy) return true;
+    window.Almacen.guardar(almacenClave, hoy);
+    return false;
+  }
+
   // Mensaje concreto si hoy es una fecha marcada; si no, null.
   function especialDeHoy(fecha) {
     var d = fecha || new Date();
     var claves = clavesFecha(d);
     for (var i = 0; i < claves.length; i++) {
-      if (FECHAS[claves[i]] != null) {
-        return elegir(FECHAS[claves[i]], d);
-      }
+      var clave = claves[i];
+      if (FECHAS[clave] == null) continue;
+      if (UNA_VEZ_AL_DIA.indexOf(clave) !== -1 && yaMostradaHoy(clave, d)) continue;
+      return elegir(FECHAS[clave], d);
     }
     return null;
   }

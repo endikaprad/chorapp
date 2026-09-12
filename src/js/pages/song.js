@@ -38,7 +38,12 @@ window.Pagina_song = (function () {
     obs = new MutationObserver(function () {
       if (!document.body.contains(cont)) { cerrarMenu(); obs.disconnect(); }
     });
-    obs.observe(vista, { childList: true, subtree: true });
+    // RENDIMIENTO — basta con `childList` en #vista, SIN `subtree`: las
+    // pantallas son hijas directas de #vista, así que su retirada ya es un
+    // cambio en esa lista. Con `subtree` el observador se disparaba en CADA
+    // inserción del DOM de la pantalla (el Modo estudio cambia mucho: letra,
+    // marcas, listas) y en cada una hacía un `document.body.contains()`.
+    obs.observe(vista, { childList: true });
   }
 
   function refrescar() { cancion = window.Canciones.obtener(cancion.id) || cancion; }

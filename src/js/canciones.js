@@ -24,8 +24,9 @@
                    },
        notasVoz:   [ { id, creado } ],         // OBSOLETO: solo para migrar notas antiguas a window.Grabaciones
        anotacionesPartitura: {                 // dibujos a mano sobre una página de partitura (Fase 5+)
-                     '<clave-adjunto>': [ { id, tipo:'circulo'|'flecha', x, y, x2?, y2?, color, creado } ]
-                   },                          // x/y/x2/y2 son fracciones 0..1 del tamaño de la imagen
+                     '<clave-adjunto>': [ { id, tipo:'circulo'|'flecha'|'trazo',
+                                            x, y, x2?, y2?, puntos?, color, creado } ]
+                   },                          // coordenadas = fracciones 0..1 del tamaño de la imagen
        creada:     number (timestamp),
        actualizada:number (timestamp)
      }
@@ -258,24 +259,38 @@ window.Canciones = (function () {
 
   // --- Anotaciones dibujadas a mano sobre una página de partitura.
   //     clave = la del adjunto (window.Adjuntos), para que cada página
-  //     tenga las suyas. x/y/x2/y2 son fracciones 0..1 del tamaño de la
-  //     imagen, así valen igual en la miniatura y en el visor a pantalla
-  //     completa, con cualquier zoom.
+  //     tenga las suyas. Todas las coordenadas (x/y/x2/y2 y los puntos de
+  //     un trazo a mano) son fracciones 0..1 del tamaño de la imagen, así
+  //     valen igual en la miniatura y en el visor a pantalla completa, con
+  //     cualquier zoom.
   function nuevoIdAnotacion() {
     return 'an-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
+  var MAX_PUNTOS_TRAZO = 600;   // techo por trazo: un garabato largo cabe de sobra
+  function _frac(v) { return Math.max(0, Math.min(1, Number(v) || 0)); }
+
   function agregarAnotacionPartitura(id, clave, datos) {
+    var TIPOS = { flecha: 1, trazo: 1, circulo: 1 };
     var a = {
       id: nuevoIdAnotacion(),
-      tipo: datos.tipo === 'flecha' ? 'flecha' : 'circulo',
-      x: Math.max(0, Math.min(1, Number(datos.x) || 0)),
-      y: Math.max(0, Math.min(1, Number(datos.y) || 0)),
+      tipo: TIPOS[datos.tipo] ? datos.tipo : 'circulo',
+      x: _frac(datos.x),
+      y: _frac(datos.y),
       color: datos.color || 'cobalto',
       creado: Date.now(),
     };
     if (a.tipo === 'flecha') {
-      a.x2 = Math.max(0, Math.min(1, Number(datos.x2) || 0));
-      a.y2 = Math.max(0, Math.min(1, Number(datos.y2) || 0));
+      a.x2 = _frac(datos.x2);
+      a.y2 = _frac(datos.y2);
+    } else if (a.tipo === 'trazo') {
+      // Dibujo a mano alzada: la línea que siguió el dedo, punto a punto.
+      var pts = Array.isArray(datos.puntos) ? datos.puntos : [];
+      a.puntos = pts.slice(0, MAX_PUNTOS_TRAZO).map(function (p) {
+        return { x: _frac(p && p.x), y: _frac(p && p.y) };
+      });
+      if (a.puntos.length < 2) return null;
+      a.x = a.puntos[0].x;
+      a.y = a.puntos[0].y;
     }
     _mutar(id, function (c) {
       if (!Array.isArray(c.anotacionesPartitura[clave])) c.anotacionesPartitura[clave] = [];

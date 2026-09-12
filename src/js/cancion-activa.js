@@ -296,20 +296,50 @@ window.CancionActiva = (function () {
     return (v % 1 === 0 ? v : v.toFixed(2).replace(/0$/, '')) + '×';
   }
 
+  /* RENDIMIENTO — esto se ejecuta en cada `timeupdate` (unas 4 veces por
+     segundo) durante TODA la canción. Hacía cinco `querySelector` cada vez
+     y reescribía valores que casi nunca cambian (la velocidad, los iconos),
+     y `setProperty` de una variable CSS obliga a recalcular estilo. Se
+     cachean los nodos y solo se escribe lo que de verdad ha cambiado. */
+  var _br = null;
+  function refsBarra() {
+    if (!barra) return null;
+    if (!_br || _br.raiz !== barra) {
+      _br = {
+        raiz: barra,
+        icPlay: barra.querySelector('.br-ic-play'),
+        icPause: barra.querySelector('.br-ic-pause'),
+        play: barra.querySelector('[data-br-play]'),
+        vel: barra.querySelector('[data-br-vel]'),
+        prog: barra.querySelector('[data-br-prog]'),
+        vSonando: null, vVel: null, vProg: null, vPct: null
+      };
+    }
+    return _br;
+  }
+
   function pintarBarra(s) {
-    if (!barra) return;
-    barra.querySelector('.br-ic-play').toggleAttribute('hidden', s.reproduciendo);
-    barra.querySelector('.br-ic-pause').toggleAttribute('hidden', !s.reproduciendo);
-    var play = barra.querySelector('[data-br-play]');
-    play.classList.toggle('is-sonando', s.reproduciendo);
-    play.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
-    barra.querySelector('[data-br-vel]').textContent = fmtVel(s.velocidad);
-    var prog = barra.querySelector('[data-br-prog]');
+    var R = refsBarra();
+    if (!R) return;
+    if (R.vSonando !== s.reproduciendo) {
+      R.vSonando = s.reproduciendo;
+      R.icPlay.toggleAttribute('hidden', s.reproduciendo);
+      R.icPause.toggleAttribute('hidden', !s.reproduciendo);
+      R.play.classList.toggle('is-sonando', s.reproduciendo);
+      R.play.setAttribute('aria-label', s.reproduciendo ? 'Pausar' : 'Reproducir');
+    }
+    var vel = fmtVel(s.velocidad);
+    if (R.vVel !== vel) { R.vVel = vel; R.vel.textContent = vel; }
+
     var w = ventana(s);
     var pct = w.span ? Math.max(0, Math.min(1, (s.actual - w.ini) / w.span)) : 0;
-    if (!arrastrandoBarra && !prog.matches(':active')) {
-      prog.value = String(Math.round(pct * 1000));
-      prog.style.setProperty('--pct', (pct * 100).toFixed(1) + '%');
+    if (!arrastrandoBarra && !R.prog.matches(':active')) {
+      var v = String(Math.round(pct * 1000));
+      if (R.vProg !== v) { R.vProg = v; R.prog.value = v; }
+      // La barra mide ~300 px: por debajo de una décima de porcentaje no se
+      // mueve ni un píxel, así que no merece un recálculo de estilo.
+      var cs = (pct * 100).toFixed(1) + '%';
+      if (R.vPct !== cs) { R.vPct = cs; R.prog.style.setProperty('--pct', cs); }
     }
   }
 

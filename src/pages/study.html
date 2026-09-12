@@ -168,21 +168,32 @@
       <svg class="lightbox__anot" data-lightbox-anot></svg>
     </div>
     <div class="anot-barra" data-anot-barra hidden>
-      <div class="anot-barra__modos" role="group" aria-label="Tipo de marca">
-        <button type="button" class="anot-barra__modo is-activo" data-anot-modo="circulo" aria-label="Círculo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="8"/></svg>
+      <div class="anot-barra__colores" data-anot-colores></div>
+      <div class="anot-barra__fila">
+        <div class="anot-barra__modos" role="group" aria-label="Marcar con una forma">
+          <button type="button" class="anot-barra__modo" data-anot-modo="circulo" aria-label="Círculo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="8"/></svg>
+          </button>
+          <button type="button" class="anot-barra__modo" data-anot-modo="flecha" aria-label="Flecha">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19 19 5"/><path d="M9 5h10v10"/></svg>
+          </button>
+          <button type="button" class="anot-barra__modo" data-anot-modo="goma" aria-label="Goma de borrar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18.5 13.5 9 4a2 2 0 0 0-2.8 0L3 7.2a2 2 0 0 0 0 2.8L11 18"/>
+              <path d="M9.5 20H20"/>
+              <path d="M13 18 20.7 10.3"/>
+            </svg>
+          </button>
+        </div>
+        <button type="button" class="anot-barra__deshacer" data-anot-deshacer aria-label="Deshacer última marca">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
         </button>
-        <button type="button" class="anot-barra__modo" data-anot-modo="flecha" aria-label="Flecha">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19 19 5"/><path d="M9 5h10v10"/></svg>
+        <button type="button" class="anot-barra__listo" data-anot-listo aria-label="Hecho">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
         </button>
       </div>
-      <div class="anot-barra__colores" data-anot-colores></div>
-      <button type="button" class="anot-barra__deshacer" data-anot-deshacer aria-label="Deshacer última marca">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
-      </button>
-      <button type="button" class="anot-barra__listo" data-anot-listo>Hecho</button>
     </div>
-    <p class="anot-pista" data-anot-pista hidden>Toca para marcar un círculo · arrastra para una flecha</p>
+    <p class="anot-pista" data-anot-pista hidden></p>
   </div>
 
 </div>

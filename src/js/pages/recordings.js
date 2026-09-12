@@ -66,7 +66,12 @@ window.Pagina_recordings = (function () {
     obs = new MutationObserver(function () {
       if (!document.body.contains(raiz)) destruir();
     });
-    obs.observe(vista, { childList: true, subtree: true });
+    // RENDIMIENTO — basta con `childList` en #vista, SIN `subtree`: las
+    // pantallas son hijas directas de #vista, así que su retirada ya es un
+    // cambio en esa lista. Con `subtree` el observador se disparaba en CADA
+    // inserción del DOM de la pantalla (el Modo estudio cambia mucho: letra,
+    // marcas, listas) y en cada una hacía un `document.body.contains()`.
+    obs.observe(vista, { childList: true });
 
     // Mini-tutorial: solo la primera vez que se llega a Grabaciones.
     var visto = false;

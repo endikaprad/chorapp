@@ -726,7 +726,7 @@ window.Bienvenida = (function () {
             '<p class="bv-sub">Que si los PDF, que si el audio, que si se cerraba sola… ' +
               'Todo, de madrugada.</p>' +
             '<div class="bv-codigo">' +
-              '<span class="bv-codigo__num"><span data-cuenta="29403" data-sep>0</span></span>' +
+              '<span class="bv-codigo__num"><span data-cuenta="44697" data-sep>0</span></span>' +
               '<span class="bv-codigo__pie">líneas de código, escritas una a una</span>' +
             '</div>' +
           '</div>'
@@ -1055,8 +1055,37 @@ window.Bienvenida = (function () {
   }
 
   /* ---------- Montaje ---------- */
+  /* RENDIMIENTO — los estilos de la bienvenida (96 KB) viven en su propia
+     hoja, css/bienvenida.css, y no en styles.css: son para una pantalla que
+     se ve UNA vez en la vida de la app, y ahí dentro pesaban en cada
+     recálculo de estilo para siempre. Se traen aquí, justo antes de abrir.
+     Hay que ESPERAR a que estén aplicados: si no, se vería un fotograma de
+     la presentación sin estilos. */
+  var _cssPedido = null;
+  function cargarEstilos() {
+    if (_cssPedido) return _cssPedido;
+    _cssPedido = new Promise(function (listo) {
+      if (document.querySelector('link[data-bv-css]')) return listo();
+      var l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = 'css/bienvenida.css';
+      l.setAttribute('data-bv-css', '');
+      // Pase lo que pase se sigue: mejor la bienvenida sin adornos que
+      // una pantalla en negro esperando a un fichero que no llega.
+      l.onload = l.onerror = function () { listo(); };
+      document.head.appendChild(l);
+      setTimeout(listo, 3000);
+    });
+    return _cssPedido;
+  }
+
   function abrir() {
     if (raiz) return;
+    // Primera llamada: traer la hoja y volver a entrar cuando esté lista.
+    if (!_cssLista) {
+      cargarEstilos().then(function () { _cssLista = true; abrir(); });
+      return;
+    }
     idx = 0;
     var datos = sectores();
     calcularTiempos(datos);
@@ -1365,11 +1394,29 @@ window.Bienvenida = (function () {
     raiz.classList.remove('is-pausa');
   }
 
+  /* RENDIMIENTO — el "mini parpadeo" al cambiar de sector.
+
+     Antes todo esto pasaba en la MISMA tarea: se descubría el sector nuevo
+     (`hidden = false`, o sea display:none → flex, que obliga a maquetar de
+     cero una ilustración a pantalla completa), se forzaba ese maquetado con
+     `void offsetWidth`, y acto seguido se arrancaban las dos transiciones y
+     el fundido de los 16 fondos. El WebView tenía que maquetar, rasterizar
+     una pantalla entera y empezar a animar todo en el mismo fotograma: se
+     lo saltaba, y ese fotograma perdido es el parpadeo.
+
+     Ahora va en dos tiempos:
+       Fotograma A — se congela la decoración, se descubre el sector en su
+                     posición de entrada y se fuerza su maquetado. Nada se
+                     mueve todavía, así que el WebView puede rasterizar
+                     tranquilo aunque tarde.
+       Fotograma B — ya está todo pintado: se sueltan las transiciones, que
+                     a partir de ahí son solo opacidad y desplazamiento. */
   function mostrar(n, dir) {
     n = Math.max(0, Math.min(slides.length - 1, n));
     dir = dir || 1;
     var prev = idx;
     idx = n;
+    var cambia = prev !== n;
 
     slides.forEach(function (el, i) {
       if (i === n || i === prev) return;
@@ -1378,59 +1425,71 @@ window.Bienvenida = (function () {
     });
 
     var entra = slides[n];
-    entra.hidden = false;
-    entra.classList.remove('is-sal-izq', 'is-sal-der', 'is-activo');
-    if (prev !== n) entra.classList.add(dir < 0 ? 'is-ent-izq' : 'is-ent-der');
-    void entra.offsetWidth;
-    entra.classList.remove('is-ent-izq', 'is-ent-der');
-    entra.classList.add('is-activo');
 
-    // El cierre, TODO ESCALONADO para que nada compita con nada:
-    //   0 ms    : entra el sector (deslizamiento + fondo + texto + check)
-    //   ~480 ms : `bv--precierre` — ya asentada la transición, promovemos la
-    //             capa de luz (opacidad casi nula, se rasteriza tranquila)
-    //   ~1900 ms: `bv--cierre` — cuando YA HA TERMINADO de escribirse la
-    //             firma "— Endika" (entra a los 1100 ms, dura 620 ms), los
-    //             bordes se encienden y se quedan brillando más y menos.
-    var esCierre = entra.classList.contains('bv-s--cierre');
-    window.clearTimeout(raiz._cierreT);
-    window.clearTimeout(raiz._cierreT2);
-    if (esCierre) {
-      raiz._cierreT = window.setTimeout(function () {
-        if (raiz && slides[idx] === entra) raiz.classList.add('bv--precierre');
-      }, 480);
-      raiz._cierreT2 = window.setTimeout(function () {
-        if (raiz && slides[idx] === entra) raiz.classList.add('bv--cierre');
-      }, 1900);
-    } else {
-      raiz.classList.remove('bv--cierre', 'bv--precierre');
-    }
-
-    // Durante la transición congela la decoración de los sectores en juego:
-    // esos ~440 ms el navegador solo funde/desliza dos capas, sin repintar
-    // decenas de animaciones. El texto (`.bv-in`) sí sigue.
-    if (prev !== n) {
+    /* ---- Fotograma A: preparar, sin mover nada ---- */
+    // La decoración se congela ANTES de descubrir el sector, no después:
+    // así no hay decenas de animaciones arrancando justo mientras el
+    // WebView rasteriza la ilustración nueva.
+    if (cambia) {
       raiz.classList.add('bv--transicion');
       window.clearTimeout(raiz._trT);
       raiz._trT = window.setTimeout(function () {
         if (raiz) raiz.classList.remove('bv--transicion');
-      }, 470);
+      }, 510);
+    }
+    entra.hidden = false;
+    entra.classList.remove('is-sal-izq', 'is-sal-der', 'is-activo');
+    if (cambia) entra.classList.add(dir < 0 ? 'is-ent-izq' : 'is-ent-der');
+    void entra.offsetWidth;   // maquetar AHORA, mientras no hay nada animando
+
+    /* ---- Fotograma B: arrancar las transiciones ---- */
+    function arrancar() {
+      if (slides[idx] !== entra) return;   // ya se ha pasado a otro sector
+
+      entra.classList.remove('is-ent-izq', 'is-ent-der');
+      entra.classList.add('is-activo');
+
+      if (cambia && slides[prev]) {
+        var sale = slides[prev];
+        sale.classList.remove('is-activo', 'is-ent-izq', 'is-ent-der');
+        sale.classList.add(dir < 0 ? 'is-sal-der' : 'is-sal-izq');
+        window.clearTimeout(sale._t);
+        sale._t = window.setTimeout(function () {
+          if (!sale.classList.contains('is-activo')) sale.hidden = true;
+        }, 500);
+      }
+
+      // Fondo en fundido cruzado.
+      fondos.forEach(function (f, i) { f.style.opacity = i === n ? 1 : 0; });
+
+      // El cierre, TODO ESCALONADO para que nada compita con nada:
+      //   0 ms    : entra el sector (deslizamiento + fondo + texto + check)
+      //   ~480 ms : `bv--precierre` — ya asentada la transición, promovemos la
+      //             capa de luz (opacidad casi nula, se rasteriza tranquila)
+      //   ~2900 ms: `bv--cierre` — cuando YA HA TERMINADO de escribirse la
+      //             firma "— Endika" (entra a los 1100 ms, dura 1700 ms), los
+      //             bordes se encienden y se quedan brillando más y menos.
+      var esCierre = entra.classList.contains('bv-s--cierre');
+      window.clearTimeout(raiz._cierreT);
+      window.clearTimeout(raiz._cierreT2);
+      if (esCierre) {
+        raiz._cierreT = window.setTimeout(function () {
+          if (raiz && slides[idx] === entra) raiz.classList.add('bv--precierre');
+        }, 480);
+        raiz._cierreT2 = window.setTimeout(function () {
+          if (raiz && slides[idx] === entra) raiz.classList.add('bv--cierre');
+        }, 2900);
+      } else {
+        raiz.classList.remove('bv--cierre', 'bv--precierre');
+      }
+
+      lanzarExtras(entra, prev, n);
     }
 
-    if (prev !== n && slides[prev]) {
-      var sale = slides[prev];
-      sale.classList.remove('is-activo', 'is-ent-izq', 'is-ent-der');
-      sale.classList.add(dir < 0 ? 'is-sal-der' : 'is-sal-izq');
-      window.clearTimeout(sale._t);
-      sale._t = window.setTimeout(function () {
-        if (!sale.classList.contains('is-activo')) sale.hidden = true;
-      }, 500);
-    }
-
-    // Fondo en fundido cruzado.
-    fondos.forEach(function (f, i) { f.style.opacity = i === n ? 1 : 0; });
-
-    lanzarExtras(entra, prev, n);
+    // Dos fotogramas: el primero acaba de maquetar, el segundo ya pinta.
+    // Sin cambio de sector (la primera vez) no hay nada que esperar.
+    if (!cambia) arrancar();
+    else requestAnimationFrame(function () { requestAnimationFrame(arrancar); });
   }
 
   /* Cosas que se disparan al mostrar un sector (contadores, toque háptico). */
@@ -1585,6 +1644,8 @@ window.Bienvenida = (function () {
       return !!(v && v.v);
     } catch (e) { return false; }
   }
+
+  var _cssLista = false;
 
   function iniciarSiPrimeraVez() {
     if (yaVista() || raiz) return false;

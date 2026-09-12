@@ -158,6 +158,7 @@ window.LetraLive = (function () {
     document.body.classList.remove('letralive-abierta');
     var c = capa;
     capa = null;
+    _refsDe = null; _refs = null;
     estado.lineas = [];
     estado.marcas = [];
     estado.tiempos = null;
@@ -672,9 +673,39 @@ window.LetraLive = (function () {
   }
 
   // Refleja en el botón el estado real de la grabación (frame a frame).
+  /* RENDIMIENTO — El bucle de abajo corre en cada fotograma mientras suena
+     la canción. Hacía CINCO `querySelector` por fotograma y reescribía tres
+     textos aunque no hubieran cambiado (el reloj solo cambia una vez por
+     segundo, pero se reescribía 60 veces, y cada escritura ensucia el
+     layout de ese nodo). Se cachean los nodos —viven en la capa exterior,
+     que no se reconstruye al cambiar de modo de letra— y solo se escribe
+     cuando el valor es distinto. */
+  var _refs = null, _refsDe = null;
+  function refs() {
+    if (!capa) return null;
+    if (_refsDe !== capa) {
+      _refsDe = capa;
+      _refs = {
+        scrub: capa.querySelector('[data-ll-scrub]'),
+        t:     capa.querySelector('[data-ll-t]'),
+        r:     capa.querySelector('[data-ll-r]'),
+        rec:   capa.querySelector('[data-ll-rec]'),
+        recT:  capa.querySelector('[data-ll-rec-t]'),
+        vt: null, vr: null, vrecT: null, vscrub: null
+      };
+    }
+    return _refs;
+  }
+  function texto(el, valor, cache, clave) {
+    if (!el || cache[clave] === valor) return;
+    cache[clave] = valor;
+    el.textContent = valor;
+  }
+
   function pintarRec() {
     if (!capa || typeof o.grabando !== 'function') return;
-    var btn = capa.querySelector('[data-ll-rec]');
+    var R = refs();
+    var btn = R && R.rec;
     if (!btn) return;
     var g = !!o.grabando();
     if (g !== estado.grabando) {
@@ -688,8 +719,7 @@ window.LetraLive = (function () {
       if (is) is.toggleAttribute('hidden', !g);
       btn.setAttribute('aria-label', g ? 'Detener la grabación' : 'Grabar tu voz');
     }
-    var tl = capa.querySelector('[data-ll-rec-t]');
-    if (tl) tl.textContent = g ? 'Grabando · ' + fmt((perf() - estado.grabT0) / 1000) : '';
+    texto(R.recT, g ? 'Grabando · ' + fmt((perf() - estado.grabT0) / 1000) : '', R, 'vrecT');
   }
 
   function alEstado(s) {
@@ -732,14 +762,14 @@ window.LetraLive = (function () {
     var pos = posActual();
     var dur = o.dur || 0;
 
-    var scrub = capa.querySelector('[data-ll-scrub]');
-    if (scrub && !scrub.matches(':active') && dur) {
-      scrub.value = String(Math.round((pos / dur) * 1000));
+    var R = refs();
+    if (!R) return;
+    if (R.scrub && dur && !R.scrub.matches(':active')) {
+      var v = String(Math.round((pos / dur) * 1000));
+      if (R.vscrub !== v) { R.vscrub = v; R.scrub.value = v; }
     }
-    var tt = capa.querySelector('[data-ll-t]');
-    var tr = capa.querySelector('[data-ll-r]');
-    if (tt) tt.textContent = fmt(pos);
-    if (tr) tr.textContent = dur ? '-' + fmt(Math.max(0, dur - pos)) : '';
+    texto(R.t, fmt(pos), R, 'vt');
+    texto(R.r, dur ? '-' + fmt(Math.max(0, dur - pos)) : '', R, 'vr');
 
     var tiempos = estado.tiempos;
     if (!tiempos || !estado.lineas.length) return;

@@ -58,7 +58,11 @@ window.Logros = (function () {
 
   function icono(clave) {
     var p = ICONOS[clave] || ICONOS.estrella;
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+    // width/height explícitos: en el WebView de Android, un <svg> insertado
+    // por innerHTML sin tamaño propio a veces pinta un frame en blanco (solo
+    // el círculo de color de fondo, sin el trazo) hasta el primer reflow.
+    // Fijar el tamaño intrínseco evita ese hueco.
+    return '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
            'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
   }
 

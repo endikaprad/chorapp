@@ -187,50 +187,55 @@
   <script defer src="js/compartido.js"></script>
   <script defer src="js/archivos.js"></script>
   <script defer src="js/adjuntos.js"></script>
-  <script defer src="js/visorpdf.js"></script>
   <script defer src="js/fechapicker.js"></script>
   <script defer src="js/canciones.js"></script>
   <script defer src="js/barraprogreso.js"></script>
-  <script defer src="js/traducir.js"></script>
-  <script defer src="js/fonetica.js"></script>
   <script defer src="js/sesiones.js"></script>
   <script defer src="js/grabaciones.js"></script>
-  <script defer src="vendor/lame.min.js"></script>
   <script defer src="js/audiomp3.js"></script>
   <script defer src="js/compartir.js"></script>
   <script defer src="js/backup.js"></script>
-  <script defer src="js/compartircancion.js"></script>
   <script defer src="js/sincronia.js"></script>
   <script defer src="js/practica.js"></script>
   <script defer src="js/logros.js"></script>
   <script defer src="js/diario.js"></script>
   <script defer src="js/sensaciones.js"></script>
-  <script defer src="js/memoletra.js"></script>
-  <script defer src="js/letralive.js"></script>
-  <script defer src="js/wrapped-music.js"></script>
-  <script defer src="js/wrapped-audio.js"></script>
-  <script defer src="js/compartirwrapped.js"></script>
-  <script defer src="js/wrapped.js"></script>
   <script defer src="js/resumenmes.js"></script>
   <script defer src="js/progreso.js"></script>
-  <script defer src="js/tono.js"></script>
   <script defer src="js/player.js"></script>
   <script defer src="js/cancion-activa.js"></script>
   <script defer src="js/miniplayer.js"></script>
   <script defer src="js/selector.js"></script>
-  <script defer src="js/hojacancion.js"></script>
   <script defer src="js/recorder.js"></script>
   <script defer src="js/calendar.js"></script>
-  <script defer src="js/pages/songs.js"></script>
-  <script defer src="js/pages/song.js"></script>
-  <script defer src="js/pages/sessions.js"></script>
-  <script defer src="js/pages/session.js"></script>
-  <script defer src="js/pages/home.js"></script>
-  <script defer src="js/pages/study.js"></script>
-  <script defer src="js/pages/practice.js"></script>
-  <script defer src="js/pages/conciertos.js"></script>
-  <script defer src="js/pages/recordings.js"></script>
-  <script defer src="js/pages/recibido.js"></script>
   <script defer src="js/app.js"></script>
+  <!-- RENDIMIENTO — Estos módulos pesan mucho (el codificador de MP3 él
+       solo son 150 KB) y ninguna pantalla los necesita en el primer
+       segundo: son funciones que Ama abre tocando algo (el Wrapped, el
+       visor de PDF, "dame el tono", compartir una canción...). Antes se
+       descargaban y ejecutaban TODOS antes del primer pintado, que es
+       justo lo que hacía que la app tardara en arrancar en el móvil.
+       Ahora entran en cuanto la primera pantalla ya se ve, de uno en uno
+       y en los ratos muertos, así que cuando Ama toca el botón ya están
+       ahí sin que se note ninguna espera.
+       Los de js/pages/*.js los trae el router, en app.js. -->
+  <script>
+    (function () {
+      var tarde = ["vendor/lame.min.js","js/wrapped.js","js/wrapped-music.js","js/wrapped-audio.js","js/compartirwrapped.js","js/letralive.js","js/memoletra.js","js/compartircancion.js","js/hojacancion.js","js/traducir.js","js/fonetica.js","js/visorpdf.js","js/tono.js"];
+      var enReposo = window.requestIdleCallback || function (fn) { return setTimeout(fn, 200); };
+      function siguiente() {
+        var src = tarde.shift();
+        if (!src) return;
+        var s = document.createElement("script");
+        s.src = src;
+        s.onload = s.onerror = function () { enReposo(siguiente); };
+        document.head.appendChild(s);
+      }
+      // Tras "load" el primer pintado ya ha ocurrido: de aquí en adelante
+      // lo que se cargue sale gratis para la sensación de arranque.
+      window.addEventListener("load", function () { enReposo(siguiente); });
+    })();
+  </script>
+
 </body>
 </html>

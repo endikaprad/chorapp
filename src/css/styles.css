@@ -243,7 +243,11 @@ button {
 
 .fondo-animado {
   position: fixed;
-  inset: -14%;
+  /* RENDIMIENTO — el margen solo tiene que cubrir lo que se desplaza
+     `fondo-deriva` (±1,5%). Estaba en -14%, que hace una capa del 128%
+     del viewport en cada eje: un 65% más de píxeles que rasterizar y
+     componer, para nada. */
+  inset: -4%;
   z-index: -1;
   overflow: hidden;
   background-color: var(--color-fondo);
@@ -307,28 +311,33 @@ button {
   animation-name: orbe-3;
   animation-duration: 20s;
 }
-/* Recorridos cerrados (empiezan y acaban igual → bucle sin salto). Traslados
-   amplios + un poco de escala para que el movimiento se vea de un vistazo. */
+/* Recorridos cerrados (empiezan y acaban igual → bucle sin salto).
+   RENDIMIENTO — SOLO traslación, nunca `scale`. Un orbe es un degradado
+   radial de hasta 320 px: trasladarlo lo resuelve el compositor moviendo
+   una textura ya pintada, pero escalarlo obliga al WebView de Android a
+   volver a rasterizar ese degradado en cada fotograma. Con tres orbes a la
+   vez eso solo ya bastaba para hundir los fps. El recorrido se amplía un
+   poco para compensar la falta de "respiración". */
 @keyframes orbe-1 {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  25%  { transform: translate3d(44vw, 12vh, 0) scale(1.18); }
-  50%  { transform: translate3d(66vw, 34vh, 0) scale(0.92); }
-  75%  { transform: translate3d(26vw, 46vh, 0) scale(1.1); }
-  100% { transform: translate3d(0, 0, 0) scale(1); }
+  0%   { transform: translate3d(0, 0, 0); }
+  25%  { transform: translate3d(46vw, 13vh, 0); }
+  50%  { transform: translate3d(68vw, 35vh, 0); }
+  75%  { transform: translate3d(27vw, 48vh, 0); }
+  100% { transform: translate3d(0, 0, 0); }
 }
 @keyframes orbe-2 {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  25%  { transform: translate3d(-40vw, -26vh, 0) scale(1.15); }
-  50%  { transform: translate3d(-54vw, 10vh, 0) scale(0.9); }
-  75%  { transform: translate3d(-20vw, 28vh, 0) scale(1.12); }
-  100% { transform: translate3d(0, 0, 0) scale(1); }
+  0%   { transform: translate3d(0, 0, 0); }
+  25%  { transform: translate3d(-42vw, -27vh, 0); }
+  50%  { transform: translate3d(-56vw, 11vh, 0); }
+  75%  { transform: translate3d(-21vw, 29vh, 0); }
+  100% { transform: translate3d(0, 0, 0); }
 }
 @keyframes orbe-3 {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  25%  { transform: translate3d(28vw, -30vh, 0) scale(0.9); }
-  50%  { transform: translate3d(-16vw, -46vh, 0) scale(1.2); }
-  75%  { transform: translate3d(-34vw, -16vh, 0) scale(1.05); }
-  100% { transform: translate3d(0, 0, 0) scale(1); }
+  0%   { transform: translate3d(0, 0, 0); }
+  25%  { transform: translate3d(29vw, -31vh, 0); }
+  50%  { transform: translate3d(-17vw, -48vh, 0); }
+  75%  { transform: translate3d(-35vw, -17vh, 0); }
+  100% { transform: translate3d(0, 0, 0); }
 }
 
 /* Pentagrama sutil: líneas horizontales finas que reptan muy despacio. */
@@ -349,6 +358,49 @@ button {
   from { transform: translate3d(0, 0, 0); }
   to   { transform: translate3d(0, -26px, 0); }
 }
+/* ============================================================
+   RENDIMIENTO — Congelar el fondo cuando no aporta nada
+   ------------------------------------------------------------
+   El fondo (deriva + 3 orbes + pentagrama + la escenografía de la
+   fecha: confeti, guirnalda, globos…) son decenas de capas que el
+   compositor mueve SIN PARAR, aunque estén tapadas por el contenido
+   o aunque la app no se esté mirando. En un móvil de gama media eso
+   se come el presupuesto de fotograma y deja a las animaciones de la
+   interfaz sin sitio: es la sensación de "todo va lento".
+
+   `animation-play-state: paused` las deja clavadas donde estén: no
+   desaparece nada, no salta nada al reanudar, y el coste por
+   fotograma pasa a cero. Lo activa app.js poniendo `fondo-quieto`
+   en el <body>:
+     · mientras se cambia de pantalla (el hilo principal está ocupado
+       montando la vista nueva — ahí es donde se veía el parpadeo),
+     · cuando la app pasa a segundo plano,
+     · cuando hay una capa a pantalla completa tapándolo todo.
+   ============================================================ */
+/* La clase va en los DOS contenedores del fondo, no en el <body>. Puesta
+   en el body, la regla `body.fondo-quieto .fondo-decor *` obliga al motor
+   a revisar TODOS los elementos de la página en cada cambio (medido: 2,9 ms
+   por congelar y otros tantos por descongelar, dos veces en cada
+   navegación — más de lo que costaba el problema que arregla). Rooteada en
+   el propio contenedor, la revisión se limita a sus ~80 hijos. */
+.esta-quieto,
+.esta-quieto::before,
+.esta-quieto::after,
+.esta-quieto *,
+.esta-quieto *::before,
+.esta-quieto *::after {
+  animation-play-state: paused !important;
+}
+
+/* Menos partículas en la escenografía de las fechas señaladas.
+   Cada <i> del confeti es una capa fixed propia que el compositor
+   mueve por separado; 16 a la vez (más guirnalda, globos y demás)
+   era el caso peor, y justo el de los días especiales — cumpleaños
+   de Ama incluido. Con 10 la escena se ve igual de poblada en una
+   pantalla de móvil y se ahorra casi un 40% de capas. */
+.fondo-confeti i:nth-child(n + 11) { display: none; }
+.fondo-guirnalda i:nth-child(2n)   { display: none; }
+
 
 /* En oscuro el cobalto (#5A67E8) sobre negro luce más: se sube un pelín la
    mezcla para que se note, sin llegar a molestar. */
@@ -504,7 +556,11 @@ body.cumple-maite .fondo-confeti {
 /* La cabecera se queda con su fondo normal; el corazón cicla de
    color y con eso ya se nota que es un día especial. */
 body.cumple-maite .header-titulo .marca-logo {
-  animation: cumple-color-ciclo 8s linear infinite;
+  /* RENDIMIENTO — animar `color` no se puede componer: repinta la
+     cabecera entera (que es fixed) en cada fotograma, para siempre. Se
+     sube a 24s para que el repintado sea esporádico en vez de continuo;
+     el degradado de colores se sigue notando igual de bonito. */
+  animation: cumple-color-ciclo 24s linear infinite;
 }
 @keyframes cumple-color-ciclo {
   0%   { color: var(--color-acento); }
@@ -606,6 +662,13 @@ body.cumple-maite .cumple-hero {
   -webkit-mask-size: 100% 100%;
           mask-size: 100% 100%;
   animation: cumple-hero-sube 6s ease-in infinite;
+  /* RENDIMIENTO — aquí había un `will-change: transform`. SE QUITÓ: estos
+     corazones arrancan en `bottom: -18%`, o sea que su capa asoma por
+     DEBAJO de la tarjeta, justo encima de la de "seguir estudiando". Con
+     capa propia, y estando dentro de un `overflow: hidden` redondeado, el
+     WebView tiene que enmascararlos y además arrastra a la tarjeta de
+     abajo a componerse con ellos: ése era su parpadeo intermitente.
+     Son de 11-18 px: volver a pintarlos sale más barato que la capa. */
 }
 .cumple-hero__corazones i:nth-child(1) { left: 6%;  width: 12px; height: 12px; animation-delay: 0s; }
 .cumple-hero__corazones i:nth-child(2) { left: 26%; width: 18px; height: 18px; animation-delay: 1.1s; }
@@ -618,10 +681,21 @@ body.cumple-maite .cumple-hero {
   80%  { opacity: 0.5; }
   100% { transform: translate3d(0, -180%, 0); opacity: 0; }
 }
+/* RENDIMIENTO — capa propia mientras dure la animación.
+   Todas estas escalan o GIRAN contenido que hay que pintar (un emoji, un
+   SVG de trazos, un degradado cónico). Sin capa propia, el WebView de
+   Android vuelve a rasterizar ese dibujo en CADA fotograma al nuevo tamaño
+   o ángulo, y mientras lo hace puede enseñar un trozo a medio pintar: eso
+   es el parpadeo de las tarjetas en el móvil.
+   Van atadas al estado que las anima (fecha señalada, mes con resumen,
+   medalla de platino conseguida) para que la capa NO exista el resto del
+   tiempo: decenas de capas permanentes agotan la memoria de GPU de un
+   móvil de gama media y provocan justo lo que intentamos quitar. */
 .cumple-hero__tarta {
   font-size: 38px;
   line-height: 1;
   animation: cumple-tarta-late 2.6s var(--curva) 400ms infinite;
+  will-change: transform;
 }
 @keyframes cumple-tarta-late {
   0%, 44%, 100% { transform: scale(1) rotate(0deg); }
@@ -996,7 +1070,10 @@ body.tema-carnaval .header-titulo .marca-logo   { color: var(--color-carnaval-ma
   0%, 100% { transform: translateY(0) scale(1); }
   50%      { transform: translateY(-7px) scale(1.08); }
 }
-.tema-hero__icono { animation: tema-icono-vive 2.6s var(--curva) 400ms infinite; }
+.tema-hero__icono {
+  animation: tema-icono-vive 2.6s var(--curva) 400ms infinite;
+  will-change: transform;   /* misma razón que la tarta: es un emoji */
+}
 
 /* Navidad: rojo → verde, nieve cayendo dentro de la tarjeta. */
 .tema-hero--navidad {
@@ -1380,6 +1457,13 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
     color-mix(in srgb, var(--color-fondo) 55%, transparent) 70%,
     transparent 100%
   );
+  /* El desenfoque de la cabecera se queda porque a Ama le gusta cómo se
+     ve. Son solo 3 px y sin `saturate`, que es lo caro: el WebView
+     redesenfoca en cada fotograma mientras el fondo se mueva, pero sobre
+     una tira de 60 px de alto sale asumible. El de .bottom-nav (20 px +
+     saturate, a lo ancho y alto de la barra) sí se quitó: ese era el que
+     hundía los fotogramas. Si alguna vez hay que recortar más, este es el
+     siguiente candidato. */
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
 }
@@ -1414,6 +1498,12 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   color: var(--color-acento);
   filter: drop-shadow(0 3px 7px rgba(21, 18, 214, 0.32));
 }
+/* RENDIMIENTO — los días señalados el logo cambia de color en bucle, y un
+   filtro sobre algo cuyo color cambia obliga a recalcular la sombra en
+   cada repintado de la cabecera (que además lleva desenfoque de fondo).
+   Solo esos días se queda sin sombra; el resto del año la conserva. */
+body.cumple-maite .header-titulo .marca-logo,
+body[class*="tema-"] .header-titulo .marca-logo { filter: none; }
 .header-titulo .marca-logo svg { width: 100%; height: 100%; overflow: visible; }
 /* Bloom cobalto que florece una vez tras dibujarse el corazón. */
 .header-titulo .marca-logo::after {
@@ -1546,7 +1636,51 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
    Sin `fill-mode`: si por lo que sea la animación no llegara a correr
    (WebView que congela animaciones), la pantalla se queda en su estado
    natural (visible), nunca invisible. */
-.pantalla.entra { animation: entra-pagina 220ms var(--curva); }
+
+/* RENDIMIENTO — las dos pantallas conviven un instante en la MISMA celda.
+   Antes se hacía `vista.innerHTML = <nueva>`, que borraba la pantalla
+   vieja de golpe y dejaba el fondo a la vista mientras el módulo de la
+   página nueva montaba su contenido (calendario, logros, listas…). En el
+   móvil de Ama eso son cientos de milisegundos de fondo pelado: el
+   "parpadeo al entrar en una sección del nav". Ahora la nueva se añade
+   encima, invisible, se monta entera y solo entonces se retira la vieja:
+   nunca hay un hueco. */
+.vista { display: grid; }
+.vista > .pantalla { grid-area: 1 / 1; min-width: 0; }
+.pantalla--entrando { opacity: 0; pointer-events: none; }
+
+/* RENDIMIENTO — Los picos de animación al entrar, repartidos.
+   ------------------------------------------------------------
+   Medido al entrar en Práctica: 42 animaciones arrancando en el mismo
+   fotograma (18 sellos del calendario, 33 logros, los datos y el fundido
+   de la pantalla). Un móvil de gama media tiene que crear cuarenta capas
+   de golpe, y eso es que entrar en una sección no se sienta fluido.
+
+   SE PROBÓ retrasar las animaciones de dentro hasta que acabara el
+   fundido de la pantalla. Bajaba el pico a 5, pero se notaba muchísimo el
+   parón entre entrar y que la pantalla cobrara vida: peor el remedio que
+   la enfermedad. Descartado — no volver a intentarlo.
+
+   Lo que sí funciona es repartir los dos montones grandes EN EL TIEMPO,
+   sin retrasar el conjunto: todo arranca ya, pero escalonado. */
+
+/* Los sellos de los días practicados salían TODOS a la vez (un mes entero
+   de golpe). Se reparten por columnas del calendario: la misma animación,
+   pero como mucho tres o cuatro a la vez en lugar de treinta. */
+.cal__dia--hecho:nth-child(7n+1) { animation-delay: 0ms; }
+.cal__dia--hecho:nth-child(7n+2) { animation-delay: 26ms; }
+.cal__dia--hecho:nth-child(7n+3) { animation-delay: 52ms; }
+.cal__dia--hecho:nth-child(7n+4) { animation-delay: 78ms; }
+.cal__dia--hecho:nth-child(7n+5) { animation-delay: 104ms; }
+.cal__dia--hecho:nth-child(7n+6) { animation-delay: 130ms; }
+.cal__dia--hecho:nth-child(7n)   { animation-delay: 156ms; }
+.semana__dia--hecho:nth-child(2) .semana__punto { animation-delay: 30ms; }
+.semana__dia--hecho:nth-child(3) .semana__punto { animation-delay: 60ms; }
+.semana__dia--hecho:nth-child(4) .semana__punto { animation-delay: 90ms; }
+.semana__dia--hecho:nth-child(5) .semana__punto { animation-delay: 120ms; }
+.semana__dia--hecho:nth-child(6) .semana__punto { animation-delay: 150ms; }
+.semana__dia--hecho:nth-child(7) .semana__punto { animation-delay: 180ms; }
+
 @keyframes entra-pagina {
   from { opacity: 0; transform: translateX(18px); }
   to   { opacity: 1; transform: translateX(0); }
@@ -1569,9 +1703,18 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
 .stagger > *:nth-child(6) { animation-delay: 195ms; }
 .stagger > *:nth-child(7) { animation-delay: 230ms; }
 .stagger > *:nth-child(8) { animation-delay: 265ms; }
+/* RENDIMIENTO — entradas de SOLO OPACIDAD, sin desplazar.
+   Estas animaciones se aplican a tarjetas llenas de TEXTO. Desplazar (o
+   peor, escalar) texto obliga al WebView de Android a volver a dibujar
+   las letras en cada fotograma, en posiciones que caen entre píxeles: eso
+   es el parpadeo de la tarjeta de "seguir estudiando" y de la de racha al
+   entrar en la pantalla. Con opacidad sola, el texto se dibuja UNA vez y
+   solo se mezcla con alfa, que lo resuelve el compositor.
+   Es el mismo motivo por el que la transición entre pantallas ya era un
+   fundido puro sin transform. */
 @keyframes entra-item {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* ============================================================
@@ -1598,9 +1741,13 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   font-weight: 600;
   font-style: normal;
 }
+/* RENDIMIENTO — antes desplazaba (translateY). Desplazar texto al lado de la
+   tarjeta destacada obliga al WebView a crear una capa temporal y a soltarla
+   al acabar: otro de los fotogramas raros al entrar en Inicio. Solo
+   opacidad, como el resto de entradas de la app. */
 @keyframes frase-dia-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .frase-dia { animation: frase-dia-fade 120ms linear both; }
@@ -1661,32 +1808,52 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   color: var(--color-concierto);
 }
 .cuenta-concierto__flecha svg { width: 17px; height: 17px; display: block; }
-.cuenta-concierto--hoy .cuenta-concierto__ico { animation: cc-late 2.2s var(--curva) infinite; }
+/* RENDIMIENTO — el latido del icono y el brillo de la tarjeta animaban
+   `box-shadow` y `border-color` en bucle infinito. Ninguna de las dos se
+   puede componer: obligan a repintar la tarjeta en CADA fotograma,
+   mientras Ama esté en Inicio y haya concierto cerca (o sea, justo los
+   días que más va a abrir la app). Ahora late un pseudo-elemento
+   detrás, animando solo transform/opacity: se ve igual y el compositor
+   lo resuelve solo, sin tocar el hilo principal. */
+.cuenta-concierto--hoy .cuenta-concierto__ico { position: relative; }
+.cuenta-concierto--hoy .cuenta-concierto__ico::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-concierto) 30%, transparent);
+  animation: cc-late 2.2s var(--curva) infinite;
+  pointer-events: none;
+}
 @keyframes cc-late {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-concierto) 45%, transparent); }
-  50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-concierto) 22%, transparent); }
+  0%, 100% { transform: scale(0.9); opacity: 0; }
+  50%      { transform: scale(1); opacity: 1; }
 }
 
 /* A menos de un día: los bordes de la tarjeta laten (brillan y se apagan) */
 .cuenta-concierto--inminente {
+  position: relative;
   border-color: color-mix(in srgb, var(--color-concierto) 70%, var(--color-borde));
-  animation: frase-dia-in 420ms var(--curva) both, cc-brillo 2s var(--curva) infinite;
+}
+.cuenta-concierto--inminente::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--color-concierto) 95%, transparent);
+  box-shadow: 0 0 14px 1px color-mix(in srgb, var(--color-concierto) 40%, transparent);
+  animation: cc-brillo 2s var(--curva) infinite;
+  pointer-events: none;
 }
 @keyframes cc-brillo {
-  0%, 100% {
-    border-color: color-mix(in srgb, var(--color-concierto) 38%, var(--color-borde));
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-concierto) 0%, transparent);
-  }
-  50% {
-    border-color: color-mix(in srgb, var(--color-concierto) 95%, var(--color-borde));
-    box-shadow: 0 0 14px 1px color-mix(in srgb, var(--color-concierto) 40%, transparent);
-  }
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .cuenta-concierto { animation: frase-dia-fade 120ms linear both; }
   .cuenta-concierto:active { transform: none; }
-  .cuenta-concierto--hoy .cuenta-concierto__ico { animation: none; }
-  .cuenta-concierto--inminente { animation: frase-dia-fade 120ms linear both; }
+  .cuenta-concierto--hoy .cuenta-concierto__ico::after { animation: none; opacity: 0.7; }
+  .cuenta-concierto--inminente::after { animation: none; opacity: 0.8; }
 }
 
 .seccion-titulo {
@@ -1722,6 +1889,15 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   background: var(--color-acento);
   border-color: var(--color-acento);
   color: #fff;
+  /* RENDIMIENTO — esta tarjeta parpadeaba al entrar en Inicio desde el APK.
+     Es la unica superficie opaca y saturada de la pantalla, y esta justo
+     entre vecinos que animan en bucle (la cuenta atras del concierto arriba,
+     la tarjeta de resumen del mes abajo). Cuando el WebView crea o descarta
+     las capas de esos vecinos vuelve a rasterizar la region entera y la
+     tarjeta se ve un fotograma a medio pintar. `contain` la declara frontera
+     de pintado: lo que pase al lado ya no la obliga a repintarse. No recorta
+     nada, porque no tiene hijos que se salgan. */
+  contain: layout paint style;
 }
 .tarjeta__icono { font-size: 34px; flex-shrink: 0; display: flex; }
 .tarjeta__icono svg { width: 30px; height: 30px; }
@@ -1775,12 +1951,33 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   gap: 2px;
   padding: 22px 16px 14px;
   margin-bottom: 12px;
-  background:
-    radial-gradient(120% 90% at 50% -10%, var(--color-acento-suave) 0%, transparent 60%),
-    var(--color-superficie);
+  /* RENDIMIENTO — fondo SÓLIDO, sin degradado. Aquí había un
+     `radial-gradient(120% 90% at 50% -10%, …)` encima del color de la
+     tarjeta. Medido: ese degradado llega justo a 105 px del borde superior,
+     y el número de la racha acaba en 104 — exactamente la franja que
+     parpadeaba ("el fondo de la tarjeta desde el número para arriba se ve
+     transparente 0,1 s cada vez que entras en Práctica").
+     La pantalla se reconstruye entera en cada cambio de sección, así que el
+     WebView tiene que rasterizar ese degradado de nuevo cada vez; hasta que
+     la baldosa está lista se ve lo que hay detrás. Un color plano se pinta
+     de inmediato y no puede llegar tarde.
+     Si se quiere recuperar el tinte, que NO sea un degradado en el fondo de
+     esta tarjeta: la reconstruye el router en cada visita. */
+  background: var(--color-superficie);
   border: 1px solid var(--color-borde);
   border-radius: calc(var(--radio) + 4px);
-  overflow: hidden;
+  /* RENDIMIENTO — SIN `overflow: hidden`, a propósito.
+     Dentro de esta tarjeta hay dos elementos con capa propia (el halo y la
+     llama, que escalan sin parar). Un recorte redondeado sobre una capa
+     compuesta obliga al WebView a fabricar una máscara para ella, y esa
+     máscara se crea y se destruye cada vez que se entra en la pantalla:
+     ahí estaba el parpadeo "de la mitad de la tarjeta para arriba" al
+     cambiar rápido de sección — justo la zona donde viven esas capas.
+     El `border-radius` ya redondea el fondo por sí solo; el recorte solo
+     haría falta si algo se saliera, y no se sale: medido a lo largo de la
+     animación, 0 px de desbordamiento por los cuatro lados. Si algún día
+     se añade aquí algo que se salga, hay que recortarlo en ESE elemento,
+     no devolver el `overflow` a la tarjeta. */
 }
 .racha-hero__llama {
   position: relative;
@@ -1794,13 +1991,39 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   position: absolute;
   inset: -6px;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--color-acento-suave) 0%, transparent 72%);
+  /* Asume también el resplandor que antes daba el drop-shadow de la llama:
+     un degradado quieto detrás cuesta un pintado, no uno por fotograma. */
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--color-acento) 22%, transparent) 0%,
+    var(--color-acento-suave) 34%, transparent 72%);
   opacity: 0;
   transform: scale(0.85);
 }
+/* Colores del degradado de la llama. Aquí y no con `var()` dentro del SVG:
+   ver el comentario de practice.html. Hex literales a propósito. */
+.racha-hero__fuego .rf-a { stop-color: #0E0B9E; }
+.racha-hero__fuego .rf-b { stop-color: #1512D6; }
+:root[data-theme="dark"] .racha-hero__fuego .rf-a { stop-color: #7C88FF; }
+:root[data-theme="dark"] .racha-hero__fuego .rf-b { stop-color: #5A67E8; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .racha-hero__fuego .rf-a { stop-color: #7C88FF; }
+  :root:not([data-theme="light"]) .racha-hero__fuego .rf-b { stop-color: #5A67E8; }
+}
+
 .racha-hero--activa .racha-hero__halo {
   opacity: 1;
+  /* La escala ya no la anima nadie, así que se fija aquí al tamaño medio
+     del latido de antes (iba de 0,9 a 1,15). Si no, se quedaría en el
+     scale(0.85) del estado de reposo y el halo se vería encogido. */
+  transform: scale(1.04);
   animation: racha-halo 2.6s var(--curva) infinite;
+  /* RENDIMIENTO — SIN `will-change`, y el latido es solo de OPACIDAD.
+     Se probó darle capa propia para que el degradado no se re-rasterizara
+     al escalar, y el remedio trajo lo suyo: crear esa capa al entrar en la
+     pantalla deja ver por debajo durante un fotograma o dos, que es el
+     fogonazo "de la mitad de la tarjeta para arriba". Sin escala no hay
+     nada que re-rasterizar, así que tampoco hace falta la capa: el halo
+     late igual de bien solo con la opacidad. */
 }
 .racha-hero--peligro .racha-hero__halo {
   opacity: 0.9;
@@ -1811,13 +2034,22 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   inset: 0;
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 4px 10px color-mix(in srgb, var(--color-acento) 35%, transparent));
+  /* RENDIMIENTO — aquí había un `filter: drop-shadow(...)` en el MISMO
+     elemento que anima `transform` sin parar (racha-fuego). Un filtro
+     sobre un nodo animado no se puede componer: el WebView tiene que
+     volver a calcular la sombra en cada fotograma. Eso era el parpadeo de
+     la tarjeta de racha en Práctica. El resplandor lo pinta ahora el halo
+     de detrás, que es un degradado estático. */
 }
 .racha-hero--peligro .racha-hero__fuego { filter: hue-rotate(-45deg) saturate(1.3); }
 .racha-hero--apagada .racha-hero__fuego { filter: grayscale(1); opacity: 0.55; }
 .racha-hero--activa .racha-hero__fuego {
   animation: racha-fuego 2.6s var(--curva) infinite;
   transform-origin: 50% 82%;
+  /* SIN `will-change` por lo mismo que el halo: la capa se crea al entrar en
+     la pantalla y ese primer fotograma deja ver por debajo. La llama se
+     mueve poco (un 8% y grado y medio), así que re-dibujar el trazo sale
+     más barato que el fogonazo. */
 }
 .racha-hero__chispas {
   position: absolute;
@@ -1907,8 +2139,8 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   50%      { transform: scale(1.08) rotate(1.5deg); }
 }
 @keyframes racha-halo {
-  0%, 100% { transform: scale(0.9); opacity: 0.7; }
-  50%      { transform: scale(1.15); opacity: 1; }
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
 }
 @keyframes racha-chispa {
   0%   { transform: translateY(0) scale(1); opacity: 0; }
@@ -1949,6 +2181,18 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   border-radius: inherit;
   background: linear-gradient(90deg, var(--color-acento), var(--color-acento-oscuro));
   transition: width 600ms var(--curva);
+}
+/* RENDIMIENTO — `content-visibility: auto` deja que el navegador se salte
+   el layout y el pintado de lo que todavía queda fuera de la pantalla, y
+   lo haga solo cuando Ama se acerca con el scroll. Las rejillas largas
+   (32 logros con su medalla, el mes del calendario, las listas de
+   canciones y grabaciones) pasan de pintarse enteras de golpe al entrar
+   en la pantalla a pintarse por trozos. `contain-intrinsic-size` le da un
+   alto estimado a cada grupo para que la barra de scroll no dé saltos.
+   Donde el navegador no lo soporta, no pasa nada: se ignora. */
+.logros__grupo {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
 }
 .logros__grid { display: flex; flex-direction: column; gap: 20px; }
 .logros__grupo { display: flex; flex-direction: column; gap: 12px; }
@@ -2008,15 +2252,20 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   transition: transform var(--dur-micro) var(--curva);
 }
 .logro:active .logro__medalla { transform: scale(0.92); }
+.logro__medalla { isolation: isolate; }
 .logro__medalla::before {
   content: "";
   position: absolute;
+  z-index: 1;
   inset: 4px;
   border-radius: 50%;
   background: var(--color-superficie);
 }
 .logro__medalla svg {
   position: relative;
+  /* Misma razón que en el aviso emergente: el icono, por encima del
+     anillo (que en platino gira sin parar y se compone aparte). */
+  z-index: 2;
   width: 24px;
   height: 24px;
   color: var(--color-texto-2);
@@ -2080,14 +2329,27 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
 .logro--hecho.logro--platino .logro__medalla::before {
   content: "";
   position: absolute;
+  z-index: 1;
   inset: -3px;
   border-radius: 50%;
   background: conic-gradient(from 0deg, transparent 0%, rgba(255, 255, 255, 0.9) 10%, transparent 26%, transparent 100%);
   animation: logro-anillo-lento 3200ms linear infinite;
+  /* Un degradado cónico girando sin parar: lo más caro de re-rasterizar
+     que hay. Solo existe en las medallas de platino ya conseguidas. */
+  will-change: transform;
 }
 @keyframes logro-anillo-lento { to { transform: rotate(360deg); } }
 
+/* RENDIMIENTO — los 32 logros entraban TODOS en el mismo fotograma (medido:
+   33 animaciones a la vez, el pico más grande de la pantalla de Práctica).
+   Se reparten en cuatro oleadas (0-105 ms). Ahora la entrada es solo un
+   fundido de opacidad, que es barato, asi que no hace falta separarlas
+   mas: alargar el escalonado solo haria que la rejilla tardara en
+   asentarse, y eso se nota mas que el coste. */
 .logros__grid .logro { animation: entra-item 260ms var(--curva) both; }
+.logros__grid .logro:nth-child(n+9)  { animation-delay: 35ms; }
+.logros__grid .logro:nth-child(n+17) { animation-delay: 70ms; }
+.logros__grid .logro:nth-child(n+25) { animation-delay: 105ms; }
 .logro--nuevo .logro__medalla { animation: cal-sello 420ms var(--curva) both; }
 
 /* Logro al que se ha llegado desde su aviso: latido con halo cobalto. */
@@ -2354,7 +2616,17 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   box-shadow: 0 4px 14px color-mix(in srgb, var(--color-acento) 45%, transparent);
 }
 .logro-toast.is-visible .logro-toast__medalla { animation: logro-medalla-pop 620ms cubic-bezier(0.22, 1.4, 0.4, 1) 60ms both; }
-.logro-toast__medalla svg { position: relative; width: 23px; height: 23px; }
+/* El icono va SIEMPRE por encima de los pseudo-elementos de la medalla
+   (el anillo giratorio y el brillo). Sin z-index explícito el orden lo
+   decidía el orden de pintado, y en el WebView de Android el anillo se
+   promociona a capa propia al animarse: una capa compuesta se pinta por
+   encima del contenido que no lo está, y el icono desaparecía dejando
+   solo el círculo de color. `isolation: isolate` crea un contexto de
+   apilamiento en la medalla para que el z-index mande de verdad. */
+.logro-toast__medalla { isolation: isolate; }
+.logro-toast__medalla svg { position: relative; z-index: 2; width: 23px; height: 23px; }
+.logro-toast__medalla::before,
+.logro-toast__medalla::after { z-index: 1; }
 /* Anillo giratorio de luz */
 .logro-toast__medalla::before {
   content: "";
@@ -2468,7 +2740,12 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
 }
 .hoy--hecho { color: var(--estado-aprendida); }
 .hoy--hecho .hoy__punto { background: var(--estado-aprendida); }
-.hoy--pendiente .hoy__punto { animation: cal-late 2.4s var(--curva) infinite; }
+.hoy--pendiente .hoy__punto { position: relative; }
+.hoy--pendiente .hoy__punto::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  box-shadow: 0 0 0 4px var(--color-acento-suave);
+  animation: cal-late 2.4s var(--curva) infinite; pointer-events: none;
+}
 
 /* Tira de la semana (Inicio) — siete días de un vistazo */
 .semana {
@@ -2505,8 +2782,11 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
 }
 .semana__dia--hoy .semana__nombre { color: var(--color-acento); font-weight: 700; }
 .semana__dia--hoy .semana__punto { border-color: var(--color-acento); border-width: 2px; }
-.semana__dia--hoy:not(.semana__dia--hecho) .semana__punto {
-  animation: cal-late 2.4s var(--curva) infinite;
+.semana__dia--hoy:not(.semana__dia--hecho) .semana__punto { position: relative; }
+.semana__dia--hoy:not(.semana__dia--hecho) .semana__punto::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  box-shadow: 0 0 0 4px var(--color-acento-suave);
+  animation: cal-late 2.4s var(--curva) infinite; pointer-events: none;
 }
 .semana__dia--futuro { opacity: 0.5; }
 
@@ -2557,19 +2837,17 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   z-index: 30;
 }
 
-/* Toque "frosted" solo donde el navegador lo soporta bien. */
-@supports ((backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px))) {
-  .bottom-nav {
-    background: rgba(255, 255, 255, 0.82);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    backdrop-filter: blur(20px) saturate(1.6);
-  }
-  :root[data-theme="dark"] .bottom-nav { background: rgba(24, 21, 19, 0.8); }
-}
+/* El "frosted" de la barra SE QUITÓ. Era translúcida y desenfocada, así que
+   lo que se veía dentro de ella era el reflejo de lo que pasaba por detrás:
+   al deslizarse el mes del calendario bajo la barra, ese reflejo se movía
+   con él y parecía que la barra se descolgaba hacia abajo. Medido con el
+   calendario: la barra NO se mueve ni un píxel (misma posición en los 170
+   fotogramas del cambio de mes), lo que se movía era su contenido prestado.
+   Con fondo sólido la barra es siempre la misma y queda de verdad quieta.
+   De paso se va la capa más cara de la app: era fija, a todo lo ancho y
+   sobre el fondo animado, así que el WebView tenía que recapturar y volver
+   a desenfocar lo de detrás en cada fotograma. */
 @media (prefers-color-scheme: dark) {
-  @supports ((backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px))) {
-    :root:not([data-theme="light"]) .bottom-nav { background: rgba(24, 21, 19, 0.8); }
-  }
   :root:not([data-theme="light"]) .bottom-nav {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05),
                 0 -12px 34px -16px rgba(0, 0, 0, 0.6);
@@ -2578,6 +2856,16 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
 :root[data-theme="dark"] .bottom-nav {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05),
               0 -12px 34px -16px rgba(0, 0, 0, 0.6);
+}
+
+/* La cabecera sí conserva su desenfoque (son 3 px sobre una tira de 60), pero
+   durante las transiciones (app.js pone `sin-fondo-vivo` en el <body>) lo
+   suelta, por el mismo motivo: mientras algo se mueve por detrás, redesenfocar
+   en cada fotograma se nota. Su fondo ya es un degradado translúcido propio,
+   así que basta con quitar el filtro. */
+body.sin-fondo-vivo .app-header {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .nav-item {
@@ -2720,7 +3008,11 @@ body.tema-txupinazo .fuego i:nth-child(even) { background: var(--color-txupi-roj
   /* Listas largas (repertorio, canciones de una sesión): el WebView se salta
      el maquetado/pintado de las filas que quedan fuera de pantalla. */
   content-visibility: auto;
-  contain-intrinsic-size: auto 60px;
+  contain-intrinsic-size: auto 74px;
+  /* Medido en pantalla de movil: el alto estimado tiene que cuadrar con el
+     real. Estaban todos un 20-25% cortos, asi que cada tarjeta CRECIA de
+     golpe al entrar en pantalla y empujaba a las de abajo: eso se ve como
+     un parpadeo mientras Ama desliza la lista. */
 }
 .cancion__abrir {
   flex: 1;
@@ -5505,7 +5797,17 @@ body.sin-scroll { overflow: hidden; }
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform var(--dur-micro) var(--curva), background var(--dur-micro) var(--curva);
+  transition: transform var(--dur-micro) var(--curva), background var(--dur-micro) var(--curva),
+    opacity var(--dur-micro) var(--curva);
+  /* Mientras se dibuja, la pista de arriba ("Toca para marcar...") ocupa
+     esa misma esquina: se apartan para no montarse una encima de otra. */
+  opacity: 1;
+}
+.lightbox--editando .lightbox__cerrar,
+.lightbox--editando .lightbox__lapiz {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.8);
 }
 .lightbox__cerrar { right: 16px; }
 .lightbox__lapiz { right: 66px; }
@@ -5520,11 +5822,13 @@ body.sin-scroll { overflow: hidden; }
 
 /* Marcas sobre la partitura (círculo / flecha a mano) */
 .anot-marca circle,
-.anot-marca line {
+.anot-marca line,
+.anot-marca polyline {
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
 }
 .anot-marca circle { animation: anot-aparece 220ms var(--curva) both; }
-.anot-marca line { animation: anot-traza 220ms var(--curva) both; }
+.anot-marca line,
+.anot-marca polyline { animation: anot-traza 220ms var(--curva) both; }
 @keyframes anot-aparece {
   0%   { opacity: 0; transform: scale(0.4); transform-box: fill-box; transform-origin: center; }
   100% { opacity: 1; transform: scale(1); }
@@ -5535,34 +5839,80 @@ body.sin-scroll { overflow: hidden; }
 }
 .lightbox__anot.is-editando .anot-marca { cursor: pointer; }
 .lightbox__anot.is-editando .anot-marca:active circle,
-.lightbox__anot.is-editando .anot-marca:active line { opacity: 0.4; }
-.anot-tmp { stroke-width: 4.5; stroke-linecap: round; opacity: 0.85; }
+.lightbox__anot.is-editando .anot-marca:active line,
+.lightbox__anot.is-editando .anot-marca:active polyline { opacity: 0.4; }
+.anot-tmp {
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  opacity: 0.85;
+}
 
-/* Barra flotante de herramientas mientras se dibuja */
+/* Panel flotante de herramientas mientras se dibuja. Dos filas bien
+   diferenciadas en vez de una tira única: arriba los colores (lo que más
+   se toca, con dianas grandes), abajo las herramientas + deshacer + Hecho.
+   Repartir en dos filas evita que, al añadir la goma, todo se apretujara en
+   una tira y el botón final quedara medio cortado — con dos filas cada una
+   respira y crece con holgura si algún día se añade una herramienta más. */
 .anot-barra {
   position: absolute;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 18px);
+  /* Deja sitio a la píldora del reproductor (.transporte, z-index más alto),
+     que también flota abajo mientras la partitura está a pantalla completa. */
+  bottom: calc(env(safe-area-inset-bottom) + 82px);
   transform: translateX(-50%);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-fondo) 82%, transparent);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.4), inset 0 0 0 1px color-mix(in srgb, #fff 12%, transparent);
+  gap: 10px;
+  padding: 12px 14px;
+  max-width: calc(100vw - 24px);
+  border-radius: 26px;
+  background: color-mix(in srgb, var(--color-fondo) 90%, transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.45), inset 0 0 0 1px color-mix(in srgb, #fff 14%, transparent);
   animation: anot-barra-entra 200ms var(--curva) both;
 }
 @keyframes anot-barra-entra {
   0%   { opacity: 0; transform: translateX(-50%) translateY(10px); }
   100% { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
-.anot-barra__modos { display: flex; gap: 2px; background: color-mix(in srgb, var(--color-texto) 8%, transparent); border-radius: 999px; padding: 2px; }
+.anot-barra__colores {
+  display: flex;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-texto) 10%, transparent);
+}
+.anot-color {
+  flex: none;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-fondo) 70%, transparent);
+  transition: transform var(--dur-micro) var(--curva), box-shadow var(--dur-micro) var(--curva);
+}
+.anot-color.is-sel {
+  transform: scale(1.16);
+  box-shadow: 0 0 0 2px var(--color-fondo), 0 0 0 4px var(--c);
+}
+.anot-color:active { transform: scale(0.88); }
+.anot-barra__fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.anot-barra__modos {
+  display: flex; flex: none; gap: 2px;
+  background: color-mix(in srgb, var(--color-texto) 8%, transparent);
+  border-radius: 999px; padding: 3px;
+}
 .anot-barra__modo {
-  width: 38px;
-  height: 38px;
+  flex: none;
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
   display: flex;
   align-items: center;
@@ -5573,23 +5923,11 @@ body.sin-scroll { overflow: hidden; }
 .anot-barra__modo svg { width: 19px; height: 19px; }
 .anot-barra__modo.is-activo { background: var(--color-acento); color: #fff; }
 .anot-barra__modo:active { transform: scale(0.9); }
-.anot-barra__colores { display: flex; gap: 5px; padding-inline: 4px; }
-.anot-color {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--c);
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-fondo) 70%, transparent);
-  transition: transform var(--dur-micro) var(--curva), box-shadow var(--dur-micro) var(--curva);
-}
-.anot-color.is-sel {
-  transform: scale(1.18);
-  box-shadow: 0 0 0 2px var(--color-fondo), 0 0 0 4px var(--c);
-}
-.anot-color:active { transform: scale(0.9); }
 .anot-barra__deshacer,
 .anot-barra__listo {
-  height: 38px;
+  flex: none;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5597,17 +5935,19 @@ body.sin-scroll { overflow: hidden; }
   color: var(--color-texto);
   transition: transform var(--dur-micro) var(--curva), background var(--dur-micro) var(--curva);
 }
-.anot-barra__deshacer { width: 38px; }
-.anot-barra__deshacer svg { width: 18px; height: 18px; }
+.anot-barra__deshacer {
+  margin-left: auto;
+  background: color-mix(in srgb, var(--color-texto) 8%, transparent);
+}
+.anot-barra__deshacer svg { width: 19px; height: 19px; }
 .anot-barra__listo {
-  padding-inline: 16px;
-  font-weight: 700;
-  font-size: 14px;
   background: var(--color-acento);
   color: #fff;
+  box-shadow: 0 4px 14px -3px color-mix(in srgb, var(--color-acento) 65%, transparent);
 }
+.anot-barra__listo svg { width: 20px; height: 20px; }
 .anot-barra__deshacer:active,
-.anot-barra__listo:active { transform: scale(0.94); }
+.anot-barra__listo:active { transform: scale(0.9); }
 .anot-pista {
   position: absolute;
   left: 50%;
@@ -5725,6 +6065,14 @@ body.sin-scroll { overflow: hidden; }
   border-radius: 10px;
   color: var(--color-texto);
 }
+/* RENDIMIENTO — al cambiar de mes la rejilla entera ya se desliza. Que
+   ademas se sellen los dias practicados son hasta treinta animaciones mas
+   compitiendo con ese deslizamiento, y es el tiron que se notaba en el APK.
+   Los sellos se quedan para el primer pintado del calendario, que es cuando
+   de verdad cuentan. */
+.cal__grid--sin-sello .cal__dia--hecho,
+.cal__grid--sin-sello .cal__dia--concierto.cal__dia--hecho::after { animation: none; }
+
 .cal__dia--vacio { visibility: hidden; }
 .cal__dia--futuro { color: color-mix(in srgb, var(--color-texto-2) 55%, transparent); }
 
@@ -5746,12 +6094,33 @@ body.sin-scroll { overflow: hidden; }
 .cal__dia--hoy:not(.cal__dia--hecho) {
   color: var(--color-acento);
   font-weight: 700;
-  animation: cal-late 2.4s var(--curva) infinite;
+  position: relative;
 }
+.cal__dia--hoy:not(.cal__dia--hecho)::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  box-shadow: 0 0 0 4px var(--color-acento-suave);
+  animation: cal-late 2.4s var(--curva) infinite; pointer-events: none;
+}
+/* RENDIMIENTO — antes esto animaba `box-shadow`, que no se puede componer:
+   repintaba el elemento en cada fotograma, para siempre, en las dos
+   pantallas que Ama más abre (el punto de hoy y la tira de la semana en
+   Inicio, y el día de hoy en el calendario de Práctica). Ahora el latido lo
+   hace un aro en `::after` con escala y opacidad, que resuelve el
+   compositor sin tocar el hilo principal. El borde fijo se queda como
+   `box-shadow` estático, que se pinta una vez. */
+/* Solo OPACIDAD, sin escala. El aro es un `box-shadow`, o sea contenido
+   pintado: escalarlo obliga a rasterizarlo otra vez en cada fotograma, y
+   son tres sitios a la vez en las dos pantallas que más se abren. Un
+   latido de opacidad se ve igual de vivo y el compositor lo resuelve sin
+   volver a pintar nada. */
 @keyframes cal-late {
-  0%, 100% { box-shadow: inset 0 0 0 2px var(--color-acento); }
-  50%      { box-shadow: inset 0 0 0 2px var(--color-acento),
-                         0 0 0 4px var(--color-acento-suave); }
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hoy--pendiente .hoy__punto::after,
+  .semana__dia--hoy:not(.semana__dia--hecho) .semana__punto::after,
+  .cal__dia--hoy:not(.cal__dia--hecho)::before { animation: none; opacity: 0; }
 }
 
 /* Día de concierto: SIEMPRE verde, gana a cualquier otro estado del día
@@ -5840,7 +6209,11 @@ body.sin-scroll { overflow: hidden; }
   border-radius: var(--radio);
   transition: transform var(--dur-micro) var(--curva), border-color var(--dur-micro) var(--curva);
   content-visibility: auto;
-  contain-intrinsic-size: auto 92px;
+  contain-intrinsic-size: auto 122px;
+  /* Medido en pantalla de movil: el alto estimado tiene que cuadrar con el
+     real. Estaban todos un 20-25% cortos, asi que cada tarjeta CRECIA de
+     golpe al entrar en pantalla y empujaba a las de abajo: eso se ve como
+     un parpadeo mientras Ama desliza la lista. */
 }
 .conc-card:active { transform: scale(0.985); }
 .conc-card--prox {
@@ -5958,6 +6331,12 @@ body.sin-scroll { overflow: hidden; }
   border: none;
   border-radius: 22px;
   box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--color-acento) 65%, transparent);
+  /* RENDIMIENTO — dentro hay cuatro animaciones en bucle (manchas, chispas,
+     icono del mes). Sin contencion, sus capas arrastraban al repintado a la
+     tarjeta de "seguir estudiando", que esta pegada encima. Ya lleva
+     `overflow: hidden`, asi que contener el pintado no cambia nada de como
+     se ve y corta esa dependencia. */
+  contain: layout paint style;
   animation: tr-entra 480ms var(--curva) both;
   transition: transform var(--dur-micro) var(--curva), box-shadow var(--dur-micro) var(--curva);
 }
@@ -5966,8 +6345,8 @@ body.sin-scroll { overflow: hidden; }
   box-shadow: 0 4px 14px -6px color-mix(in srgb, var(--color-acento) 60%, transparent);
 }
 @keyframes tr-entra {
-  from { opacity: 0; transform: translateY(10px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 /* Fondo vivo: dos manchas cobalto que vagan muy despacio dentro de la
    tarjeta (mismo lenguaje que el fondo de la app y del Wrapped a pantalla
@@ -6066,6 +6445,14 @@ body.sin-scroll { overflow: hidden; }
   display: none;
   opacity: 0.24;   /* icono de trazos (sol/copo): sutil de por sí */
 }
+/* El icono del mes gira o se mece en bucle sobre la tarjeta de resumen de
+   Inicio. Se le PUSO capa propia (`will-change`) para que no se redibujaran
+   los trazos del SVG en cada fotograma, y SE QUITÓ: medido, su capa se sale
+   del recorte redondeado de la tarjeta, y una capa compuesta que cruza un
+   recorte obliga al WebView a enmascararla y a arrastrar a lo que tiene al
+   lado — la tarjeta de "seguir estudiando", que es justo la que parpadeaba.
+   Va al 24% de opacidad, gira despacio y solo se ve los días 1-12: sale más
+   barato repintarlo que las consecuencias de la capa. */
 
 /* Partículas del tema: 6 puntitos reutilizables cuya posición horizontal
    se fija aquí y cuya forma/color/animación pone cada tema (nieve, hojas,
@@ -7161,8 +7548,8 @@ body.reordenando { cursor: grabbing; user-select: none; }
 }
 .practica__datos li:first-child { border-top: 0; }
 @keyframes dato-entra {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .practica__datos li { animation: none; }
@@ -7391,7 +7778,9 @@ body.reordenando { cursor: grabbing; user-select: none; }
   border-radius: var(--radio);
   padding: 14px 16px;
   content-visibility: auto;
-  contain-intrinsic-size: auto 120px;
+  contain-intrinsic-size: auto 178px;
+  /* Era 120 y mide 178: casi un 50% corto, el peor de todos. Cada tarjeta
+     de grabacion pegaba un salto al entrar en pantalla. */
 }
 .grabacion__cab {
   display: flex;
@@ -8308,18 +8697,22 @@ body.reordenando { cursor: grabbing; user-select: none; }
   pointer-events: none;
   transition: transform 240ms var(--curva), opacity 240ms var(--curva);
 }
-/* El desenfoque va en una capa propia sin hijos: si se pone en .barra-repro,
-   Chrome (WebView) no lo aplica detrás de los botones/inputs hijos y queda
-   medio sólido. La pseudo-capa lo resuelve. */
+/* RENDIMIENTO — aquí había un `backdrop-filter: blur(10px)`. Esta barra
+   está en pantalla TODO el rato que suena una canción, que es justo lo
+   que Ama hace a diario, y flota sobre el contenido y el fondo animado.
+   Un desenfoque de fondo solo es barato cuando lo de detrás está quieto
+   (el visor de PDF, el lightbox); aquí lo de detrás se mueve siempre, así
+   que el WebView lo recalculaba en cada fotograma durante toda la
+   canción. Fondo opaco: se lee mejor y no cuesta nada.
+   La capa propia se conserva porque el WebView no aplica bien el fondo
+   translúcido detrás de los botones e inputs hijos. */
 .barra-repro::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  background: color-mix(in srgb, var(--color-superficie) 80%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  background: var(--color-superficie);
 }
 .barra-repro.is-visible {
   opacity: 1;
@@ -8876,6 +9269,15 @@ body.app-grabando #btn-parar-grabando {
 
 /* Tarjeta de sesión en la lista */
 .sesion {
+  /* Listas largas: el WebView se salta el maquetado y el pintado de las
+     sesiones que quedan fuera de pantalla (.cancion, .conc-card y
+     .grabacion ya lo tenían; esta lista se había quedado fuera). */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 126px;
+  /* Medido en pantalla de movil: el alto estimado tiene que cuadrar con el
+     real. Estaban todos un 20-25% cortos, asi que cada tarjeta CRECIA de
+     golpe al entrar en pantalla y empujaba a las de abajo: eso se ve como
+     un parpadeo mientras Ama desliza la lista. */
   display: flex;
   align-items: center;
   gap: 14px;
@@ -11261,2790 +11663,12 @@ body.wrapped-abierto { overflow: hidden; }
 .wrapped--sin-motion.wrapped--anual .w-btn .w-btn__tx,
 .wrapped--sin-motion.wrapped--anual .w-paso--next .w-btn__tx { animation: none; background-position: -84% 0; }
 
-/* ============================================================
-   Bienvenida — presentación a pantalla completa, solo la 1ª vez.
-   Inmersiva: cada sector con su color, su ilustración y su entrada.
-   Solo se anima transform y opacity.
-   ============================================================ */
-.bv-abierta { overflow: hidden; }
+/* La bienvenida (la presentación de la primera vez) tiene su hoja aparte:
+   css/bienvenida.css, que carga js/bienvenida.js solo cuando va a abrirse.
+   Eran 96 KB de reglas —muchas terminadas en `*`, de las que el motor tiene
+   que considerar para cualquier elemento— viviendo aquí para siempre por una
+   pantalla que se ve una vez. */
 
-.bv {
-  position: fixed;
-  inset: 0;
-  z-index: 9500;
-  display: flex;
-  flex-direction: column;
-  background: #160B3B;               /* base bajo las capas de fondo */
-  color: #fff;
-  opacity: 0;
-  transition: opacity 300ms var(--curva);
-  -webkit-tap-highlight-color: transparent;
-  /* `clip` y no `hidden`: si un sector desborda (pantallas bajas), NO se
-     crea un contenedor scrollable. Con `hidden`, al tocar un botón a ras
-     del borde el WebView hacía scroll-into-view y el contenido "saltaba"
-     justo antes de la animación de entrada a la app. */
-  overflow: clip;
-}
-.bv.is-abierta { opacity: 1; }
-
-/* --- Capas de fondo (una por sector, fundido cruzado), a pantalla COMPLETA
-   de `.bv` para que no queden bordes oscuros arriba/abajo. --- */
-.bv-fondos { position: absolute; inset: 0; z-index: 0; }
-.bv-fondo {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity 520ms var(--curva);
-}
-
-/* --- Barra superior: atrás - progreso - saltar --- */
-.bv-top {
-  position: relative;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: calc(env(safe-area-inset-top) + 12px) 16px 4px;
-}
-.bv-prog { flex: 1; display: flex; gap: 5px; }
-.bv-seg {
-  flex: 1;
-  height: 3px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
-  overflow: hidden;
-}
-.bv-seg b {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: #fff;
-  transform: scaleX(0);
-  transform-origin: left;
-}
-
-.bv-saltar {
-  border: none;
-  background: none;
-  color: rgba(255, 255, 255, 0.8);
-  font: inherit;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 6px 4px;
-}
-.bv-saltar[hidden] { display: none; }
-.bv-saltar:active { opacity: 0.55; }
-
-/* --- Zona de sectores --- */
-.bv-slides { position: relative; z-index: 1; flex: 1; min-height: 0; overflow: clip; }
-.bv-slide {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;          /* grupo centrado: el aire sobra arriba y abajo por igual */
-  gap: clamp(18px, 4.5vh, 40px);
-  padding: 24px 26px;
-  /* Transición fluida: fundido + un pelín de deslizamiento lateral. Solo
-     `opacity` y `transform` (nada de scale a pantalla completa). */
-  opacity: 0;
-  transform: translate3d(0, 0, 0);
-  transition: opacity 400ms var(--curva), transform 400ms var(--curva);
-  backface-visibility: hidden;
-}
-.bv-slide[hidden] { display: none; }
-.bv-slide.is-ent-der { opacity: 0; transform: translate3d(40px, 0, 0); }
-.bv-slide.is-ent-izq { opacity: 0; transform: translate3d(-40px, 0, 0); }
-.bv-slide.is-sal-izq { opacity: 0; transform: translate3d(-40px, 0, 0); }
-.bv-slide.is-sal-der { opacity: 0; transform: translate3d(40px, 0, 0); }
-.bv-slide.is-activo  { opacity: 1; transform: translate3d(0, 0, 0); transition-delay: 20ms; }
-/* Ningún sector que no sea el activo anima nada: varias ilustraciones tenían
-   animaciones infinitas SIN atar a `.is-activo` y seguían corriendo ocultas
-   gastando CPU. Selector barato. */
-.bv-slide:not(.is-activo) *,
-.bv-slide:not(.is-activo) *::before,
-.bv-slide:not(.is-activo) *::after { animation-play-state: paused !important; }
-
-/* Decoración congelada durante el deslizamiento entre sectores (JS pone
-   `bv--transicion` ~540 ms). Selector barato: solo los 2 sectores en juego.
-   El texto (`.bv-in`) sí sigue: su entrada `bv-rise` es lo que da vida al
-   momento en que el sector se descubre, y es barata. */
-.bv--transicion .bv-slide.is-activo *,
-.bv--transicion .bv-slide.is-activo *::before,
-.bv--transicion .bv-slide.is-activo *::after,
-.bv--transicion .bv-slide.is-sal-izq *,
-.bv--transicion .bv-slide.is-sal-der * { animation-play-state: paused !important; }
-.bv--transicion .bv-slide.is-activo .bv-in,
-.bv--transicion .bv-slide.is-activo .bv-in * { animation-play-state: running !important; }
-
-/* `backdrop-filter` dentro de la bienvenida: es de lo más caro que hay en
-   el WebView de Android (recompone todo lo que queda por detrás cada
-   frame). Ninguna ilustración lo necesita. */
-.bv .bv-codigo,
-.bv [class*="bv-decor"],
-.bv [class*="bv-decor"] * {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-}
-
-/* Y NADA de `filter` (blur / drop-shadow) en las ilustraciones: varias los
-   animaban en bucle (desenfoque letra a letra en la de la IA, la polaroid
-   revelándose…) y eso mantiene un shader corriendo a pantalla parcial todo
-   el rato — es lo que hacía que, una vez dentro del sector, siguiera
-   lagueado. Los `!important` ganan también a los valores de los keyframes.
-   Las ilustraciones se quedan planas pero se mueven fluidas, que es lo que
-   se ha pedido. */
-.bv [class*="bv-decor"],
-.bv [class*="bv-decor"] *,
-.bv [class*="bv-decor"] *::before,
-.bv [class*="bv-decor"] *::after { filter: none !important; }
-
-/* `will-change` a mano en decenas de elementos de una ilustración (el
-   karaoke tiene un `will-change` por palabra) satura la memoria de GPU del
-   WebView y acaba provocando que recree capas → parpadeos negros. Que
-   decida el navegador. */
-.bv [class*="bv-decor"] * { will-change: auto !important; }
-
-/* PODA GLOBAL (v1.24.5): todas las capas de "adorno" —partículas, chispas,
-   auras, halos, motas, glifos flotando, corazones cayendo, haces de luz—
-   solo suman elementos animándose sin parar. Cada sector conserva su
-   elemento principal y su animación clave; el resto fuera. Es lo que hacía
-   que los cambios de sector fueran lentos en un móvil de 120 Hz. */
-.bv .bv-flota,
-.bv .bv-cae,
-.bv .bv-luna,
-.bv [class$="__chispa"], .bv [class*="__chispa "],
-.bv [class$="__spark"], .bv [class*="__spark "], .bv .bv-ll__sparks,
-.bv [class*="__pulso"],
-.bv [class*="__dust"], .bv .bv-ll__dustwrap,
-.bv [class*="__mota"],
-.bv [class*="__aura"],
-.bv [class*="__glow"],
-.bv [class*="__scan"],
-.bv [class*="__beam"],
-.bv [class*="__halo"],
-.bv [class*="__ping"],
-.bv .bv-est__chispa,
-.bv .bv-ia__pulso { display: none !important; }
-
-/* Ilustración: ocupa solo lo que necesita, encima del texto */
-.bv-decor {
-  position: relative;
-  flex: 0 1 auto;
-  min-height: 0;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-/* Variante decorativa: glifos que flotan por TODO el sector, sin ocupar sitio */
-.bv-decor--fondo {
-  position: absolute;
-  inset: 0;
-  flex: none;
-  pointer-events: none;
-}
-.bv-in { flex: 0 0 auto; max-width: 430px; width: 100%; margin: 0 auto; }
-.bv-in--centro { text-align: center; }
-
-/* --- Tipografía de los sectores --- */
-.bv-eyebrow {
-  margin: 0 0 10px;
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72);
-}
-.bv-h1 {
-  margin: 0 0 14px;
-  font-family: var(--fuente-titulo);
-  font-weight: 800;
-  font-size: clamp(36px, 11vw, 50px);
-  line-height: 1.06;
-  letter-spacing: -0.02em;
-}
-.bv-h2 {
-  margin: 0 0 14px;
-  font-family: var(--fuente-titulo);
-  font-weight: 700;
-  font-size: clamp(24px, 6.5vw, 30px);
-  letter-spacing: -0.01em;
-}
-.bv-h3 {
-  margin: 0 0 14px;
-  font-family: var(--fuente-titulo);
-  font-weight: 800;
-  font-size: clamp(26px, 7.4vw, 33px);
-  line-height: 1.14;
-  letter-spacing: -0.015em;
-}
-.bv-sub {
-  margin: 0;
-  font-size: clamp(16px, 4.5vw, 18.5px);
-  line-height: 1.58;
-  color: rgba(255, 255, 255, 0.9);
-}
-/* Firma "— Endika" con letra de mano y que se escribe sola */
-.bv-firma {
-  position: relative;
-  display: inline-block;
-  margin: 20px 0 0;
-  line-height: 1;
-}
-.bv-firma__tx {
-  display: inline-block;
-  font-family: 'Caveat', 'Segoe Script', 'Bradley Hand', cursive;
-  font-size: 34px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  opacity: 0;
-}
-.bv-firma__pluma { display: none; }
-/* Entra sola: sube un poco y aparece (solo transform + opacity). Antes
-   animaba `clip-path` (repinta el texto cada frame) + un puntito con
-   `left` (layout cada frame): dos cosas caras justo al entrar al cierre. */
-.bv-slide.is-activo .bv-firma__tx {
-  animation: bv-firma-in 620ms cubic-bezier(0.2, 0.8, 0.3, 1) 1100ms both;
-}
-@keyframes bv-firma-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-/* ---- Confirmación al "Saltar" ---- */
-.bv-confirm {
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 28px;
-  background: rgba(8, 6, 28, 0.55);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
-  opacity: 0;
-  transition: opacity 220ms var(--curva);
-}
-.bv-confirm.is-visible { opacity: 1; }
-.bv-confirm__caja {
-  width: 100%;
-  max-width: 320px;
-  padding: 22px 20px 16px;
-  border-radius: 18px;
-  background: #fff;
-  color: #1A1A1A;
-  text-align: center;
-  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.55);
-  transform: translateY(12px) scale(0.95);
-  transition: transform 240ms var(--curva);
-}
-.bv-confirm.is-visible .bv-confirm__caja { transform: none; }
-.bv-confirm__tx {
-  margin: 0 0 16px;
-  font-size: 15.5px;
-  font-weight: 600;
-  line-height: 1.42;
-}
-.bv-confirm__bts { display: flex; flex-direction: column; gap: 8px; }
-.bv-confirm__bts button {
-  padding: 12px;
-  border: none;
-  border-radius: 11px;
-  font: inherit;
-  font-size: 14.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.bv-confirm__seguir { background: var(--color-acento); color: #fff; }
-.bv-confirm__salir { background: none; color: #8A8A90; font-weight: 600; }
-.bv-confirm__bts button:active { transform: scale(0.98); }
-
-.bv-num {
-  font-family: var(--fuente-titulo);
-  font-weight: 800;
-  font-size: clamp(78px, 26vw, 132px);
-  line-height: 0.9;
-  letter-spacing: -0.04em;
-  margin-bottom: 2px;
-  background: linear-gradient(180deg, #FFFFFF 0%, #E7C7FF 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.bv-llama { display: inline-block; }
-
-/* Cifra secundaria del sector "Lo que llevó": líneas de código */
-.bv-codigo {
-  margin-top: 20px;
-  padding: 14px 20px 15px 22px;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 5px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  position: relative;
-  overflow: hidden;
-}
-.bv-codigo::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: linear-gradient(180deg, #FFFFFF, #E7C7FF);
-}
-.bv-codigo__num {
-  font-family: var(--fuente-titulo);
-  font-weight: 800;
-  font-size: clamp(34px, 11vw, 52px);
-  line-height: 1;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-  background: linear-gradient(180deg, #FFFFFF 0%, #E7C7FF 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.bv-codigo__pie {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.62);
-}
-
-/* --- Entrada en cascada del contenido: sube, con un pelín de rebote --- */
-.bv-slide.is-activo .bv-in > * {
-  animation: bv-rise 640ms cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
-}
-.bv-slide.is-activo .bv-in > *:nth-child(1) { animation-delay: 60ms; }
-.bv-slide.is-activo .bv-in > *:nth-child(2) { animation-delay: 150ms; }
-.bv-slide.is-activo .bv-in > *:nth-child(3) { animation-delay: 240ms; }
-.bv-slide.is-activo .bv-in > *:nth-child(4) { animation-delay: 330ms; }
-.bv-slide.is-activo .bv-in > *:nth-child(5) { animation-delay: 420ms; }
-.bv-slide.is-activo .bv-in > *:nth-child(6) { animation-delay: 500ms; }
-@keyframes bv-rise {
-  0%   { opacity: 0; transform: translateY(28px) scale(0.95); }
-  55%  { opacity: 1; }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-.bv-sub--tenue { color: rgba(255, 255, 255, 0.55); font-style: italic; margin-top: 10px; }
-
-/* Botones "Listo" (sector 0) y "Entrar" (cierre) */
-.bv-cta {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  width: fit-content;
-  margin: 24px auto 0;
-  padding: 15px 28px;
-  border: none;
-  border-radius: 14px;
-  background: #fff;
-  color: var(--color-acento);
-  font: inherit;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  /* Sombra contenida: con 34-38 px de blur, al entrar el botón se promovía a
-     capa (por `bv-rise`/`bv-cta-latido`) y rasterizar esa sombra grande daba
-     un parpadeo al llegar al cierre. */
-  box-shadow: 0 10px 20px -12px rgba(0, 0, 0, 0.5);
-  transition: transform var(--dur-micro) var(--curva), opacity 320ms var(--curva);
-}
-.bv-cta svg { width: 19px; height: 19px; }
-.bv-cta:active { transform: scale(0.97); }
-.bv-cta.is-ido {
-  animation: none !important;
-  opacity: 0;
-  transform: scale(0.9);
-  pointer-events: none;
-}
-.bv-s--cierre .bv-cta { background: linear-gradient(120deg, #FFE9B0, #F3B33F); color: #5A4300; box-shadow: 0 10px 22px -12px rgba(0, 0, 0, 0.55); }
-/* primero entra (bv-rise), luego late sin parar para pedir que la toquen.
-   Selector reforzado para ganar a `.bv-slide.is-activo .bv-in > *`. */
-.bv-slide.bv-s--cierre.is-activo .bv-cta {
-  animation: bv-rise 520ms var(--curva) 320ms both,
-             bv-cta-latido 1.7s ease-in-out 1.5s infinite;
-}
-@keyframes bv-cta-latido {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.055); }
-}
-
-/* --- Pie: aviso + indicador de pausa --- */
-.bv-pie {
-  position: relative;
-  z-index: 3;
-  min-height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 26px calc(env(safe-area-inset-bottom) + 20px);
-}
-.bv-hint {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.66);
-  transition: opacity 400ms var(--curva);
-}
-.bv-hint.is-fuera { opacity: 0; }
-.bv-pausa {
-  position: absolute;
-  left: 50%;
-  top: 38%;                 /* bien arriba del centro, no pegado abajo */
-  z-index: 4;
-  width: 44px;
-  height: 44px;
-  margin: -22px 0 0 -22px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.3);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transform: scale(0.8);
-  transition: opacity 160ms var(--curva), transform 160ms var(--curva);
-  pointer-events: none;
-}
-.bv-pausa svg { width: 18px; height: 18px; }
-.bv.is-pausa .bv-pausa { opacity: 1; transform: none; }
-.bv.is-pausa .bv-hint { opacity: 0; }
-
-/* --- Portada a pantalla completa: "ponte los auriculares" --- */
-.bv-gate {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 28px;
-  background: radial-gradient(120% 80% at 50% 0%, #3B39E8 0%, #1512D6 45%, #0E0B9E 100%);
-  transition: opacity 550ms var(--curva), transform 550ms var(--curva);
-}
-.bv-gate.is-ido { opacity: 0; transform: scale(1.06); pointer-events: none; }
-.bv-gate[hidden] { display: none; }
-.bv-gate__in {
-  width: 100%;
-  max-width: 420px;
-  text-align: center;
-  color: #fff;
-}
-.bv-gate .bv-cascos {
-  width: clamp(90px, 26vw, 112px);
-  height: auto;
-  margin-bottom: 26px;
-  animation: bv-cascos-late 2.6s var(--curva) infinite;
-}
-@keyframes bv-cascos-late {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-.bv-gate__h {
-  margin: 0 0 14px;
-  font-family: var(--fuente-titulo);
-  font-weight: 800;
-  font-size: clamp(32px, 9.5vw, 44px);
-  line-height: 1.08;
-  letter-spacing: -0.02em;
-}
-.bv-gate__p {
-  margin: 0 0 4px;
-  font-size: clamp(15.5px, 4.4vw, 17.5px);
-  line-height: 1.55;
-  color: rgba(255, 255, 255, 0.88);
-}
-.bv-gate__saltar {
-  display: block;
-  margin: 16px auto 0;
-  border: none;
-  background: none;
-  color: rgba(255, 255, 255, 0.6);
-  font: inherit;
-  font-size: 13.5px;
-  cursor: pointer;
-  padding: 6px;
-}
-.bv-gate__saltar:active { opacity: 0.5; }
-
-/* --- Entrar: FUSIÓN con la app = CROSS-FADE PURO. Sin transform en
-   ningún sitio (varias iteraciones: cualquier scale, por pequeño que
-   fuera, se percibía como que "algo se movía" — el slide, la barra de
-   nav…). Ahora SOLO opacidad: el overlay se funde a 0 y, debajo, la app
-   (ya montada) sube de opacidad. Nada se desplaza ni se escala.
-   Se congelan además las animaciones internas del overlay para que se
-   apague quieto. --- */
-.bv.bv--entrando-app {
-  /* "Entrar a un mundo nuevo" = DISOLVENCIA lenta de cine. CERO `transform`
-     y CERO `filter` sobre `.bv` — ya se probó `scale()` y Maite se quejó de
-     que "el slide se mueve mientras se desvanece" (escalar a pantalla
-     completa desplaza el contenido de los bordes), y el blur daba tirones.
-     Solo `opacity`, despacio (~1,3 s) y con una curva suave. El "viaje" lo
-     da el tempo + que la app aparezca por detrás con su propio ritmo. */
-  transition: opacity 1300ms cubic-bezier(0.5, 0, 0.2, 1);
-  opacity: 0;
-  transform: none;
-  filter: none;
-  will-change: opacity;
-  pointer-events: none;
-}
-.bv.bv--entrando-app *,
-.bv.bv--entrando-app *::before,
-.bv.bv--entrando-app *::after {
-  animation-play-state: paused !important;
-  transition: none !important;
-}
-/* La app aparece por opacidad, en paralelo al fundido del overlay. SIN
-   transform: `#vista` es alto y su centro cae fuera de pantalla, así que
-   cualquier `scale` desplazaba el contenido visible. */
-body.bv-aterriza #vista {
-  /* El mundo nuevo aparece despacio por OPACIDAD, sin moverse (nada de
-     `transform` en `#vista`: es alto y cualquier scale desplaza lo visible)
-     y sin blur. Empieza un pelín después que se va la bienvenida → hay un
-     instante de "cruce" entre los dos mundos. */
-  animation: bv-aterrizaje 1300ms cubic-bezier(0.33, 1, 0.68, 1) 120ms both;
-}
-@keyframes bv-aterrizaje {
-  0%   { opacity: 0.08; }
-  100% { opacity: 1; }
-}
-
-/* Golpe corto cuando la instrumental rompe (no cierra: sigue el acto 2) */
-/* El "drop" al pasar al acto 2: SOLO un destello de opacidad. Se quitó el
-   `transform: scale()` sobre `.bv` — escalar todo el overlay a pantalla
-   completa re-rasterizaba el árbol entero y provocaba un "corte" negro. */
-.bv.bv--pulso::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  background: radial-gradient(circle at 50% 46%, #fff 0%, rgba(255,255,255,0.7) 45%, rgba(255,255,255,0) 78%);
-  pointer-events: none;
-  animation: bv-flash 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-@keyframes bv-flash {
-  0%  { opacity: 0; }
-  22% { opacity: 0.34; }
-  100% { opacity: 0; }
-}
-
-/* --- Sector "fases": lista con checks que se dibujan --- */
-.bv-fases {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  width: min(320px, 84vw);
-}
-.bv-fases li {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  font-size: 19px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
-}
-.bv-fase__c {
-  flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.bv-fase__c svg { width: 18px; height: 18px; }
-
-/* La fila aparece con el círculo VACÍO; el tick cae dentro con rebote y
-   el círculo da un "ping". Cada fila, bien separada, para que se vea. */
-.bv-fase__c svg { opacity: 0; }
-.bv-slide.is-activo .bv-fases li {
-  animation: bv-fila-in 460ms cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
-}
-.bv-slide.is-activo .bv-fases li:nth-child(1) { animation-delay: 250ms; }
-.bv-slide.is-activo .bv-fases li:nth-child(2) { animation-delay: 600ms; }
-.bv-slide.is-activo .bv-fases li:nth-child(3) { animation-delay: 950ms; }
-.bv-slide.is-activo .bv-fases li:nth-child(4) { animation-delay: 1300ms; }
-.bv-slide.is-activo .bv-fases li:nth-child(5) { animation-delay: 1650ms; }
-.bv-slide.is-activo .bv-fases li .bv-fase__c svg { animation: bv-tick-pop 480ms cubic-bezier(0.34, 1.7, 0.5, 1) both; }
-.bv-slide.is-activo .bv-fases li .bv-fase__c { animation: bv-tick-ping 480ms var(--curva) both; }
-.bv-slide.is-activo .bv-fases li:nth-child(1) .bv-fase__c,
-.bv-slide.is-activo .bv-fases li:nth-child(1) .bv-fase__c svg { animation-delay: 480ms; }
-.bv-slide.is-activo .bv-fases li:nth-child(2) .bv-fase__c,
-.bv-slide.is-activo .bv-fases li:nth-child(2) .bv-fase__c svg { animation-delay: 830ms; }
-.bv-slide.is-activo .bv-fases li:nth-child(3) .bv-fase__c,
-.bv-slide.is-activo .bv-fases li:nth-child(3) .bv-fase__c svg { animation-delay: 1180ms; }
-.bv-slide.is-activo .bv-fases li:nth-child(4) .bv-fase__c,
-.bv-slide.is-activo .bv-fases li:nth-child(4) .bv-fase__c svg { animation-delay: 1530ms; }
-.bv-slide.is-activo .bv-fases li:nth-child(5) .bv-fase__c,
-.bv-slide.is-activo .bv-fases li:nth-child(5) .bv-fase__c svg { animation-delay: 1880ms; }
-@keyframes bv-fila-in {
-  from { opacity: 0; transform: translateY(15px); }
-  to   { opacity: 1; transform: none; }
-}
-@keyframes bv-tick-pop {
-  0%   { opacity: 0; transform: scale(0.2) rotate(-30deg); }
-  60%  { opacity: 1; transform: scale(1.25) rotate(6deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0); }
-}
-@keyframes bv-tick-ping {
-  0%, 100% { background: rgba(255, 255, 255, 0.16); transform: scale(1); }
-  45% { background: rgba(150, 210, 255, 0.55); transform: scale(1.18); }
-}
-
-/* --- Glifos flotantes (portada, curro) --- */
-.bv-flota {
-  position: absolute;
-  bottom: -10%;
-  color: rgba(255, 255, 255, 0.5);
-  animation: bv-flota var(--dur, 10s) linear var(--d, 0s) infinite;
-  will-change: transform, opacity;
-}
-@keyframes bv-flota {
-  0%   { opacity: 0; transform: translateY(0) rotate(0deg); }
-  12%  { opacity: 1; }
-  85%  { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-92vh) rotate(22deg); }
-}
-
-/* --- Logo oficial de la app, como icono cuadrado redondeado --- */
-.bv-logo-wrap { display: inline-flex; margin-bottom: 26px; }
-.bv-logo-chip {
-  display: inline-flex;
-  width: clamp(104px, 29vw, 126px);
-  height: clamp(104px, 29vw, 126px);
-  border-radius: 24%;
-  overflow: hidden;
-  box-shadow: 0 16px 38px -18px rgba(0, 0, 0, 0.45);
-}
-.bv-logo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.bv-slide.is-activo .bv-logo-chip { animation: bv-pop 560ms var(--curva) 160ms both; }
-@keyframes bv-draw { to { stroke-dashoffset: 0; } }
-
-/* --- Auriculares (portada) --- */
-.bv-cascos { color: #fff; }
-@keyframes bv-pop {
-  0% { opacity: 0; transform: scale(0.5); }
-  70% { transform: scale(1.12); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-/* --- Ilustraciones de los sectores de historia --- */
-.bv-arte { width: clamp(128px, 42vw, 176px); height: auto; color: #fff; }
-.bv-arte--libreta { transform: rotate(-3deg); }
-.bv-arte--libreta .bv-arte__l,
-.bv-arte--libreta .bv-arte__n {
-  stroke-dasharray: 70;
-  stroke-dashoffset: 70;
-}
-.bv-slide.is-activo .bv-arte--libreta rect { animation: bv-draw 620ms var(--curva) 120ms both; stroke-dasharray: 360; stroke-dashoffset: 360; }
-.bv-slide.is-activo .bv-arte--libreta .bv-arte__l { animation: bv-draw 380ms var(--curva) both; }
-.bv-slide.is-activo .bv-arte--libreta .bv-arte__l:nth-of-type(2) { animation-delay: 520ms; }
-.bv-slide.is-activo .bv-arte--libreta .bv-arte__l:nth-of-type(3) { animation-delay: 660ms; }
-.bv-slide.is-activo .bv-arte--libreta .bv-arte__l:nth-of-type(4) { animation-delay: 800ms; }
-.bv-slide.is-activo .bv-arte--libreta .bv-arte__n { animation: bv-draw 400ms var(--curva) 940ms both; }
-.bv-slide.is-activo .bv-arte--libreta circle { animation: bv-pop 420ms var(--curva) 1040ms both; }
-
-.bv-arte--corazon .bv-arte__h { stroke-dasharray: 168; stroke-dashoffset: 168; }
-.bv-slide.is-activo .bv-arte--corazon { animation: bv-late 2.6s var(--curva) 1.4s infinite; }
-.bv-slide.is-activo .bv-arte--corazon .bv-arte__h { animation: bv-draw 900ms var(--curva) 160ms forwards; }
-
-@keyframes bv-late {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.08); }
-}
-
-/* ======  ACTO 2: las animaciones no paran nunca  ====== */
-
-/* --- Fichas que entran UNA A UNA, alternando lados, en flujo continuo
-   (Sesiones + Modo estudio). Cada ficha entra de su lado, se queda un
-   rato y se va; el desfase (`--n`, negativo) reparte las fichas por el
-   ciclo para que siempre haya varias dentro. --- */
-@keyframes bv-cae-lista {
-  0%        { opacity: 0; transform: translateX(var(--from, 130px)); }
-  9%        { opacity: 1; }
-  15%, 70%  { opacity: 1; transform: translateX(0); }
-  84%, 100% { opacity: 0; transform: translateX(calc(var(--from, 130px) * -0.3)); }
-}
-.bv-cancion, .bv-chip {
-  animation: bv-cae-lista 8s cubic-bezier(0.33, 1, 0.5, 1) infinite;
-  will-change: transform, opacity;
-}
-
-/* --- Sesiones: 4 canciones cayendo dentro de la sesión --- */
-.bv-agrupa {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  width: min(290px, 78vw);
-  padding: 22px 14px 14px;
-}
-.bv-agrupa__caja {
-  position: absolute;
-  inset: 0;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  border-radius: 16px;
-}
-.bv-agrupa__caja b {
-  position: absolute;
-  top: -11px;
-  left: 14px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: #17408A;
-  font-size: 10.5px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.92);
-}
-.bv-cancion {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 11px 13px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.16);
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #fff;
-  opacity: 0;
-  animation-delay: calc(var(--n, 0) * -2s);
-}
-.bv-cancion i { font-style: normal; opacity: 0.65; }
-
-/* Que nada se recorte al entrar (fichas, checks que rebotan, medallas…) */
-.bv-s--sesiones .bv-decor,
-.bv-s--estudio .bv-decor,
-.bv-s--fases .bv-decor,
-.bv-s--logros .bv-decor,
-.bv-s--conci .bv-decor,
-.bv-s--programa .bv-decor,
-.bv-s--compartir .bv-decor,
-.bv-s--estados .bv-decor,
-.bv-s--notis .bv-decor { overflow: visible; }
-.bv-fases { padding-bottom: 6px; }
-
-/* --- Modo estudio: las 3 vistas entran una a una + el piano toca --- */
-.bv-decor--estudio { flex-direction: column; gap: 20px; }
-.bv-chips { display: flex; flex-direction: column; gap: 10px; width: min(300px, 80vw); }
-.bv-chip {
-  padding: 11px 15px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
-  opacity: 0;
-  animation-duration: 9s;
-  animation-delay: calc(var(--n, 0) * 0.5s - 0.5s);
-}
-.bv-chip--a { align-self: flex-start; }
-.bv-chip--b { align-self: center; font-style: italic; background: rgba(255,255,255,0.1); }
-.bv-chip--c { align-self: flex-end; }
-.bv-piano {
-  display: flex;
-  gap: 3px;
-  height: 56px;
-  padding: 6px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.25);
-}
-.bv-piano i {
-  width: 15px;
-  border-radius: 0 0 3px 3px;
-  background: rgba(255, 255, 255, 0.9);
-  animation: bv-tecla 3.5s linear infinite;
-  animation-delay: calc(var(--n, 0) * 0.5s);
-}
-.bv-piano i.k {
-  background: rgba(20, 10, 40, 0.85);
-  height: 62%;
-  margin: 0 -8px;
-  z-index: 1;
-  width: 11px;
-  animation: none;
-}
-@keyframes bv-tecla {
-  0%, 3%   { background: #F3B33F; transform: translateY(1.5px); }
-  10%, 100% { background: rgba(255, 255, 255, 0.9); transform: none; }
-}
-
-/* --- Modo estudio: pastillas de velocidad que se encienden en bucle --- */
-.bv-vel { display: flex; gap: 8px; }
-.bv-vel span {
-  padding: 8px 14px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.12);
-  animation: bv-vel-on 4.5s var(--curva) infinite;
-  animation-delay: calc(var(--n, 0) * 1.5s);
-}
-@keyframes bv-vel-on {
-  0%, 22%, 100% { background: rgba(255, 255, 255, 0.12); color: #fff; box-shadow: none; transform: none; }
-  8%, 14% { background: rgba(255, 255, 255, 0.92); color: #2E1466; box-shadow: 0 0 18px rgba(255, 255, 255, 0.5); transform: translateY(-2px); }
-}
-
-/* --- IA (Gemini): un haz de luz lee el euskera, la estrella suelta una
-   onda y las letras SALEN de la estrella y vuelan a su sitio para escribir
-   PRIMERO cómo se pronuncia y DESPUÉS la traducción. El euskera se queda
-   arriba de referencia. Ciclo de 11 s. Solo transform/opacity/blur breve. */
-.bv-decor--ia { flex-direction: column; gap: 16px; overflow: visible; }
-.bv-ia {
-  display: flex; flex-direction: column; align-items: center; gap: 14px;
-  overflow: visible;
-}
-
-/* Origen: el euskera, con un haz de luz que lo recorre cada 5,5 s */
-.bv-ia__fuente {
-  position: relative; margin: 0;
-  max-width: 90vw;
-  font-size: 14px; font-weight: 600; letter-spacing: 0.01em;
-  color: rgba(255, 255, 255, 0.42);
-  overflow: hidden;
-}
-.bv-ia__scan {
-  position: absolute; top: 0; bottom: 0; left: -55%;
-  width: 45%;
-  background: linear-gradient(90deg, transparent, rgba(188, 198, 255, 0.6), transparent);
-  animation: bv-ia-scan 5.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-@keyframes bv-ia-scan {
-  0%, 100%  { transform: translateX(0); opacity: 0; }
-  4%        { opacity: 1; }
-  17%       { transform: translateX(340%); opacity: 1; }
-  22%, 100% { transform: translateX(340%); opacity: 0; }
-}
-
-/* La estrella: núcleo que centellea + dos ondas, una por cada salida */
-.bv-ia__estrella {
-  position: relative;
-  width: 50px; height: 50px;
-  display: grid; place-items: center;
-}
-.bv-ia__estrella svg {
-  display: block; width: 100%; height: 100%;
-  filter: drop-shadow(0 0 12px rgba(155, 170, 255, 0.8));
-  animation: bv-gem-nucleo 5.5s var(--curva) infinite;
-}
-@keyframes bv-gem-nucleo {
-  0%, 100%  { transform: rotate(0) scale(1); filter: drop-shadow(0 0 10px rgba(155,170,255,0.55)); }
-  10%       { transform: rotate(32deg) scale(1.3); filter: drop-shadow(0 0 20px rgba(184,194,255,1)); }
-  20%, 68%  { transform: rotate(45deg) scale(1.08); filter: drop-shadow(0 0 13px rgba(160,175,255,0.8)); }
-}
-.bv-ia__pulso {
-  position: absolute; inset: 4px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(175, 187, 255, 0.7);
-  opacity: 0;
-  animation: bv-ia-pulso 5.5s var(--curva) infinite;
-}
-.bv-ia__pulso--2 { animation-delay: 0.4s; }
-@keyframes bv-ia-pulso {
-  0%, 5%  { transform: scale(0.4); opacity: 0; }
-  10%     { opacity: 0.85; }
-  36%     { transform: scale(3); opacity: 0; }
-  100%    { transform: scale(3); opacity: 0; }
-}
-
-/* Salida: las dos líneas en el mismo hueco, alternándose en el ciclo */
-.bv-ia__salida {
-  position: relative;
-  width: min(340px, 92vw); height: 30px;
-}
-.bv-ia__linea {
-  position: absolute; inset: 0; margin: 0;
-  display: flex; justify-content: center; flex-wrap: nowrap;
-  gap: 0.32em;
-  white-space: nowrap;
-}
-.bv-ia__linea--fon {
-  font-size: 15.5px; font-weight: 600; font-style: italic;
-  letter-spacing: 0.02em;
-  color: #EAECFF;
-}
-.bv-ia__linea--es {
-  font-size: 18.5px; font-weight: 700;
-  color: #fff;
-}
-.bv-ia__linea i {
-  --ox: calc((0.5 - var(--k, 0) / var(--n, 1)) * 190px);
-  display: inline-block; font-style: inherit;
-  opacity: 0;
-  animation-duration: 11s;
-  animation-timing-function: cubic-bezier(0.16, 0.8, 0.3, 1);
-  animation-iteration-count: infinite;
-  animation-delay: calc(var(--k, 0) * 0.05s);
-}
-.bv-ia__linea .bv-ia__sp { width: 0.32em; }
-.bv-ia__linea .bv-ia__dot { opacity: 0.4; margin: 0 0.02em; }
-.bv-ia__linea--fon i { animation-name: bv-ia-mat-fon; }
-.bv-ia__linea--es i  { animation-name: bv-ia-mat-es; }
-@keyframes bv-ia-mat-fon {
-  0%        { opacity: 0; transform: translate(var(--ox), -48px) scale(0.3); filter: blur(4px); }
-  5%        { opacity: 1; }
-  13%, 36%  { opacity: 1; transform: translate(0, 0) scale(1); filter: blur(0); }
-  43%, 100% { opacity: 0; transform: translate(0, -8px) scale(0.9); filter: blur(1.5px); }
-}
-@keyframes bv-ia-mat-es {
-  0%, 49%   { opacity: 0; transform: translate(var(--ox), -48px) scale(0.3); filter: blur(4px); }
-  55%       { opacity: 1; }
-  63%, 90%  { opacity: 1; transform: translate(0, 0) scale(1); filter: blur(0); }
-  96%, 100% { opacity: 0; transform: translate(0, -8px) scale(0.9); filter: blur(1.5px); }
-}
-
-.bv-ia__etqs { display: flex; align-items: center; gap: 9px; }
-.bv-ia__etq {
-  padding: 5px 12px; border-radius: 999px;
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: rgba(255, 255, 255, 0.55);
-  white-space: nowrap;
-}
-.bv-ia__etq--src {
-  color: #fff; border-color: rgba(255, 255, 255, 0.38); background: rgba(255, 255, 255, 0.1);
-  animation: bv-ia-src-lee 5.5s var(--curva) infinite;
-}
-@keyframes bv-ia-src-lee {
-  0%, 26%, 100% { box-shadow: 0 0 0 rgba(184, 194, 255, 0); }
-  12%           { box-shadow: 0 0 13px rgba(184, 194, 255, 0.55); }
-}
-.bv-ia__etq-slot { position: relative; display: inline-block; width: 116px; height: 24px; }
-.bv-ia__etq-slot .bv-ia__etq {
-  position: absolute; left: 0; top: 0; width: 100%;
-  text-align: center;
-  color: #fff;
-  border-color: rgba(160, 172, 255, 0.55);
-  background: rgba(150, 162, 255, 0.16);
-}
-.bv-ia__etq--fon {
-  font-style: italic; text-transform: none; letter-spacing: 0.02em;
-  animation: bv-ia-lab-fon 11s var(--curva) infinite;
-}
-.bv-ia__etq--tra { animation: bv-ia-lab-tra 11s var(--curva) infinite; }
-@keyframes bv-ia-lab-fon {
-  0%, 38%   { opacity: 1; }
-  46%, 94%  { opacity: 0; }
-  100%      { opacity: 1; }
-}
-@keyframes bv-ia-lab-tra {
-  0%, 42%   { opacity: 0; }
-  50%, 92%  { opacity: 1; }
-  98%, 100% { opacity: 0; }
-}
-.bv-ia__flecha { color: rgba(255, 255, 255, 0.5); font-size: 15px; }
-
-/* Sector fusionado: karaoke en directo (arriba) + IA que pronuncia y
-   traduce (abajo), unidos por un haz que sube de la onda a la estrella. */
-.bv-iac {
-  --lh: 40px; --beat: 0.462s; --ww: min(320px, 88vw);
-  display: flex; flex-direction: column; align-items: center; gap: 10px;
-  overflow: visible;
-}
-.bv-iac .bv-ll__marco { min-height: var(--lh); }
-.bv-iac .bv-ll__linea { font-size: 16px; }
-.bv-iac .bv-ia__salida { height: 26px; }
-.bv-iac__rayo {
-  width: 2px; height: 20px; border-radius: 2px;
-  background: linear-gradient(180deg, rgba(198, 179, 255, 0), rgba(198, 179, 255, 0.95));
-  animation: bv-iac-rayo 11s var(--curva) infinite;
-}
-@keyframes bv-iac-rayo {
-  0%, 3%    { opacity: 0; transform: scaleY(0.35); }
-  8%        { opacity: 1; transform: scaleY(1); }
-  16%, 53%  { opacity: 0; transform: scaleY(0.5); }
-  58%       { opacity: 1; transform: scaleY(1); }
-  66%, 100% { opacity: 0; transform: scaleY(0.5); }
-}
-.bv-iac__nucleo { width: 40px; height: 40px; }
-.bv-iac__etqs { margin-top: 2px; }
-
-/* Eyebrow con la palabra Gemini en degradado y un brillo que barre el texto */
-.bv-eyebrow--gem {
-  display: inline-flex; align-items: center; gap: 7px;
-  text-transform: none;
-  letter-spacing: 0.01em;
-  font-size: 13.5px;
-}
-.bv-gem-ic { width: 15px; height: 15px; flex: 0 0 auto; }
-.bv-gem-ic svg { display: block; width: 100%; height: 100%; }
-.bv-gem-tx {
-  background: linear-gradient(100deg, #6BA9FF 0%, #A98BFF 30%, #F0A6C8 48%, #A98BFF 68%, #6BA9FF 100%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text; background-clip: text;
-  color: transparent;
-  animation: bv-gem-sheen 4.5s linear infinite;
-}
-@keyframes bv-gem-sheen { to { background-position: -200% 0; } }
-
-/* --- Letra en directo: KARAOKE ESPACIAL. La pila de versos flota en 3D
-   (el que suena viene al frente y nítido, el resto retrocede y se apaga),
-   un haz de la IA "lee" el verso y sus palabras se encienden una a una al
-   pasar. Debajo, la onda real de la canción con su cabezal de luz. Un aura
-   late al ritmo (--beat). Ciclo de 15 s. transform / opacity (+ blur breve
-   solo en las transiciones de cada verso). --- */
-.bv-decor--letralive { flex-direction: column; overflow: visible; }
-.bv-ll {
-  --lh: 44px;
-  --beat: 0.462s;
-  --ww: min(340px, 90vw);
-  position: relative;
-  width: var(--ww);
-  display: flex; flex-direction: column; align-items: center; gap: 17px;
-  overflow: visible;
-}
-
-/* Chip "sonando" */
-.bv-ll__chip {
-  position: relative; z-index: 3;
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 5px 13px 5px 9px; border-radius: 999px;
-  background: rgba(255, 255, 255, 0.11);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
-  text-transform: uppercase; color: rgba(255, 255, 255, 0.74);
-}
-.bv-ll__gem { width: 14px; height: 14px; display: block; flex: 0 0 auto; }
-.bv-ll__gem svg {
-  width: 100%; height: 100%; display: block;
-  animation: bv-gem-nucleo 3s var(--curva) infinite;
-}
-
-/* Escenario de la letra: UN verso centrado y quieto; las palabras se
-   encienden solas. Sin 3D, sin máscara, sin apilado. */
-.bv-ll__marco {
-  position: relative; z-index: 2;
-  width: 100%; min-height: var(--lh);
-  display: flex; align-items: center; justify-content: center;
-  padding: 4px 0;
-}
-.bv-ll__pila { display: contents; }
-.bv-ll__linea {
-  margin: 0;
-  display: flex; align-items: baseline; justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.1em 0.4em;
-  font-size: 17.5px; font-weight: 700;
-  text-align: center;
-}
-
-/* Cada palabra se enciende al pasar el "cabezal". ANTES animaba
-   `background-position` sobre texto con `background-clip:text` → el WebView
-   re-rasterizaba las 13 palabras EN CADA FRAME (era el mayor coste de este
-   sector). Ahora es solo `opacity` + `transform` (compositor): apagada =
-   translúcida, encendida = blanca con un micro-pop. */
-.bv-ll__w {
-  display: inline-block; font-weight: inherit; font-style: normal;
-  color: #fff;
-  opacity: 0.3;
-  animation: bv-ll-word 6s ease-in-out infinite both;
-  animation-delay: calc(var(--w) * 0.9s);
-}
-@keyframes bv-ll-word {
-  0%      { opacity: 0.3; transform: scale(0.96); }
-  8%      { opacity: 1;   transform: scale(1.08); }
-  14%     { opacity: 1;   transform: scale(1); }
-  60%     { opacity: 1;   transform: scale(1); }
-  75%,100%{ opacity: 0.3; transform: scale(1); }
-}
-/* Onda de la canción: 22 barras estáticas, un relleno que barre (clip-path)
-   y un cabezal que corre (translateX). Nada de animar `width`/`left` (era
-   layout en cada frame) ni barras animándose una a una. */
-.bv-ll__wave {
-  position: relative; z-index: 2;
-  width: var(--ww); height: 46px;
-}
-.bv-ll__bars {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; gap: 3px;
-}
-.bv-ll__bars i {
-  flex: 1 1 0; border-radius: 2px;
-  height: calc(var(--h) * 1px); min-height: 3px;
-}
-.bv-ll__bars--bg i { background: rgba(255, 255, 255, 0.16); }
-.bv-ll__bars--on i { background: linear-gradient(180deg, #C6B3FF, #6BA9FF); }
-.bv-ll__fill {
-  position: absolute; inset: 0; overflow: hidden;
-  animation: bv-ll-fill 12s linear infinite;
-}
-@keyframes bv-ll-fill {
-  from { clip-path: inset(0 100% 0 0); }
-  to   { clip-path: inset(0 0 0 0); }
-}
-.bv-ll__playhead {
-  position: absolute; left: 0; top: -6px; bottom: -6px;
-  width: 2px; background: #fff;
-  box-shadow: 0 0 10px 1px rgba(169, 139, 255, 0.95);
-  animation: bv-ll-head 12s linear infinite;
-}
-@keyframes bv-ll-head {
-  from { transform: translateX(0); }
-  to   { transform: translateX(var(--ww)); }
-}
-
-/* --- De memoria: una hoja de letra con huecos; la palabra correcta CAE
-   en su sitio (sube, se enfoca, chispa, la línea se enciende) y al final
-   sube la nota "9 / 10". Ciclo de 11 s. Solo transform/opacity/blur. --- */
-.bv-decor--memo { flex-direction: column; gap: 18px; overflow: visible; }
-.bv-memo {
-  display: flex; flex-direction: column; align-items: center; gap: 14px;
-  overflow: visible;
-}
-.bv-memo__hoja {
-  display: flex; flex-direction: column; gap: 11px;
-  padding: 16px 20px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.22);
-  max-width: 92vw;
-}
-.bv-memo__verso {
-  display: flex; flex-wrap: wrap; align-items: flex-end;
-  justify-content: center; gap: 2px 6px;
-  font-size: 15.5px; font-weight: 600; letter-spacing: 0.01em;
-  color: rgba(255, 255, 255, 0.86);
-  line-height: 1.5;
-}
-.bv-memo__hueco {
-  position: relative;
-  display: inline-flex; align-items: flex-end; justify-content: center;
-  min-width: 3.4em; padding: 0 3px;
-}
-/* la rayita del hueco */
-.bv-memo__hueco::after {
-  content: ""; position: absolute; left: 1px; right: 1px; bottom: -1px;
-  height: 2px; border-radius: 2px;
-  background: rgba(255, 255, 255, 0.28);
-  animation: bv-memo-linea 11s var(--curva) infinite;
-  animation-delay: calc(var(--g, 0) * 1.7s);
-}
-/* la chispa al acertar */
-.bv-memo__hueco::before {
-  content: ""; position: absolute; left: 50%; top: 45%;
-  width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%;
-  background: radial-gradient(circle, #fff 0%, rgba(255, 255, 255, 0) 70%);
-  opacity: 0;
-  animation: bv-memo-chispa 11s var(--curva) infinite;
-  animation-delay: calc(var(--g, 0) * 1.7s);
-}
-.bv-memo__hueco i {
-  font-style: normal; font-weight: 700; color: #fff;
-  text-shadow: 0 0 13px rgba(130, 190, 255, 0.75);
-  opacity: 0;
-  animation: bv-memo-fill 11s cubic-bezier(0.16, 0.85, 0.28, 1) infinite;
-  animation-delay: calc(var(--g, 0) * 1.7s);
-}
-@keyframes bv-memo-fill {
-  0%, 4%    { opacity: 0; transform: translateY(12px) scale(0.6); filter: blur(3px); }
-  11%       { opacity: 1; }
-  16%, 82%  { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
-  92%, 100% { opacity: 0; transform: translateY(5px) scale(0.9); filter: blur(2px); }
-}
-@keyframes bv-memo-linea {
-  0%, 4%    { background: rgba(255, 255, 255, 0.28); box-shadow: none; }
-  10%       { background: #fff; box-shadow: 0 0 13px rgba(150, 200, 255, 0.85); }
-  16%       { background: #fff; box-shadow: 0 0 6px rgba(150, 200, 255, 0.4); }
-  20%, 82%  { background: rgba(160, 205, 255, 0.8); box-shadow: none; }
-  92%, 100% { background: rgba(255, 255, 255, 0.28); box-shadow: none; }
-}
-@keyframes bv-memo-chispa {
-  0%, 6%    { opacity: 0; transform: scale(0.3); }
-  10%       { opacity: 1; transform: scale(1.5); }
-  16%, 100% { opacity: 0; transform: scale(2.6); }
-}
-.bv-memo__nota {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 9px 17px; border-radius: 999px;
-  background: rgba(255, 255, 255, 0.13);
-  border: 1px solid rgba(255, 255, 255, 0.26);
-  font-size: 13.5px; font-weight: 700; color: #fff;
-  opacity: 0;
-  animation: bv-memo-nota 11s var(--curva) infinite;
-}
-.bv-memo__nota svg { width: 15px; height: 15px; color: #8FE3B0; flex: 0 0 auto; }
-.bv-memo__nota b { color: #8FE3B0; font-size: 16px; font-weight: 800; }
-@keyframes bv-memo-nota {
-  0%, 62%   { opacity: 0; transform: translateY(9px) scale(0.9); }
-  70%       { opacity: 1; transform: translateY(0) scale(1.07); }
-  76%, 86%  { opacity: 1; transform: translateY(0) scale(1); }
-  93%, 100% { opacity: 0; transform: translateY(5px) scale(0.95); }
-}
-
-/* --- Práctica: el calendario se rellena en oleada y vuelve a empezar --- */
-.bv-cal {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 9px;
-  width: min(280px, 74vw);
-}
-.bv-celda {
-  aspect-ratio: 1;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.14);
-  animation: bv-relleno 4.5s ease-in-out infinite;
-  animation-delay: calc(var(--i) * 0.13s);
-}
-.bv-celda.is-hoy {
-  background: linear-gradient(120deg, #FFE9B0, #F3B33F);
-  animation: bv-late 1.8s var(--curva) infinite;
-}
-@keyframes bv-relleno {
-  0%, 8%    { background: rgba(255, 255, 255, 0.14); }
-  26%, 72%  { background: #fff; }
-  92%, 100% { background: rgba(255, 255, 255, 0.14); }
-}
-
-/* --- Grabaciones: micro con ondas (sin recortes) --- */
-.bv-decor.bv-decor--grab {
-  overflow: visible;
-  min-height: 210px;
-}
-.bv-mic {
-  position: relative;
-  width: 96px;
-  height: 96px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.bv-mic__btn {
-  position: relative;
-  z-index: 1;
-  width: 88px;
-  height: 88px;
-  border-radius: 999px;
-  background: #fff;
-  color: #A11133;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  animation: bv-late 2s var(--curva) infinite;
-}
-.bv-mic__btn svg { width: 38px; height: 38px; }
-.bv-ring {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 88px;
-  height: 88px;
-  margin: -44px 0 0 -44px;
-  border-radius: 999px;
-  border: 2px solid rgba(255, 255, 255, 0.42);
-  animation: bv-ring 2.6s ease-out infinite;
-  animation-delay: calc(var(--i) * 0.86s);
-}
-@keyframes bv-ring {
-  0%   { opacity: 0.55; transform: scale(1); }
-  100% { opacity: 0; transform: scale(2.3); }
-}
-
-/* --- Copia de seguridad: nube que respira + iconos que suben y se funden --- */
-.bv-decor.bv-decor--nube {
-  overflow: visible;
-  min-height: 200px;
-}
-.bv-nube {
-  position: relative;
-  width: 168px;
-  height: 108px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-.bv-nube__svg {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.28));
-  animation: bv-nube-respira 3.6s var(--curva) infinite;
-}
-@keyframes bv-nube-respira {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.035); }
-}
-.bv-nube__check {
-  position: absolute;
-  right: 18px;
-  bottom: 8px;
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  background: var(--estado-aprendida, #4C7A5A);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.5);
-  animation: bv-nube-check-in 520ms cubic-bezier(0.34, 1.6, 0.5, 1) 400ms both,
-             bv-late 2.4s var(--curva) 900ms infinite;
-}
-.bv-nube__check svg { width: 20px; height: 20px; }
-@keyframes bv-nube-check-in {
-  0%   { opacity: 0; transform: scale(0.3) rotate(-20deg); }
-  100% { opacity: 1; transform: scale(1) rotate(0); }
-}
-.bv-nube__subidas {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.bv-nube__item {
-  position: absolute;
-  left: calc(24% + var(--i) * 26%);
-  bottom: -6px;
-  font-size: 20px;
-  opacity: 0;
-  animation: bv-nube-sube 2.8s ease-in infinite;
-  animation-delay: calc(var(--i) * 0.9s);
-}
-@keyframes bv-nube-sube {
-  0%   { opacity: 0; transform: translateY(0) scale(0.8); }
-  15%  { opacity: 1; }
-  70%  { opacity: 0.9; }
-  100% { opacity: 0; transform: translateY(-88px) scale(0.55); }
-}
-
-/* --- Resumen: las barras suben y bajan suave, sin parar --- */
-.bv-barras {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  height: 180px;
-  width: min(300px, 78vw);
-}
-.bv-barras i {
-  flex: 1;
-  border-radius: 6px 6px 3px 3px;
-  background: var(--c, #fff);
-  height: var(--h, 60%);
-  transform-origin: bottom;
-  animation: bv-onda 2.8s ease-in-out infinite alternate;
-  animation-delay: calc(var(--i) * -0.45s);
-}
-.bv-barras i:nth-child(odd) { animation-duration: 3.3s; }
-.bv-barras i:nth-child(3n) { animation-duration: 2.3s; }
-@keyframes bv-onda {
-  from { transform: scaleY(0.45); }
-  to   { transform: scaleY(1); }
-}
-
-/* --- Logros: medallas que caen y brillan --- */
-.bv-medallas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  justify-content: center;
-  max-width: 260px;
-}
-.bv-medalla {
-  width: 62px;
-  height: 62px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26px;
-  background: radial-gradient(circle at 35% 30%, #fff 0%, var(--c, #F3B33F) 45%, color-mix(in srgb, var(--c, #F3B33F) 60%, #000) 100%);
-  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.55), inset 0 -3px 6px rgba(0, 0, 0, 0.25);
-}
-.bv-slide.is-activo .bv-medalla {
-  animation: bv-medalla-in 620ms cubic-bezier(0.34, 1.6, 0.5, 1) both,
-             bv-medalla-brillo 3.2s ease-in-out infinite;
-}
-.bv-slide.is-activo .bv-medalla:nth-child(1) { animation-delay: 250ms, 1.4s; }
-.bv-slide.is-activo .bv-medalla:nth-child(2) { animation-delay: 430ms, 1.9s; }
-.bv-slide.is-activo .bv-medalla:nth-child(3) { animation-delay: 610ms, 2.4s; }
-.bv-slide.is-activo .bv-medalla:nth-child(4) { animation-delay: 790ms, 2.9s; }
-.bv-slide.is-activo .bv-medalla:nth-child(5) { animation-delay: 970ms, 3.4s; }
-@keyframes bv-medalla-in {
-  0%   { opacity: 0; transform: translateY(-26px) scale(0.4) rotate(-18deg); }
-  65%  { opacity: 1; transform: translateY(0) scale(1.12) rotate(4deg); }
-  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
-}
-@keyframes bv-medalla-brillo {
-  0%, 100% { box-shadow: 0 10px 24px -10px rgba(0,0,0,0.55), inset 0 -3px 6px rgba(0,0,0,0.25); }
-  50% { box-shadow: 0 10px 26px -8px rgba(255,255,255,0.4), inset 0 -3px 6px rgba(0,0,0,0.2); }
-}
-
-/* --- Conciertos: clavas una chincheta en el día y luego se REVELA una
-   foto de carrete del recuerdo. Bucle de 7 s. --- */
-.bv-conci {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 22px;
-}
-.bv-cal--mini { width: min(200px, 56vw); gap: 7px; }
-.bv-cal--mini .bv-celda { animation: none; background: rgba(255, 255, 255, 0.14); }
-.bv-celda.is-concierto {
-  position: relative;
-  z-index: 1;
-  background: linear-gradient(120deg, #FF8A5B, #E4552E);
-  animation: bv-conci-poke 7s var(--curva) infinite;
-}
-@keyframes bv-conci-poke {
-  0%, 15% { transform: scale(1); filter: brightness(1); }
-  19%     { transform: scale(0.9); filter: brightness(1.55); }
-  25%     { transform: scale(1.07); filter: brightness(1.1); }
-  31%     { transform: scale(1); filter: brightness(1); }
-  100%    { transform: scale(1); filter: brightness(1); }
-}
-
-/* La chincheta cae de arriba y se clava con un rebotito */
-.bv-chincheta {
-  position: absolute;
-  left: 50%;
-  bottom: 40%;
-  width: 30px;
-  transform: translateX(-50%);
-  z-index: 4;
-  opacity: 0;
-}
-.bv-chincheta__svg {
-  width: 100%;
-  height: auto;
-  display: block;
-  filter: drop-shadow(0 6px 7px rgba(0, 0, 0, 0.4));
-}
-.bv-chincheta__sombra { fill: rgba(0, 0, 0, 0.28); }
-.bv-slide.is-activo .bv-chincheta { animation: bv-chincheta-clava 7s var(--curva) infinite; }
-@keyframes bv-chincheta-clava {
-  0%, 8%   { opacity: 0; transform: translateX(-50%) translateY(-62px) rotate(-14deg) scale(0.9); }
-  17%      { opacity: 1; transform: translateX(-50%) translateY(6px)  rotate(5deg)  scale(1.05); }
-  21%      { opacity: 1; transform: translateX(-50%) translateY(0)    rotate(-2deg) scale(1); }
-  25%      { opacity: 1; transform: translateX(-50%) translateY(0)    rotate(1.5deg) scale(1); }
-  31%      { opacity: 1; transform: translateX(-50%) translateY(0)    rotate(0)     scale(1); }
-  86%      { opacity: 1; transform: translateX(-50%) translateY(0)    rotate(0)     scale(1); }
-  94%, 100% { opacity: 0; transform: translateX(-50%) translateY(-10px) rotate(0) scale(0.92); }
-}
-
-/* La foto de carrete: cae, se balancea y se "revela" (deja de estar
-   oscura y borrosa) como una instantánea que se acaba de sacar */
-.bv-polaroid {
-  width: 172px;
-  padding: 10px 10px 32px;
-  border-radius: 3px;
-  background: #FDFBF5;
-  box-shadow: 0 22px 42px -16px rgba(0, 0, 0, 0.62);
-  opacity: 0;
-  transform-origin: 50% -10%;
-}
-.bv-slide.is-activo .bv-polaroid { animation: bv-polaroid-in 7s cubic-bezier(0.28, 1, 0.4, 1) infinite; }
-@keyframes bv-polaroid-in {
-  0%, 22%   { opacity: 0; transform: translateY(-14px) rotate(7deg) scale(0.9); }
-  31%       { opacity: 1; transform: translateY(0) rotate(-5deg) scale(1.03); }
-  37%       { opacity: 1; transform: translateY(0) rotate(-3deg) scale(1); }
-  55%       { opacity: 1; transform: translateY(0) rotate(-1.5deg) scale(1); }
-  73%       { opacity: 1; transform: translateY(0) rotate(-4deg) scale(1); }
-  86%       { opacity: 1; transform: translateY(0) rotate(-3deg) scale(1); }
-  93%, 100% { opacity: 0; transform: translateY(12px) rotate(-7deg) scale(0.95); }
-}
-.bv-polaroid__foto {
-  position: relative;
-  overflow: hidden;
-  aspect-ratio: 4 / 3;
-  border-radius: 2px;
-  background: linear-gradient(150deg, #2E5AA8, #6E3AA0);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 30px;
-}
-.bv-polaroid__foto img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.bv-slide.is-activo .bv-polaroid__foto { animation: bv-foto-nitida 7s var(--curva) infinite; }
-@keyframes bv-foto-nitida {
-  0%, 35%   { filter: blur(3px) saturate(0.35) brightness(0.72); }
-  56%       { filter: blur(0) saturate(1.05) brightness(1); }
-  90%       { filter: blur(0) saturate(1) brightness(1); }
-  100%      { filter: blur(3px) saturate(0.35) brightness(0.72); }
-}
-.bv-polaroid__revela {
-  position: absolute;
-  inset: 0;
-  background: #22222A;
-}
-.bv-slide.is-activo .bv-polaroid__revela { animation: bv-revela 7s var(--curva) infinite; }
-@keyframes bv-revela {
-  0%, 35%  { opacity: 1; }
-  55%      { opacity: 0; }
-  90%      { opacity: 0; }
-  100%     { opacity: 1; }
-}
-.bv-polaroid__pie {
-  margin-top: 9px;
-  font-size: 11.5px;
-  font-weight: 600;
-  text-align: center;
-  color: #3A342E;
-  opacity: 0;
-}
-.bv-slide.is-activo .bv-polaroid__pie { animation: bv-pie-fade 7s var(--curva) infinite; }
-@keyframes bv-pie-fade {
-  0%, 46%   { opacity: 0; }
-  58%, 86%  { opacity: 1; }
-  94%, 100% { opacity: 0; }
-}
-
-/* ============================================================
-   Programa de concierto: la hoja del programa. Las canciones entran
-   en orden, una luz baja marcando "esta toca ahora", cada una se
-   queda cantada con su check + chispa, y al final un barrido de
-   brillo recorre la hoja. Bucle de 11 s. Solo transform / opacity
-   (+ color y sombra, que no cuestan layout). --- */
-.bv-pc {
-  position: relative;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  overflow: visible;
-}
-/* La pila: la hoja del pase + otros programas asomando por detrás.
-   `margin-right` centra el bloque dejando hueco a la derecha para
-   que el abanico no se salga de pantalla. */
-.bv-pc__pila {
-  position: relative;
-  width: min(258px, 70vw);
-  margin-right: 50px;
-}
-/* Tarjetas de fondo: otros conciertos, cada uno con su lista de
-   canciones ya marcadas. Ocultas tras la hoja hasta que el pase
-   acaba; entonces asoman en abanico hacia la derecha. Sin `scale`
-   final (emborrona el texto): solo desplazamiento + giro leve. */
-.bv-pc__fantasma {
-  position: absolute;
-  inset: 0;
-  padding: 15px 9px 15px 15px;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #F1E7D2 0%, #E4D8BC 100%);
-  box-shadow: 0 20px 40px -18px rgba(0, 0, 0, 0.55);
-  transform-origin: 50% 55%;
-  opacity: 0;
-  transform: translateX(6px);
-  z-index: calc(2 - var(--k, 1));
-}
-.bv-pc__fantasma:nth-child(1) { --fx: 26px; --fy: 8px;  --fr: 2deg; }
-.bv-pc__fantasma:nth-child(2) { --fx: 54px; --fy: 15px; --fr: 3.4deg; }
-.bv-pc__fantasma-kick {
-  display: block;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: #B0842E;
-}
-.bv-pc__fantasma-tit {
-  display: block;
-  margin-top: 3px;
-  font-size: 13px;
-  font-weight: 800;
-  color: #6B5836;
-}
-.bv-pc__fantasma-lista {
-  margin-top: 13px;
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-}
-.bv-pc__ff {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.bv-pc__ff s {
-  flex: 1;
-  height: 7px;
-  border-radius: 4px;
-  background: rgba(107, 88, 54, 0.20);
-}
-.bv-pc__ff:nth-child(2n) s { flex: 0 0 78%; }
-.bv-pc__ff:nth-child(3n) s { flex: 0 0 64%; }
-/* Tick a mano: trazo de boli verde, sin círculo, y cada uno con su
-   inclinación/tamaño para que no parezcan clonados. */
-.bv-pc__ff em {
-  flex: none;
-  width: 17px;
-  height: 17px;
-  display: block;
-  color: #3B6B4E;
-}
-.bv-pc__ffcheck {
-  width: 100%;
-  height: 100%;
-  display: block;
-  overflow: visible;
-}
-.bv-pc__ff:nth-child(1) em { transform: rotate(-7deg) scale(1.02); }
-.bv-pc__ff:nth-child(2) em { transform: rotate(5deg) scale(1.1); }
-.bv-pc__ff:nth-child(3) em { transform: rotate(-3deg) scale(0.92); }
-.bv-pc__ff:nth-child(4) em { transform: rotate(8deg) scale(1.04); }
-.bv-pc__ff:nth-child(5) em { transform: rotate(-5deg) scale(0.97); }
-.bv-pc__fantasma:nth-child(2) .bv-pc__ff:nth-child(1) em { transform: rotate(6deg) scale(0.95); }
-.bv-pc__fantasma:nth-child(2) .bv-pc__ff:nth-child(3) em { transform: rotate(-8deg) scale(1.06); }
-.bv-pc__fantasma:nth-child(2) .bv-pc__ff:nth-child(5) em { transform: rotate(3deg) scale(0.9); }
-.bv-slide.is-activo .bv-pc__fantasma {
-  animation: bv-pc-fantasma 900ms cubic-bezier(0.32, 1.25, 0.5, 1) forwards;
-}
-.bv-slide.is-activo .bv-pc__fantasma:nth-child(1) { animation-delay: 9.9s; }
-.bv-slide.is-activo .bv-pc__fantasma:nth-child(2) { animation-delay: 9.72s; }
-@keyframes bv-pc-fantasma {
-  0%   { opacity: 0; transform: translate(0, 10px) rotate(0); }
-  50%  { opacity: 1; }
-  100% { opacity: 1; transform: translate(var(--fx), var(--fy)) rotate(var(--fr)); }
-}
-
-.bv-pc__hoja {
-  position: relative;
-  z-index: 3;
-  width: 100%;
-  padding: 16px 16px 14px;
-  border-radius: 12px;
-  background:
-    linear-gradient(180deg, #FDF8EE 0%, #F6EEDD 100%);
-  color: #2A2622;
-  box-shadow:
-    0 26px 50px -18px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  transform-origin: 50% 100%;
-  opacity: 0;
-  overflow: hidden;
-}
-/* Toda la secuencia se reproduce UNA vez y se queda (el sector solo
-   está en pantalla ~12 s). Nada de `infinite`: al repetirse en bucle
-   el escalonado se perdía y salían todos a la vez.
-   2ª animación: al acabar el pase, la hoja se echa a un lado y deja
-   ver las tarjetas de fondo. `forwards` (no `both`) para no pisar la
-   entrada. */
-.bv-slide.is-activo .bv-pc__hoja {
-  animation:
-    bv-pc-hoja 900ms cubic-bezier(0.34, 1.3, 0.5, 1) both,
-    bv-pc-hoja-aparta 850ms cubic-bezier(0.34, 1.12, 0.5, 1) 9.75s forwards;
-}
-/* Entrada: solo translateY (nada de rotateX/scale, que emborronan el
-   texto bajo `perspective`). Termina exactamente en reposo, nítida. */
-@keyframes bv-pc-hoja {
-  0%   { opacity: 0; transform: translateY(-24px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-/* Se echa a un lado. Sin `scale` final: el giro es suficiente y el
-   texto se queda nítido. */
-@keyframes bv-pc-hoja-aparta {
-  0%   { transform: translate(0, 0) rotate(0); }
-  100% { transform: translate(-8px, -3px) rotate(-3.5deg); }
-}
-/* Barrido de brillo cuando el pase ya está entero */
-.bv-pc__hoja::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -40%;
-  width: 40%;
-  height: 100%;
-  background: linear-gradient(100deg,
-    transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%);
-  transform: translateX(0) skewX(-12deg);
-  opacity: 0;
-  pointer-events: none;
-}
-.bv-slide.is-activo .bv-pc__hoja::after {
-  animation: bv-pc-sheen 1300ms ease-in-out 8.7s both;
-}
-@keyframes bv-pc-sheen {
-  0%   { opacity: 0; transform: translateX(0) skewX(-12deg); }
-  20%  { opacity: 1; }
-  100% { opacity: 0; transform: translateX(380%) skewX(-12deg); }
-}
-
-.bv-pc__cab { margin-bottom: 12px; }
-.bv-pc__kicker {
-  display: block;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: #B0621C;
-}
-.bv-pc__cab b {
-  display: block;
-  margin-top: 3px;
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  color: #241F1A;
-}
-
-.bv-pc__cuerpo { position: relative; }
-/* El hilo vertical que une los números; ::before es la parte "recorrida".
-   left:21px = centro exacto del círculo del número
-   (fila: padding-left 10px + radio 11px). */
-.bv-pc__hilo {
-  position: absolute;
-  left: 21px;
-  margin-left: -1px;
-  top: 15px;
-  bottom: 17px;
-  width: 2px;
-  background: rgba(42, 38, 34, 0.18);
-  border-radius: 2px;
-  z-index: 0;
-}
-.bv-pc__hilo::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #1512D6, #4C7A5A);
-  transform: scaleY(0);
-  transform-origin: 50% 0%;
-}
-.bv-slide.is-activo .bv-pc__hilo::before {
-  animation: bv-pc-hilo 7.4s cubic-bezier(0.4, 0, 0.2, 1) 1.2s both;
-}
-@keyframes bv-pc-hilo {
-  0%   { transform: scaleY(0); }
-  100% { transform: scaleY(1); }
-}
-/* La luz que baja por el hilo, centrada en el mismo eje (21px) */
-.bv-pc__luz {
-  position: absolute;
-  left: 21px;
-  margin-left: -3px;
-  top: 12px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow:
-    0 0 0 4px rgba(21, 18, 214, 0.28),
-    0 0 14px 4px rgba(21, 18, 214, 0.65);
-  opacity: 0;
-  transform: translateY(0);
-  z-index: 1;
-}
-.bv-slide.is-activo .bv-pc__luz {
-  animation: bv-pc-luz 7.4s cubic-bezier(0.4, 0, 0.2, 1) 1.2s both;
-}
-@keyframes bv-pc-luz {
-  0%   { opacity: 0; transform: translateY(0); }
-  6%   { opacity: 1; transform: translateY(4px); }
-  90%  { opacity: 1; transform: translateY(150px); }
-  100% { opacity: 0; transform: translateY(156px); }
-}
-
-.bv-pc__lista {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.bv-pc__fila {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-height: 34px;
-  padding: 4px 10px;
-  border-radius: 9px;
-  border: 1px solid transparent;
-  opacity: 0;
-  transform: translateX(calc(var(--lado, -1) * 26px));
-}
-.bv-slide.is-activo .bv-pc__fila {
-  animation:
-    bv-pc-fila-in 600ms cubic-bezier(0.22, 1, 0.36, 1) both,
-    bv-pc-fila-estado 2800ms cubic-bezier(0.4, 0, 0.2, 1) both;
-  animation-delay:
-    calc(0.5s + var(--n) * 0.16s),
-    calc(1.15s + var(--n) * 1.3s);
-}
-@keyframes bv-pc-fila-in {
-  0%   { opacity: 0; transform: translateX(calc(var(--lado, -1) * 26px)); }
-  100% { opacity: 1; transform: translateX(0); }
-}
-/* pendiente -> AHORA (cobalto) -> cantada (verde, atenuada) */
-@keyframes bv-pc-fila-estado {
-  0%, 14% {
-    background: transparent;
-    border-color: transparent;
-    box-shadow: none;
-  }
-  24%, 48% {
-    background: rgba(21, 18, 214, 0.10);
-    border-color: rgba(21, 18, 214, 0.30);
-    box-shadow: 0 10px 22px -10px rgba(21, 18, 214, 0.55);
-  }
-  100% {
-    background: rgba(76, 122, 90, 0.10);
-    border-color: rgba(76, 122, 90, 0.22);
-    box-shadow: none;
-  }
-}
-/* Nodo: círculo SIEMPRE opaco (tapa el hilo). Dentro, el dígito y el
-   check se cruzan; nada se sale del círculo. */
-.bv-pc__num {
-  position: relative;
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11.5px;
-  font-weight: 800;
-  background: #EBE2CD;
-  color: #fff;
-  z-index: 2;
-}
-.bv-pc__digito {
-  position: relative;
-  z-index: 1;
-  line-height: 1;
-  color: #8A7F68;
-}
-.bv-pc__tick {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 13px;
-  height: 13px;
-  color: #fff;
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.3);
-}
-.bv-slide.is-activo .bv-pc__num {
-  animation: bv-pc-num 2800ms cubic-bezier(0.34, 1.5, 0.5, 1) both;
-  animation-delay: calc(1.15s + var(--n) * 1.3s);
-}
-@keyframes bv-pc-num {
-  0%, 14%   { transform: scale(1);    background: #EBE2CD; }
-  24%       { transform: scale(1.24); background: #1512D6; }
-  40%       { transform: scale(1);    background: #1512D6; }
-  55%, 100% { transform: scale(1);    background: #4C7A5A; }
-}
-.bv-slide.is-activo .bv-pc__digito {
-  animation: bv-pc-digito 2800ms cubic-bezier(0.4, 0, 0.2, 1) both;
-  animation-delay: calc(1.15s + var(--n) * 1.3s);
-}
-@keyframes bv-pc-digito {
-  0%, 14%   { opacity: 1; color: #8A7F68; }
-  24%, 40%  { opacity: 1; color: #fff; }
-  52%, 100% { opacity: 0; color: #fff; }
-}
-.bv-slide.is-activo .bv-pc__tick {
-  animation: bv-pc-tick 2800ms cubic-bezier(0.34, 1.5, 0.5, 1) both;
-  animation-delay: calc(1.15s + var(--n) * 1.3s);
-}
-@keyframes bv-pc-tick {
-  0%, 44%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
-  56%       { opacity: 1; transform: translate(-50%, -50%) scale(1.18); }
-  66%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-}
-.bv-pc__tit {
-  flex: 1;
-  min-width: 0;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #3A342C;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.bv-slide.is-activo .bv-pc__tit {
-  animation: bv-pc-tit 2800ms cubic-bezier(0.4, 0, 0.2, 1) both;
-  animation-delay: calc(1.15s + var(--n) * 1.3s);
-}
-@keyframes bv-pc-tit {
-  0%, 14%  { opacity: 0.62; transform: translateX(0); }
-  24%      { opacity: 1; transform: translateX(2px); }
-  48%      { opacity: 0.82; transform: translateX(0); }
-  100%     { opacity: 0.82; transform: translateX(0); }
-}
-/* Chispa al terminar cada canción: un halo dorado que revienta
-   alrededor del nodo (mismo eje, por detrás del círculo). */
-.bv-pc__chispa {
-  position: absolute;
-  left: 21px;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  margin: -4px 0 0 -4px;
-  border-radius: 50%;
-  background: #F3B33F;
-  opacity: 0;
-  transform: scale(0);
-  pointer-events: none;
-  z-index: 1;
-}
-.bv-slide.is-activo .bv-pc__chispa {
-  animation: bv-pc-chispa 720ms ease-out both;
-  animation-delay: calc(1.15s + var(--n) * 1.3s + 1.35s);
-}
-@keyframes bv-pc-chispa {
-  0%   { opacity: 0; transform: scale(0); }
-  35%  { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(2.6); }
-}
-
-.bv-pc__pie {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 12px;
-  padding-top: 9px;
-  border-top: 1px dashed rgba(42, 38, 34, 0.22);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #8A7F68;
-}
-.bv-pc__pie span { opacity: 0; transform: translateY(6px); }
-.bv-slide.is-activo .bv-pc__pie span {
-  animation: bv-pc-pie 600ms cubic-bezier(0.22, 1, 0.36, 1) 9.2s both;
-}
-.bv-slide.is-activo .bv-pc__pie span:last-child { animation-delay: 9.5s; }
-@keyframes bv-pc-pie {
-  0%   { opacity: 0; transform: translateY(6px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-
-/* --- Avisos: flujo continuo. Cada aviso entra por arriba, se queda un
-   rato y se va por abajo; el desfase hace que siempre haya un par a la
-   vista y no paren de llegar. --- */
-.bv-notis {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: min(310px, 84vw);
-}
-.bv-noti {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 15px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 16px 34px -14px rgba(0, 0, 0, 0.55);
-  color: #1A1A1A;
-  opacity: 0;
-}
-.bv-slide.is-activo .bv-noti {
-  animation: bv-noti-flujo 6s infinite both;
-  animation-delay: calc(var(--n) * -2s);
-}
-/* Entra deslizándose desde arriba con un rebotito (como una notificación
-   nueva de verdad). Al salir, se desliza al lado y se va (como cuando la
-   apartas con el dedo para descartarla). --out = lado (1 der, -1 izq). */
-@keyframes bv-noti-flujo {
-  0%   { opacity: 0; transform: translate(0, -42px) rotate(0) scale(0.95);
-         animation-timing-function: cubic-bezier(0.12, 0.8, 0.25, 1); }
-  9%   { opacity: 1; transform: translate(0, 5px) rotate(0) scale(1.02);
-         animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1); }
-  15%  { opacity: 1; transform: translate(0, 0) rotate(0) scale(1);
-         animation-timing-function: linear; }
-  66%  { opacity: 1; transform: translate(0, 0) rotate(0) scale(1);
-         animation-timing-function: cubic-bezier(0.4, 0, 0.9, 0.35); }
-  74%  { opacity: 1; transform: translate(calc(var(--out, 1) * 26px), 0) rotate(0) scale(1); }
-  88%  { opacity: 0; transform: translate(calc(var(--out, 1) * 380px), -3px)
-                              rotate(calc(var(--out, 1) * 3deg)) scale(0.97); }
-  100% { opacity: 0; transform: translate(calc(var(--out, 1) * 380px), -3px)
-                              rotate(calc(var(--out, 1) * 3deg)) scale(0.97); }
-}
-.bv-noti__ic {
-  flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  overflow: hidden;
-}
-.bv-noti__ic img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.bv-noti__tx { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.bv-noti__tx b { font-size: 12px; font-weight: 700; }
-.bv-noti__tx span {
-  font-size: 12.5px;
-  color: #4A4540;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* --- Compartir: un ensayo que sale volando a WhatsApp, en bucle --- */
-.bv-compartir {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 22px;
-  width: min(300px, 80vw);
-}
-.bv-comp__card {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  width: 100%;
-  padding: 13px 15px;
-  border-radius: 15px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  color: #fff;
-}
-.bv-comp__ic {
-  flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  background: #fff;
-  color: #1E7A4E;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.bv-comp__ic svg { width: 17px; height: 17px; margin-left: 2px; }
-.bv-comp__tx { display: flex; flex-direction: column; gap: 2px; }
-.bv-comp__tx b { font-size: 14px; font-weight: 700; }
-.bv-comp__tx span { font-size: 12px; color: rgba(255, 255, 255, 0.7); }
-.bv-comp__wa {
-  position: relative;
-  width: 68px;
-  height: 68px;
-  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.4));
-}
-.bv-comp__wa > svg { width: 100%; height: 100%; }
-.bv-slide.is-activo .bv-comp__wa { animation: bv-wa-recibe 3.2s var(--curva) infinite; }
-@keyframes bv-wa-recibe {
-  0%, 62%, 100% { transform: scale(1); }
-  72% { transform: scale(1.16); }
-  82% { transform: scale(1); }
-}
-.bv-comp__check {
-  position: absolute;
-  right: -6px;
-  bottom: -4px;
-  font-size: 12px;
-  font-weight: 800;
-  color: #34B7F1;
-  background: #fff;
-  border-radius: 999px;
-  padding: 1px 4px;
-  opacity: 0;
-}
-.bv-slide.is-activo .bv-comp__check { animation: bv-wa-check 3.2s var(--curva) infinite; }
-@keyframes bv-wa-check {
-  0%, 70%, 100% { opacity: 0; transform: scale(0.5); }
-  78%, 94% { opacity: 1; transform: scale(1); }
-}
-/* El "avión" viaja de la tarjeta a WhatsApp, una y otra vez */
-.bv-comp__avion {
-  position: absolute;
-  left: 50%;
-  top: 44px;
-  margin-left: -15px;
-  color: #EAFBF0;
-  opacity: 0;
-  filter: drop-shadow(0 0 8px rgba(37, 211, 102, 0.7));
-}
-.bv-comp__avion svg { width: 30px; height: 30px; }
-.bv-slide.is-activo .bv-comp__avion { animation: bv-avion 3.2s cubic-bezier(0.4, 0, 0.5, 1) infinite; }
-@keyframes bv-avion {
-  0%   { opacity: 0; transform: translate(0, -6px) rotate(10deg) scale(0.6); }
-  16%  { opacity: 1; transform: translate(0, 4px) rotate(10deg) scale(1); }
-  58%  { opacity: 1; transform: translate(0, 62px) rotate(24deg) scale(0.7); }
-  68%, 100% { opacity: 0; transform: translate(0, 82px) rotate(28deg) scale(0.4); }
-}
-.bv-comp__contactos { display: none; }
-
-/* --- Sector 8: cierre --- */
-.bv-cae {
-  position: absolute;
-  top: -12%;
-  font-size: 22px;
-  color: rgba(255, 255, 255, 0.55);
-  animation: bv-cae var(--dur, 6s) linear var(--d, 0s) infinite;
-}
-@keyframes bv-cae {
-  0% { opacity: 0; transform: translateY(0) rotate(0deg); }
-  10% { opacity: 1; }
-  85% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(112vh) rotate(40deg); }
-}
-.bv-check {
-  display: inline-flex;
-  width: 64px;
-  height: 64px;
-  margin-bottom: 18px;
-}
-
-/* El "Feliz cumpleaños, Ama" cabe en 2 líneas, no en 3 */
-.bv-s--cierre .bv-h1 {
-  font-size: clamp(24px, 6.6vw, 31px);
-  line-height: 1.16;
-  letter-spacing: -0.025em;
-}
-.bv-s--cierre .bv-sub { font-size: clamp(14px, 4vw, 16px); }
-/* Resplandor del marco al llegar al cierre + destello. Antes era un SVG con
-   3 trazos a pantalla completa, cada uno con `drop-shadow` y animando
-   `stroke-dashoffset`: el WebView re-rasterizaba TODA la pantalla a través
-   de un filtro en cada frame → la transición al último sector se atascaba
-   muchísimo. Ahora es SOLO opacidad (el resplandor es un `box-shadow`
-   estático que se enciende, y el destello un degradado que aparece y se
-   va). Cero filtros, cero transform: todo en el compositor. */
-.bv-luz {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  z-index: 40;
-  pointer-events: none;
-  opacity: 0;
-  /* Marco luminoso en el cierre: los CUATRO bordes brillan. SOLO degradados
-     lineales (rasterizan al instante) + un rim fino. SIN `box-shadow` inset
-     con blur — esa convolución a pantalla completa era lo que hacía que el
-     "encendido" del marco no fuera fluido en el primer frame. Los degradados
-     de arriba/abajo van un poco más anchos para dar el "bloom" interior. */
-  border: 1px solid rgba(214, 226, 255, 0.42);
-  background:
-    linear-gradient(180deg, rgba(180, 202, 255, 0.62) 0%, rgba(180, 202, 255, 0.12) 9%, rgba(180, 202, 255, 0) 26%),
-    linear-gradient(0deg,   rgba(180, 202, 255, 0.62) 0%, rgba(180, 202, 255, 0.12) 9%, rgba(180, 202, 255, 0) 26%),
-    linear-gradient(90deg,  rgba(180, 202, 255, 0.5) 0%, rgba(180, 202, 255, 0) 13%),
-    linear-gradient(270deg, rgba(180, 202, 255, 0.5) 0%, rgba(180, 202, 255, 0) 13%);
-}
-/* Un frame antes de encender el marco lo dejamos ya en su propia capa y
-   RASTERIZADO (opacidad casi nula) → cuando arranca el `bv-luz-marco` solo
-   se compone, sin pintar nada de golpe. */
-.bv.bv--precierre:not(.bv--cierre) .bv-luz { opacity: 0.02; }
-.bv.bv--precierre .bv-luz { will-change: opacity; }
-.bv.bv--cierre .bv-luz {
-  /* Se encienden con un fundido MUY suave (1,3 s, ease puro) hasta 0,72 y
-     desde ahí brillan MÁS y MENOS sin parar. CLAVE: `bv-luz-late` empieza y
-     termina en 0,72 (= donde acaba `bv-luz-marco`) → no hay salto entre las
-     dos animaciones, que era lo que hacía rara la "primera toma de contacto". */
-  animation:
-    bv-luz-marco 1400ms cubic-bezier(0.45, 0, 0.55, 1) both,
-    bv-luz-late 5000ms ease-in-out 1400ms infinite;
-}
-
-/* El destello blanco a pantalla completa (`.bv-luz__rayo`) se quitó: era otra
-   capa a pantalla completa que se encendía en el cierre y sumaba al tirón.
-   El marco luminoso ya da suficiente sensación de "cierre". */
-.bv-luz__rayo { display: none; }
-
-@keyframes bv-luz-marco {
-  0%   { opacity: 0; }
-  100% { opacity: 0.72; }
-}
-@keyframes bv-luz-late {
-  0%, 100% { opacity: 0.72; }
-  50%      { opacity: 0.44; }
-}
-
-.bv--sin-motion .bv-luz { animation: none !important; opacity: 0.4; }
-.bv--sin-motion .bv-luz__rayo { animation: none !important; opacity: 0; }
-
-.bv-check svg { width: 100%; height: 100%; fill: none; stroke: #fff; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
-.bv-check circle { stroke-dasharray: 151; stroke-dashoffset: 151; animation: bv-draw 620ms var(--curva) 200ms forwards; }
-.bv-check path { stroke-dasharray: 40; stroke-dashoffset: 40; animation: bv-draw 420ms var(--curva) 640ms forwards; }
-
-/* --- Pantalla de bloqueo: la notificación del reproductor, botón a botón ---
-   Ciclo de 10 s: 5 botones, 2 s por botón. Cada botón lleva --n (0..4) y
-   arranca su animación con un desfase negativo -> el "foco" recorre los
-   controles en bucle. */
-.bv-s--lock .bv-decor { overflow: visible; }
-.bv-lock {
-  position: relative;
-  width: min(322px, 87vw);
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-}
-.bv-lock__pull {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  color: rgba(255, 255, 255, 0.42);
-}
-.bv-lock__pull i { width: 34px; height: 4px; border-radius: 999px; background: currentColor; }
-.bv-lock__pull svg { width: 15px; height: 15px; display: block; }
-.bv-slide.is-activo .bv-lock__pull { animation: bv-lk-pull 10s ease-in-out infinite; }
-@keyframes bv-lk-pull {
-  0%, 84%, 100% { transform: translateY(0); opacity: 0.42; }
-  90%           { transform: translateY(5px); opacity: 0.8; }
-}
-.bv-lock__top {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  color: rgba(255, 255, 255, 0.72);
-}
-.bv-lock__lock svg { width: 14px; height: 14px; display: block; }
-.bv-lock__hora { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
-.bv-lock__card {
-  border-radius: 20px;
-  padding: 15px 15px 17px;
-  background: linear-gradient(158deg, #2422E4 0%, #1512D6 55%, #100CA8 100%);
-  /* Sombra más contenida (antes 48 px de blur): al arrancar el sector, el
-     WebView promovía esta tarjeta a capa y rasterizaba la sombra grande de
-     golpe → un parpadeo al entrar. Además ya NO flota (`bv-lk-bob` fuera):
-     así no se promueve a capa y la sombra se pinta una sola vez. */
-  box-shadow: 0 14px 26px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  color: #fff;
-}
-.bv-lock__cab { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
-.bv-lock__ic { flex: none; width: 34px; height: 34px; border-radius: 9px; overflow: hidden; }
-.bv-lock__ic img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.bv-lock__meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.bv-lock__meta b { font-size: 14px; font-weight: 700; }
-.bv-lock__meta span {
-  font-size: 12px; color: rgba(255, 255, 255, 0.62);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.bv-lock__barra { position: relative; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); container-type: inline-size; }
-/* La barra de progreso del lock: ANTES animaba `width` y `left` (layout en
-   cada frame durante 11 s → parpadeo al entrar al sector). Ahora solo
-   `transform` (scaleX + translateX en `cqw` = % del ancho de la barra). */
-.bv-lock__fill {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 100%;
-  border-radius: 999px; background: #fff;
-  transform-origin: left center;
-  transform: scaleX(0.07);
-}
-.bv-lock__thumb {
-  position: absolute; top: 50%; left: 0;
-  width: 11px; height: 11px; border-radius: 999px; background: #fff;
-  transform: translate(-50%, -50%) translateX(7cqw);
-  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.4);
-}
-.bv-slide.is-activo .bv-lock__fill { animation: bv-lk-fill 11s linear infinite; }
-.bv-slide.is-activo .bv-lock__thumb { animation: bv-lk-thumb 11s linear infinite; }
-@keyframes bv-lk-fill { 0% { transform: scaleX(0.07); } 100% { transform: scaleX(0.68); } }
-@keyframes bv-lk-thumb {
-  0%   { transform: translate(-50%, -50%) translateX(7cqw); }
-  100% { transform: translate(-50%, -50%) translateX(68cqw); }
-}
-.bv-lock__times {
-  display: flex; justify-content: space-between; margin-top: 7px;
-  font-size: 11px; color: rgba(255, 255, 255, 0.55); font-variant-numeric: tabular-nums;
-}
-.bv-lock__ctrl { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
-.bv-lk__b {
-  position: relative;
-  width: 40px; height: 40px; border-radius: 999px;
-  display: inline-flex; align-items: center; justify-content: center;
-  color: #fff; flex: none;
-}
-.bv-lk__b::before {
-  content: ""; position: absolute; inset: 0; border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18); transform: scale(0.4); opacity: 0;
-}
-.bv-slide.is-activo .bv-lk__b::before {
-  animation: bv-lk-halo 10s ease-in-out infinite;
-  animation-delay: calc(var(--n) * -2s);
-}
-@keyframes bv-lk-halo {
-  0%        { opacity: 0; transform: scale(0.4); }
-  4%        { opacity: 1; transform: scale(1); }
-  14%       { opacity: 1; transform: scale(1); }
-  22%, 100% { opacity: 0; transform: scale(1.18); }
-}
-.bv-slide.is-activo .bv-lk__b {
-  animation: bv-lk-press 10s ease-in-out infinite;
-  animation-delay: calc(var(--n) * -2s);
-}
-@keyframes bv-lk-press {
-  0%, 3%    { transform: scale(1); }
-  8%        { transform: scale(0.84); }
-  17%, 100% { transform: scale(1); }
-}
-.bv-lk__b svg { width: 21px; height: 21px; display: block; }
-.bv-lk__b--play { width: 46px; height: 46px; background: rgba(255, 255, 255, 0.14); }
-.bv-lk__b--play svg { width: 23px; height: 23px; }
-.bv-lk__i { position: absolute; }
-.bv-lk__b--play .bv-lk__i--play { opacity: 0; }
-.bv-slide.is-activo .bv-lk__b--play .bv-lk__i--pause { animation: bv-lk-pause 10s ease infinite; animation-delay: calc(var(--n) * -2s); }
-.bv-slide.is-activo .bv-lk__b--play .bv-lk__i--play  { animation: bv-lk-play  10s ease infinite; animation-delay: calc(var(--n) * -2s); }
-@keyframes bv-lk-pause { 0%, 6% { opacity: 1; transform: scale(1); } 11%, 15% { opacity: 0; transform: scale(0.5); } 20%, 100% { opacity: 1; transform: scale(1); } }
-@keyframes bv-lk-play  { 0%, 6% { opacity: 0; transform: scale(0.5); } 11%, 15% { opacity: 1; transform: scale(1); } 20%, 100% { opacity: 0; transform: scale(0.5); } }
-/* Velocidad: 1x <-> 1.25x */
-.bv-lk__vel { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 20px; font-size: 12.5px; font-weight: 800; font-style: normal; }
-.bv-lk__vel i { font-style: normal; white-space: nowrap; }
-.bv-lk__vel i + i { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 11px; opacity: 0; }
-.bv-slide.is-activo .bv-lk__vel i:first-child { animation: bv-lk-vela 10s ease infinite; }
-.bv-slide.is-activo .bv-lk__vel i:last-child  { animation: bv-lk-velb 10s ease infinite; }
-@keyframes bv-lk-vela { 0%, 7% { opacity: 1; } 11%, 19% { opacity: 0; } 23%, 100% { opacity: 1; } }
-@keyframes bv-lk-velb { 0%, 7% { opacity: 0; } 11%, 19% { opacity: 1; } 23%, 100% { opacity: 0; } }
-/* Repetir: se enciende con su puntito */
-.bv-lk__dot {
-  position: absolute; bottom: 4px; left: 50%;
-  width: 4px; height: 4px; border-radius: 999px; background: #7CF3C6;
-  transform: translateX(-50%) scale(0);
-}
-.bv-slide.is-activo .bv-lk__b--loop .bv-lk__dot { animation: bv-lk-dot 10s ease infinite; animation-delay: calc(var(--n) * -2s); }
-@keyframes bv-lk-dot { 0%, 8% { transform: translateX(-50%) scale(0); } 15% { transform: translateX(-50%) scale(1.5); } 21%, 100% { transform: translateX(-50%) scale(1); } }
-.bv-slide.is-activo .bv-lk__b--loop svg { animation: bv-lk-spin 10s ease infinite; animation-delay: calc(var(--n) * -2s); }
-@keyframes bv-lk-spin { 0%, 8% { transform: rotate(0); } 24%, 100% { transform: rotate(360deg); } }
-
-.bv--sin-motion .bv-lock__pull,
-.bv--sin-motion .bv-lock__card,
-.bv--sin-motion .bv-lock__fill,
-.bv--sin-motion .bv-lock__thumb,
-.bv--sin-motion .bv-lk__b,
-.bv--sin-motion .bv-lk__b::before,
-.bv--sin-motion .bv-lk__i,
-.bv--sin-motion .bv-lk__vel i,
-.bv--sin-motion .bv-lk__b--loop svg,
-.bv--sin-motion .bv-lk__dot { animation: none !important; }
-.bv--sin-motion .bv-lk__b--play .bv-lk__i--play { opacity: 0 !important; }
-.bv--sin-motion .bv-lk__b--play .bv-lk__i--pause { opacity: 1 !important; }
-.bv--sin-motion .bv-lk__vel i:last-child { opacity: 0 !important; }
-.bv--sin-motion .bv-lk__dot { transform: translateX(-50%) scale(1) !important; }
-
-/* ============================================================
-   Sector Estados: Pendiente -> En progreso -> Aprendida
-   Tres tarjetas desfasadas 1/3 de ciclo: siempre se ven los
-   tres estados a la vez y avanzando. Al tocar "Aprendida":
-   el aro se cierra, el check se dibuja y salta una celebración.
-   ============================================================ */
-.bv-est {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: min(320px, 84vw);
-}
-.bv-est__card {
-  --d: calc(var(--n) * -3s);
-  --brillo: 0 0 0 rgba(124, 243, 198, 0);
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  padding: 13px 15px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #fff;
-  will-change: transform;
-}
-.bv-slide.bv-s--estados.is-activo .bv-est {
-  animation: bv-est-in 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-@keyframes bv-est-in {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.bv-slide.bv-s--estados.is-activo .bv-est__card {
-  animation: bv-est-card 9s cubic-bezier(0.4, 0, 0.2, 1) var(--d) infinite;
-}
-@keyframes bv-est-card {
-  0%, 12%   { transform: translateY(0) scale(1);
-              box-shadow: 0 10px 24px -16px rgba(0, 0, 0, 0.5); }
-  46%       { transform: translateY(-7px) scale(1.045);
-              box-shadow: 0 20px 44px -14px rgba(52, 214, 150, 0.55),
-                          0 0 0 1px rgba(124, 243, 198, 0.5); }
-  54%, 80%  { transform: translateY(-3px) scale(1.02);
-              box-shadow: 0 16px 34px -16px rgba(52, 214, 150, 0.4),
-                          0 0 0 1px rgba(124, 243, 198, 0.22); }
-  92%, 100% { transform: translateY(0) scale(1);
-              box-shadow: 0 10px 24px -16px rgba(0, 0, 0, 0.5); }
-}
-
-/* Icono: aro de progreso + nota + check */
-.bv-est__ico {
-  position: relative;
-  flex: none;
-  width: 42px;
-  height: 42px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.bv-est__ring { position: absolute; inset: 0; transform: rotate(-90deg); overflow: visible; }
-.bv-est__ring-bg { fill: none; stroke: rgba(255, 255, 255, 0.18); stroke-width: 3; }
-.bv-est__ring-fg {
-  fill: none;
-  stroke: #FFCE6B;
-  stroke-width: 3.4;
-  stroke-linecap: round;
-  stroke-dasharray: 100;
-  stroke-dashoffset: 100;
-  filter: drop-shadow(0 0 5px rgba(255, 206, 107, 0.7));
-}
-.bv-slide.bv-s--estados.is-activo .bv-est__ring-fg {
-  animation: bv-est-ring 9s cubic-bezier(0.4, 0, 0.2, 1) var(--d) infinite;
-}
-@keyframes bv-est-ring {
-  0%, 12%   { stroke-dashoffset: 100; stroke: #FFCE6B; }
-  44%       { stroke-dashoffset: 34;  stroke: #FFCE6B; }
-  50%       { stroke-dashoffset: 0;   stroke: #5CE6A0;
-              filter: drop-shadow(0 0 9px rgba(92, 230, 160, 0.95)); }
-  80%       { stroke-dashoffset: 0;   stroke: #5CE6A0; }
-  90%, 100% { stroke-dashoffset: 100; stroke: #FFCE6B; }
-}
-.bv-est__nota {
-  font-style: normal;
-  font-size: 17px;
-  color: rgba(255, 255, 255, 0.92);
-}
-.bv-slide.bv-s--estados.is-activo .bv-est__nota {
-  animation: bv-est-nota 9s ease var(--d) infinite;
-}
-@keyframes bv-est-nota {
-  0%, 42%   { opacity: 1; transform: scale(1); }
-  47%, 82%  { opacity: 0; transform: scale(0.4); }
-  88%, 100% { opacity: 1; transform: scale(1); }
-}
-.bv-est__check {
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  color: #7CF3C6;
-  opacity: 0;
-  stroke-dasharray: 34;
-  stroke-dashoffset: 34;
-}
-.bv-slide.bv-s--estados.is-activo .bv-est__check {
-  animation: bv-est-check 9s cubic-bezier(0.34, 1.6, 0.5, 1) var(--d) infinite;
-}
-@keyframes bv-est-check {
-  0%, 45%  { opacity: 0; stroke-dashoffset: 34; transform: scale(0.3); }
-  50%      { opacity: 1; stroke-dashoffset: 0;  transform: scale(1.25); }
-  56%, 80% { opacity: 1; stroke-dashoffset: 0;  transform: scale(1); }
-  86%, 100% { opacity: 0; stroke-dashoffset: 34; transform: scale(0.3); }
-}
-
-/* Texto + chip de estado */
-.bv-est__tx { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.bv-est__tx b {
-  font-size: 14.5px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.bv-est__chip {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  height: 21px;
-  padding: 0 10px 0 8px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  color: #fff;
-  background: rgba(154, 148, 144, 0.55);
-  max-width: 100%;
-}
-.bv-slide.bv-s--estados.is-activo .bv-est__chip {
-  animation: bv-est-chip 9s cubic-bezier(0.4, 0, 0.2, 1) var(--d) infinite;
-}
-@keyframes bv-est-chip {
-  0%, 10%   { background: rgba(154, 148, 144, 0.55); }
-  16%, 44%  { background: rgba(201, 138, 46, 0.92); }
-  50%, 82%  { background: rgba(52, 170, 116, 0.95); }
-  90%, 100% { background: rgba(154, 148, 144, 0.55); }
-}
-.bv-est__dot {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: #fff;
-}
-.bv-slide.bv-s--estados.is-activo .bv-est__dot {
-  animation: bv-est-dot 9s ease var(--d) infinite;
-}
-@keyframes bv-est-dot {
-  0%, 8%   { transform: scale(1); opacity: 0.9; }
-  13%      { transform: scale(1.9); opacity: 1; }
-  18%, 44% { transform: scale(1); opacity: 0.9; }
-  48%      { transform: scale(2.1); opacity: 1; }
-  54%, 100% { transform: scale(1); opacity: 0.9; }
-}
-.bv-est__labs { display: inline-grid; }
-.bv-est__labs > .bv-est__lab { grid-area: 1 / 1; }
-.bv-est__lab {
-  white-space: nowrap;
-  opacity: 0;
-}
-.bv-slide.bv-s--estados.is-activo .bv-est__lab--pend { animation: bv-est-lp 9s ease var(--d) infinite; }
-.bv-slide.bv-s--estados.is-activo .bv-est__lab--prog { animation: bv-est-lg 9s ease var(--d) infinite; }
-.bv-slide.bv-s--estados.is-activo .bv-est__lab--aprd { animation: bv-est-la 9s ease var(--d) infinite; }
-@keyframes bv-est-lp { 0%, 9% { opacity: 1; } 13%, 87% { opacity: 0; } 92%, 100% { opacity: 1; } }
-@keyframes bv-est-lg { 0%, 12% { opacity: 0; } 17%, 45% { opacity: 1; } 49%, 100% { opacity: 0; } }
-@keyframes bv-est-la { 0%, 47% { opacity: 0; } 52%, 83% { opacity: 1; } 88%, 100% { opacity: 0; } }
-
-/* Celebración: chispas que salen del icono al llegar a Aprendida */
-.bv-est__chispas {
-  position: absolute;
-  left: 15px;
-  top: 50%;
-  width: 42px;
-  height: 42px;
-  margin-top: -21px;
-  pointer-events: none;
-}
-.bv-est__chispa {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 5px;
-  height: 5px;
-  margin: -2.5px;
-  border-radius: 999px;
-  background: #7CF3C6;
-  opacity: 0;
-  box-shadow: 0 0 6px rgba(124, 243, 198, 0.9);
-}
-.bv-slide.bv-s--estados.is-activo .bv-est__chispa {
-  animation: bv-est-chispa 9s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d) infinite;
-}
-@keyframes bv-est-chispa {
-  0%, 46%  { opacity: 0; transform: rotate(calc(var(--a) * 72deg)) translateY(0) scale(0.2); }
-  50%      { opacity: 1; transform: rotate(calc(var(--a) * 72deg)) translateY(-12px) scale(1); }
-  60%      { opacity: 0; transform: rotate(calc(var(--a) * 72deg)) translateY(-30px) scale(0.4); }
-  100%     { opacity: 0; transform: rotate(calc(var(--a) * 72deg)) translateY(-30px) scale(0.4); }
-}
-
-/* Sin movimiento: cada tarjeta se queda en un estado fijo (los tres a la vez) */
-.bv--sin-motion .bv-est,
-.bv--sin-motion .bv-est__card,
-.bv--sin-motion .bv-est__ring-fg,
-.bv--sin-motion .bv-est__nota,
-.bv--sin-motion .bv-est__check,
-.bv--sin-motion .bv-est__chip,
-.bv--sin-motion .bv-est__dot,
-.bv--sin-motion .bv-est__lab,
-.bv--sin-motion .bv-est__chispa { animation: none !important; transform: none !important; }
-.bv--sin-motion .bv-est__chispa { display: none; }
-.bv--sin-motion .bv-est__lab { position: static; opacity: 0; }
-.bv--sin-motion .bv-est__card:nth-child(1) .bv-est__lab--pend,
-.bv--sin-motion .bv-est__card:nth-child(2) .bv-est__lab--prog,
-.bv--sin-motion .bv-est__card:nth-child(3) .bv-est__lab--aprd { opacity: 1; }
-.bv--sin-motion .bv-est__card:nth-child(2) .bv-est__chip { background: rgba(201, 138, 46, 0.92); }
-.bv--sin-motion .bv-est__card:nth-child(3) .bv-est__chip { background: rgba(52, 170, 116, 0.95); }
-.bv--sin-motion .bv-est__card:nth-child(1) .bv-est__ring-fg { stroke-dashoffset: 100; }
-.bv--sin-motion .bv-est__card:nth-child(2) .bv-est__ring-fg { stroke-dashoffset: 40; }
-.bv--sin-motion .bv-est__card:nth-child(3) .bv-est__ring-fg { stroke-dashoffset: 0; stroke: #5CE6A0; }
-.bv--sin-motion .bv-est__card:nth-child(3) .bv-est__nota { opacity: 0; }
-.bv--sin-motion .bv-est__card:nth-child(3) .bv-est__check { opacity: 1; stroke-dashoffset: 0; }
-
-/* --- Accesibilidad: sin movimiento --- */
-.bv--sin-motion .bv-slide { transition: opacity 140ms linear; transform: none !important; }
-.bv--sin-motion .bv-slide.is-ent-der,
-.bv--sin-motion .bv-slide.is-ent-izq,
-.bv--sin-motion .bv-slide.is-sal-izq,
-.bv--sin-motion .bv-slide.is-sal-der { transform: none !important; }
-.bv--sin-motion .bv-fondo { transition: opacity 160ms linear; }
-.bv--sin-motion.bv--pulso { animation: none; }
-.bv--sin-motion.bv--pulso::after { animation: bv-flash 260ms linear both; }
-.bv--sin-motion .bv-flota,
-.bv--sin-motion .bv-cae,
-.bv--sin-motion .bv-ring,
-.bv--sin-motion .bv-mic__btn,
-.bv--sin-motion .bv-celda,
-.bv--sin-motion .bv-celda.is-hoy,
-.bv--sin-motion .bv-luna,
-.bv--sin-motion .bv-cancion,
-.bv--sin-motion .bv-agrupa__caja,
-.bv--sin-motion .bv-medalla,
-.bv--sin-motion .bv-celda.is-concierto,
-.bv--sin-motion .bv-chincheta,
-.bv--sin-motion .bv-polaroid__foto,
-.bv--sin-motion .bv-polaroid__revela,
-.bv--sin-motion .bv-notis,
-.bv--sin-motion .bv-comp__wa,
-.bv--sin-motion .bv-comp__avion,
-.bv--sin-motion .bv-comp__check,
-.bv--sin-motion .bv-piano i,
-.bv--sin-motion .bv-vel span,
-.bv--sin-motion .bv-ia__estrella svg,
-.bv--sin-motion .bv-ia__linea i,
-.bv--sin-motion .bv-ia__etq--src,
-.bv--sin-motion .bv-ia__etq--fon,
-.bv--sin-motion .bv-ia__etq--tra,
-.bv--sin-motion .bv-gem-tx,
-.bv--sin-motion .bv-iac__rayo,
-.bv--sin-motion .bv-memo__hueco i,
-.bv--sin-motion .bv-memo__hueco::after,
-.bv--sin-motion .bv-memo__hueco::before,
-.bv--sin-motion .bv-memo__nota,
-.bv--sin-motion .bv-nube__svg,
-.bv--sin-motion .bv-nube__check,
-.bv--sin-motion .bv-nube__item { animation: none !important; }
-.bv--sin-motion .bv-nube__check { opacity: 1 !important; transform: none !important; }
-.bv--sin-motion .bv-nube__item { opacity: 0 !important; }
-.bv--sin-motion .bv-memo__hueco i { opacity: 1 !important; transform: none !important; filter: none !important; }
-.bv--sin-motion .bv-memo__hueco::after { background: rgba(160, 205, 255, 0.8) !important; }
-.bv--sin-motion .bv-memo__nota { opacity: 1 !important; transform: none !important; }
-.bv--sin-motion .bv-ia__linea i {
-  opacity: 1 !important; transform: none !important; filter: none !important;
-}
-.bv--sin-motion .bv-ia__salida { height: auto; }
-.bv--sin-motion .bv-ia__linea--fon { display: none; }
-.bv--sin-motion .bv-ia__linea--es { position: static; }
-.bv--sin-motion .bv-ia__etq--fon { display: none; }
-.bv--sin-motion .bv-ia__etq--tra { position: static; opacity: 1 !important; }
-.bv--sin-motion .bv-ia__pulso,
-.bv--sin-motion .bv-ia__scan { display: none; }
-.bv--sin-motion .bv-iac__rayo { opacity: 1 !important; transform: none !important; }
-.bv--sin-motion .bv-ll__aura,
-.bv--sin-motion .bv-ll__glow,
-.bv--sin-motion .bv-ll__beam,
-.bv--sin-motion .bv-ll__dust,
-.bv--sin-motion .bv-ll__pila,
-.bv--sin-motion .bv-ll__linea,
-.bv--sin-motion .bv-ll__w,
-.bv--sin-motion .bv-ll__w::after,
-.bv--sin-motion .bv-ll__spark,
-.bv--sin-motion .bv-ll__wave,
-.bv--sin-motion .bv-ll__clip,
-.bv--sin-motion .bv-ll__playhead,
-.bv--sin-motion .bv-ll__playdot,
-.bv--sin-motion .bv-ll__gem svg { animation: none !important; }
-.bv--sin-motion .bv-ll__aura { opacity: 0.4; transform: translate(-50%, -50%); }
-.bv--sin-motion .bv-ll__glow { opacity: 0.7; transform: translate(-50%, -50%); }
-.bv--sin-motion .bv-ll__beam { opacity: 0; }
-.bv--sin-motion .bv-ll__linea { opacity: 0; transform: none; filter: none; }
-.bv--sin-motion .bv-ll__linea:nth-child(2) { opacity: 0.22; transform: translateY(calc(var(--lh) * -1)); }
-.bv--sin-motion .bv-ll__linea:nth-child(3) { opacity: 1; transform: none; }
-.bv--sin-motion .bv-ll__linea:nth-child(4) { opacity: 0.22; transform: translateY(var(--lh)); }
-.bv--sin-motion .bv-ll__w { background-position: 100% 0; transform: none; filter: none; }
-.bv--sin-motion .bv-ll__linea:nth-child(3) .bv-ll__w { background-position: 0 0; }
-.bv--sin-motion .bv-ll__clip { width: 46%; }
-.bv--sin-motion .bv-ll__playhead { left: 46%; }
-.bv--sin-motion .bv-comp__avion { display: none; }
-.bv--sin-motion .bv-comp__check { opacity: 1 !important; }
-.bv--sin-motion .bv-polaroid__revela { opacity: 0 !important; }
-.bv--sin-motion .bv-polaroid__foto { filter: none !important; }
-.bv--sin-motion .bv-chincheta { opacity: 1 !important; transform: translateX(-50%) !important; }
-.bv--sin-motion .bv-slide.is-activo .bv-in > *,
-.bv--sin-motion .bv-slide.is-activo .bv-chip,
-.bv--sin-motion .bv-slide.is-activo .bv-celda,
-.bv--sin-motion .bv-slide.is-activo .bv-fases li,
-.bv--sin-motion .bv-slide.is-activo .bv-cancion,
-.bv--sin-motion .bv-slide.is-activo .bv-medalla,
-.bv--sin-motion .bv-slide.is-activo .bv-polaroid,
-.bv--sin-motion .bv-slide.is-activo .bv-polaroid__pie,
-.bv--sin-motion .bv-slide.is-activo .bv-noti,
-.bv--sin-motion .bv-slide.is-activo .bv-barras i {
-  animation: none !important;
-  opacity: 1 !important;
-  transform: none !important;
-}
-.bv--sin-motion .bv-pc__hoja,
-.bv--sin-motion .bv-pc__hoja::after,
-.bv--sin-motion .bv-pc__hilo::before,
-.bv--sin-motion .bv-pc__luz,
-.bv--sin-motion .bv-pc__fila,
-.bv--sin-motion .bv-pc__num,
-.bv--sin-motion .bv-pc__digito,
-.bv--sin-motion .bv-pc__tick,
-.bv--sin-motion .bv-pc__tit,
-.bv--sin-motion .bv-pc__chispa,
-.bv--sin-motion .bv-pc__pie span { animation: none !important; }
-.bv--sin-motion .bv-pc__hoja { opacity: 1 !important; transform: none !important; }
-.bv--sin-motion .bv-pc__fila { opacity: 1 !important; transform: none !important;
-  background: rgba(76, 122, 90, 0.10); border-color: rgba(76, 122, 90, 0.22); }
-.bv--sin-motion .bv-pc__num { transform: none !important; background: #EBE2CD; }
-.bv--sin-motion .bv-pc__digito { opacity: 1 !important; color: #8A7F68; }
-.bv--sin-motion .bv-pc__tick { opacity: 0 !important; }
-.bv--sin-motion .bv-pc__tit { opacity: 1 !important; transform: none !important; }
-.bv--sin-motion .bv-pc__luz, .bv--sin-motion .bv-pc__chispa { display: none; }
-.bv--sin-motion .bv-pc__hilo::before { transform: scaleY(1) !important; }
-.bv--sin-motion .bv-pc__pie span { opacity: 1 !important; transform: none !important; }
-/* Sin movimiento: las tarjetas de fondo se muestran ya en su sitio,
-   quietas, y la hoja sin ladear. */
-.bv--sin-motion .bv-pc__fantasma {
-  animation: none !important;
-  opacity: 1;
-}
-.bv--sin-motion .bv-pc__fantasma:nth-child(1) {
-  transform: translate(26px, 8px) rotate(2deg);
-}
-.bv--sin-motion .bv-pc__fantasma:nth-child(2) {
-  transform: translate(54px, 15px) rotate(3.4deg);
-}
-.bv--sin-motion .bv-pc__hoja { transform: translate(-8px, -3px) rotate(-3.5deg) !important; }
-
-.bv--sin-motion .bv-firma__tx { animation: none !important; clip-path: none !important; }
-.bv--sin-motion .bv-firma__pluma { display: none; }
-.bv--sin-motion .bv-agrupa__caja { opacity: 1 !important; transform: none !important; }
-.bv--sin-motion .bv-chip { background: rgba(255,255,255,0.18) !important; color: #fff !important; }
-.bv--sin-motion .bv-cascos,
-.bv--sin-motion .bv-logo-chip { animation: none !important; }
-.bv--sin-motion .bv-s--cierre .bv-cta { animation: none !important; transform: none !important; }
-.bv--sin-motion .bv-gate { transition: opacity 140ms linear; }
-.bv--sin-motion .bv-gate.is-ido { transform: none; }
-.bv--sin-motion.bv--entrando-app {
-  transition: opacity 200ms linear;
-  transform: none;
-  filter: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  body.bv-aterriza #vista { animation: none !important; }
-}
-.bv--sin-motion .bv-celda:nth-child(-n+8) { background: #fff; }
-.bv--sin-motion .bv-fases li .bv-fase__c,
-.bv--sin-motion .bv-fases li .bv-fase__c svg { animation: none !important; opacity: 1 !important; transform: none !important; }
-.bv--sin-motion .bv-arte * { stroke-dashoffset: 0 !important; animation: none !important; opacity: 1 !important; }
-.bv--sin-motion .bv-arte--corazon { animation: none !important; }
-.bv--sin-motion .bv-check circle,
-.bv--sin-motion .bv-check path { stroke-dashoffset: 0; animation: none; }
-.bv--sin-motion .bv-confirm { transition: opacity 120ms linear; }
-.bv--sin-motion .bv-confirm__caja { transition: none; transform: none; }
-.bv--sin-motion .bv-barras i { transform: scaleY(0.85) !important; }
-
-/* Bienvenida — retoques */
-.bv-luna {
-  position: absolute;
-  top: 6%;
-  right: 14%;
-  width: 128px;
-  height: 128px;
-  fill: rgba(255, 255, 255, 0.09);
-  animation: bv-bob 6s ease-in-out infinite;
-}
-@keyframes bv-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(12px); } }
-.bv-eq--card { height: 26px; opacity: 0.9; }
-.bv--sin-motion .bv-luna { animation: none; }
 
 /* ============================================================
    OTA — tarjeta de "hay novedades" (js/ota.js).
